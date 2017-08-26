@@ -1,0 +1,46 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+
+#########################################################################################
+#
+#  iiwi-2.0 general ph2 query
+#
+#  Teeple April 2009
+#
+#  
+#########################################################################################
+#. /apps/sybase/local/etc/sybase_env.sh
+# sqsh -U qso_neo -P op2qsoneo -S CFHT -D ph2
+#sp_help
+#go
+#
+# RETURNS:
+#    runid, og_label, target_label, target_name, ra, dec, equinox
+
+if {[llength $argv] < 1} {
+   puts "wirph2db: send a direct query to the ph2 database."
+   exit 1
+}
+source /cfht/lib/syblib
+set usr "qso_neo"
+set pass "op2qsoneo"
+#set dbname [exec ssGet /d/host]
+set dbname "pono"
+#set runid [lindex $argv 0]
+#set og 1
+#set query "select f.label, t.name, f.req_ra, f.req_dec, f.req_equinox from prg p, target_f f, target t, ob b, obseq s, ogroup g where p.runid='$runid' and g.label=1 and t.prg_id=p.id and f.id=t.id and b.tar_id=t.id and b.id=s.ob_id and s.ogr_id=g.id and f.is_deleted=0 and t.is_deleted=0 and b.is_deleted=0 and s.is_deleted=0 and g.is_deleted=0"
+set query [lindex $argv 0]
+set db [sybconnect $usr $pass $dbname ph2]
+sybuse $db  ph2
+if [catch {sybsql $db $query} msg] {
+	puts $sybmsg(msgtext)
+	exit 1
+}
+sybnext $db {
+	puts @0
+}
+catch {close $db}
+
+exit

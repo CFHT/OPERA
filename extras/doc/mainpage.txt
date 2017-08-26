@@ -1,0 +1,183 @@
+/*! \mainpage Opera-1.0
+ *\section intro_sec Introduction
+OPERA (Open-source Pipeline for Espadons Reduction and Analysis) is an open-source collaborative software reduction 
+pipeline for ESPaDOnS data. ESPaDOnS is a bench-mounted high-resolution echelle spectrograph and spectro-polarimeter 
+which was designed to obtain a complete optical spectrum (from 370 to 1,050 nm) in a single exposure with a mode-dependent 
+resolving power between 68,000 and 81,000. Each exposure contains 40 orders which are curved; the image produced by the
+slicer (pseudo-slit) has a shape which is tilted with respect to rows.
+
+All source code and documentation is maintained on SourceForge at this URL:
+http://sourceforge.net/projects/opera-pipeline/
+
+This document does not cover detailed design issues such as algorithms or data structures. It describes the scientific and operational tasks to be performed by OPERA at the level of basic functionality. It also documents a list of modules anticipated to participate in the CFHT Core Pipeline, with module inputs and outputs. This document introduces a number of software libraries including functions anticipated to be included each library. Each function's inputs and outputs are given. This document also lists command line tools anticipated to be built for OPERA with inputs and outputs. Finally this document introduces some of the infrastructure which will need to be created to support OPERA. A follow-on OPERA Design Document will be produced with these details in approximately six months after acceptance of this preliminary design document.
+Readers should refer to prior OPERA documents in order to understand the level of detail presented here. 
+These documents are: 
+	- <a href=http://opera.cfht.hawaii.edu/Opera/doc/OPERA_conceptual_design.pdf>OPERA Conceptual Design</a>, which introduces the module, harness and library concepts, 
+	- <a href=http://opera.cfht.hawaii.edu/Opera/doc/OPERA_SCOPE.pdf>OPERA Scope</a>, which determines what the Core OPERA will perform and not perform as a pipeline for spectroscopy, 
+	- <a href=http://opera.cfht.hawaii.edu/Opera/doc/OPERA_OperationalAndTechnicalRequirements.pdf>OPERA Operational Technical and Scientific Requirements</a> document, which outlines what is required of the pipeline.
+
+We will now briefly introduce each of these concepts within the context of the OPERA Core.
+ *
+ *\section harness Harness
+ *
+The requirements document states that the harness shall control execution of the modules, access parameter and configuration data from the parameter and configuration access layer, and support abort-ability and restartability.
+The requirements document states that the harness also shall support parallel execution of modules on a single or multiple machines and to support multiple simultaneous executions of the pipeline.
+The harness shall be flexible in order to permit easy integration of new modules and adaptation to new instruments.
+ *
+ *\section module Modules
+ *
+Previous Conceptual Design and Requirements documents described the overall structure of OPERA as consisting of a harness, modules	software and data libraries, and tools.
+Conceptually, a module executes a single, specific processing step in the pipeline. Core modules, as described in the OPERA Technical, Operational and Scientific Requirements document, will be developed by CFHT. Analysis and post-reduction modules will be developed by both CFHT and collaborators.
+Generally speaking a module is an executable processing step. Each module should take all input parameters on the command line and endeavor to produce a single output. It may not be possible to have a module produce a single output, due to a large overlap in processing required to generate the outputs. The only way that the harness can fulfill the requirement that the pipeline be restartable and recover from aborts, is that the output be known to the Harness. If there is more than one output then managing the outputs becomes very difficult. So, while exceptions can be made, in general good module design should follow the guideline that the module produces a single output. The output may be a vector, or a table in a file, but the output should be a single entity.
+A module shall not contain numeric or textual ‚Äúhard-coded‚Äù parameters. Examples of such parameters would be temporary file paths, byproduct paths, gain or noise estimates for a particular instrument, and the like.
+The input and output files are required to be plain text or FITS images or FITS tables. The final output products are required to be FITS tables.
+A module shall not use shared memory. This design decision stems from the requirement to support multiple simultaneous execution instances of the pipeline.
+Modules shall not use threading, since there is no guarantee that an installation will have a re-entrant CFITSIO library.
+There are a number of standard file paths supplied by the harness for use by modules and tools. The creation and use of standard file paths for use by all modules stem from the requirement that modules be parameterized to execute in multiple external environments.
+
+The file paths are:
+- products file path (where the final output products for PIs reside)
+- temp file path	(temp files are files that are not products and are used only internally to a module as temporary data storage. These should be stored in the temp file path passed by the harness)
+- byproducts file path (byproducts are temporary files that are not output products given to PIs, that do provide temporary data storage, and that are shared between modules)
+- configuration file path (location of any config files) 
+- calibration file path (where master calibration data are stored) 
+- input file path (where a unit of reduction is stored)
+
+A module shall not generate temporary file names, unless the filename is based on the odometer of an input file. Odometers are numbers representing unique images taken at CFHT. All temporary files shall be placed in the temporary directory as passed on the command line.
+A module shall not test for the existence of a temporary file, or byproduct file or output product file and shall not skip the processing step if a file is found. This design decision stems from the requirements that the pipeline produce correct results, support 99+% availability, support recovery from aborts and support multiple simultaneous executions of the pipeline.
+A module shall not modify any input file. This is a direct requirement from the Requirements document.
+A module shall write error and warning messages to stderr in C programs or cerr in C++ programs. If the flag --verbose is passed to the module the informational messages shall be written to stdout in C programs or cout in C++ programs. C++ programs shall not use stdout or stderr.
+A module shall return an error code as defined in its header file or an OPERA common error code header file if an error is detected.
+A module shall accept at least the standard parameters:
+
+ - --verbose, -v print verbose informative messaging to stderr 
+ - --debug, -d  print debug messages to stderr
+ - --trace, -t trace module execution
+ - --help, -h issue usage information and exit
+
+Core modules, software libraries and tools will be written by CFHT software engineers in C and C++ computer language. This design decision is driven by the requirement for core reduction speed.
+Contributed core modules may be written in any computer language, but contributions in other languages will be rewritten in C or C++ by CFHT personnel. This design decision stems from the requirement that the open source nature of OPERA would be compromised if core modules were written in a computer language that requires a license in order to execute.
+Each contributed module should be accompanied the following:
+
+(1) Module Description: A full description of the algorithm used in the module, in English.
+(2) Code: The source code and possible header files in any computer language.
+(3) Build: A description of the compilation method and operating systems it has been tested on.
+(4) System dependencies: The compiler/interpreter version, libraries required to be installed, package dependencies, etc.
+(5) File dependencies: The files needed to run the program including input configuration files, data files, etc.
+(6) Input formats: Input file formats. It's important to describe the limitations on size and formats, e.g. for FITS files one should specify the number/type of extensions, number of pixels, data type, etc. One should also describe what are the supported formats.
+(7) Output format: A description of the output files generated by the routines including data products, log files, etc.	Describe the format and contents of these files.
+(8) To do: What the code was expected to do and it doesn't do. This will also be helpful for further improvements or additions to this program.
+
+Modules are classified in to two types: 
+
+1) those associated with calibration and 
+2) those associated with reduction.
+
+ *
+ *\section libraries Software Libraries
+ *
+A number of software libraries are defined for use by modules:
+
+ - operaCCD - espadons-related functions
+ - operaConfiguratonAccess - configuration file acess functions
+ - operaError - the operaError functions
+ - operaException - the operaException class interface
+ - operaFIT - fitting functions
+ - operaFITSImage - the operaFITSImage class interface for reading and writing FITS-format images
+ - operaImage - generic image manipulation functions
+ - operaLMFit - fitting functions
+ - operaParamterAccess - parameter file acess functions
+ - operaStats - statistical functions
+ 
+ *
+ *\section tools Tools
+ *
+A number of useful tools are identified. Tools, in this context, are standalone executable programs that are intended to be executed by the OPERA pipeline user and are external to the pipeline itself. This use of the word ‚Äútool‚Äù distinguishes a ‚Äútool‚Äù from a ‚Äúmodule‚Äù, the latter only being intended to be executed by the OPERA pipeline harness.
+In previous documents we described the difference, within the context of OPERA, between parameter access and configuration access. Parameters refer to instrument-specific numerical and textual values. An example might be the expected gain for the OLAPA-a device. Configuration, on the other hand, refers to the software environment. An example might be the file path of the root directory where OPERA is installed in a particular installation.
+ - OPERA tool - the harness itself is required to be driven by a command line oriented tool. This tool accepts arguments, accesses the parameter and configuration access layers as needed and executes the harness.
+ - OPERA parameter access tool - a command line interface to the parameter access layer. The design decision stems from the requirement that parameters be accessible from the command line. This tool supports access ‚Äúget‚Äù, add, delete parameters by name.
+ - OPERA configuration access tool - a command line interface to the configuration access layer. The design decision stems from the requirement that configuration data be accessible from the command line. This tool supports access ‚Äúget‚Äù, add, delete configuration values by name.
+ - OPERA FITS To Text tool - a command line interface to unpack OPERA FITS tables in to Upena / Libre-Esprit-compatible text file(s).
+ - OPERA FITS To PNG tool - a command line PNG thumbnail generator.
+ - OPERA Generate Module Template tool - a command line tool to generate a standard module template.
+ - OPERA Image Arith - a command line tool to perform arithmetic transformations on FITS images.
+ - OPERA Image Combine - a command line tool to combine FITS images.
+ - OPERA Create Bad Pixel Mask From Map - a command line tool to create a FITS format badpixel mask.
+
+OPERA is required to operate at multiple sites in order to be of use to the astronomy community. As such there shall be infrastructure in place to permit easy configuration and installation on Linux platforms. The infrastructure shall encompass source code control, issue tracking, release management and management of external contributions.
+
+ *
+ *\section doc Additional Docmentation
+ *
+  - <a href=http://opera.cfht.hawaii.edu/Opera/README>README</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/NEWS>NEWS</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/LICENSE>LICENSE</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/DISCLAIMER>DISCLAIMER</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/DEPENDENCIES>DEPENDENCIES</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/INSTALLATION>INSTALLATION</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/AUTHORS>AUTHORS</a>
+  - <a href=http://opera.cfht.hawaii.edu/Opera/ChangeLog>ChangeLog</a>
+ 
+ *
+ *\section code Source Code
+ *
+ 
+ The latest opera drop can be found <a href=http://opera.cfht.hawaii.edu/Opera/drop>here</a>.
+
+ *
+ *\section installation Installation
+ *
+
+1. Download the compressed file: opera-1.0.zip
+
+2. Unpack this file in your home directory:
+   unzip opera-1.0.zip
+
+3. Open a terminal and access the directory 
+   cd $HOME/opera-1.0/ 
+
+4. Run autogen.sh to generate the file ./configure:
+  
+   ./autoconf/autogen.sh -v
+  
+5. Run the configuration file:
+   ./configure --prefix=$HOME/opera-1.0/
+  
+  NOTE: if you obtain errors like this
+  ./configure: line 4322: syntax error near unexpected token
+  `build_libtool_libs
+,'
+  ./configure: line 4322: `    _LT_DECL(build_libtool_libs,
+  enable_shared, 0,'
+  
+  Open ./configure file in a text editor and delete those lines,
+  then run ./configure again:
+  
+  ./configure --prefix=$HOME/opera-1.0/  
+  
+6. Build: 
+   ./make
+  
+7. Install into your bin/libs:  
+   ./make install
+   ./make install
+
+8. Thereafter, when you make code changes you only need to:
+   make install
+
+=====================
+
+There is a bash script called <a href=http://opera.cfht.hawaii.edu/Opera/INSTALL_OPERA-1.0>INSTALL_OPERA-1.0</a> you can call to do all this, posted on Sourceforge, and here,
+
+usage:
+
+. ./INSTALL_OPERA-1.0
+
+BUGS:
+
+sometimes autogen makes a bad configure script on MacOSX. Just delete lines
+4369, 4370 and all will be good.
+
+
+*/
+

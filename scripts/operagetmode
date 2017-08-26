@@ -1,0 +1,51 @@
+#!/bin/bash
+#########################################################################################
+#
+# Script name: operagetmode
+# Version: 1.0
+# Description: get mode from header
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operagetmode
+#/// \brief mode from header
+#/// \arg filename
+#/// \ingroup scripts
+#
+#########################################################################################
+# 
+#
+bindir=$opera/bin/
+if [[ $# -eq 1 ]]; then
+	key=INSTMODE
+	filename=$1
+elif [[ $# -eq 2 ]]; then
+	key=$1
+	filename=$2
+else
+	echo "operagetmode: Invalid number of inputs"
+	exit
+fi
+echo -n `${bindir}/operagetheader --keyword=${key} ${filename} | awk '{if ($1=="Polarimetry,") print "pol"; else if ($2=="star+sky,") print "sp1"; else if ($2=="star") print "sp2"; else if ($1=="TWOSLICE") print "sp1"; else if ($1=="FOURSLICE") print "sp2"; else print "unknown"; }'`
+exit

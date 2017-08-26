@@ -1,0 +1,89 @@
+#!/bin/bash
+#########################################################################################
+#
+# Script name: operatrim
+# Version: 1.0
+# Description: trim leading calibrations from a reduction list
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operatrim
+#/// \brief trim leading calibrations from a reduction list
+#/// \arg filename
+#/// \ingroup scripts
+#
+#########################################################################################
+# 
+#
+if (( $# != 1 ))
+then
+	echo "usage: operatrim <reductionlist filename>"
+	exit
+fi
+files=`cat <$1`
+((foundanobject=0))
+((foundflat=0))
+for f in $files
+do
+	if [[ `echo $f | grep "[0-9]*o.fits"` ]]
+	then
+		((foundanobject=1))
+	fi
+	if (( foundanobject ))
+	then
+		if [[ `echo $f | grep "[0-9]*f.fits"` ]]
+		then
+			((foundflat=1))
+		fi
+	fi
+	
+done
+# if we didn't find a flat after finding object then there were
+# no morning calibrations. so use the evening calibrations
+# Note that sometimes biases ar taken only in the morning
+if (( foundflat == 0 && foundanobject == 1 ))
+then
+	cat $1
+else
+	((foundanobject=0))
+	for f in $files
+	do
+		if [[ `echo $f | grep "[0-9]*o.fits"` ]]
+		then
+			((foundanobject=1))
+		fi
+		if (( foundanobject ))
+		then
+			echo "$f"
+		fi
+	done
+fi
+#
+# in this case we found no objects, but still calculate gain
+#
+if (( foundanobject == 0 ))
+then
+	cat $1
+fi
+exit

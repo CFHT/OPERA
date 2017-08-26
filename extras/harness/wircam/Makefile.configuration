@@ -1,0 +1,202 @@
+#########################################################################################
+#
+# Makefile name: Makefile.configuration.wircam
+# Version: 1.0
+# Description: configuration rules for wircam
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu 
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_configuration_wircam
+#/// \brief OPERA Configuration Definitions
+#/// \brief - all observatory-specific configuration definitions go here
+#/// \brief Configuration definitions are items like filepaths and the like
+#/// \brief which change depending on the location where the pipeline is run.
+#/// \see makefile.parameters for instrument-specific definitions.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#///
+#///	Section 1 directory paths and whoami
+#///
+#########################################################################################
+
+.SUFFIXES: .fits .cpu .jpg .cal .txt .zpt
+.PRECIOUS:
+.SECONDARY:
+.FORCE:
+
+#########################################################################################
+#
+# Global Defines
+#
+#########################################################################################
+
+me					:= opera-1.0
+VERSION				:= 200
+IIWI_MAJOR			:= 2.1
+IIWI_VERSION		:= $(IIWI_MAJOR).$(VERSION)
+version				:= "WIRCam iiwi/realtime Version $(IIWI_VERSION) May 2013"
+iiwi				:= iiwi2
+homedir				:= $(HOME)/$(me)/
+bindir				:= $(homedir)bin/
+cfhtconfdir			:= /cfht/conf/iiwi2/
+archivebindir		:= /h/archive/sw/tools/
+libdir				:= /cfht/lib/
+wwwdir				:= /h/www//www.cfht.hawaii.edu/
+iiwisrcdir			:= /cfht/src/eos/elixir_ir/$(me)/
+
+SESSIONHOST			:= lokahi
+RSH					:= rsh
+jobs				:= 8
+
+IIWI_HOME_DIR				:= $(homedir)
+IIWI_MASTER_ROOT_DIR		:= /data/iiwi/
+IIWI_ROOT_DIR				:= $(IIWI_MASTER_ROOT_DIR)
+IIWI_RAW_DIR				:= $(IIWI_ROOT_DIR)raw/
+IIWI_WEB_DIR				:= $(IIWI_ROOT_DIR)web/
+IIWI_TMP_DIR				:= $(IIWI_ROOT_DIR)tmp/$(CRUNID)/$(RUNID)/
+IIWI_WEBSTATS_DIR			:= /apps/www/www.cfht.hawaii.edu/Instruments/Imaging/WIRCam/
+IIWI_LOCK_DIR				:= $(IIWI_ROOT_DIR)reductions/
+IIWI_CALIBRATION_DIR		:= $(IIWI_MASTER_ROOT_DIR)calibrations/
+IIWI_CALS_BADPIX_DIR		:= $(IIWI_CALIBRATION_DIR)badpix/
+IIWI_CALS_DARKS_DIR			:= $(IIWI_CALIBRATION_DIR)darks/
+IIWI_CALS_DEFSKIES_DIR		:= $(IIWI_CALIBRATION_DIR)defaultskies/
+IIWI_CALS_DOMEFLATS_DIR		:= $(IIWI_CALIBRATION_DIR)domeflats/
+IIWI_CALS_TWIFLATS_DIR		:= $(IIWI_CALIBRATION_DIR)twilightflats/
+IIWI_CALS_WEIGHT_DIR		:= $(IIWI_CALIBRATION_DIR)weight/
+IIWI_CALS_ZEROPOINT_DIR		:= $(IIWI_CALIBRATION_DIR)zeropoints/
+IIWI_PROCESSED_DIR			:= $(IIWI_ROOT_DIR)processed/
+IIWI_CONFIG_DIR				:= $(IIWI_MASTER_ROOT_DIR)config/
+IIWI_LOG_DIR				:= $(IIWI_ROOT_DIR)logs/$(CRUNID)/$(RUNID)/
+IIWI_STANDARDS_DIR			:= $(IIWI_ROOT_DIR)standards/
+IIWI_TOAPPROVE_DIR			:= $(IIWI_ROOT_DIR)toapprove/
+IIWI_REDUCTION_DIR			:= $(IIWI_ROOT_DIR)reductions/$(CRUNID)/$(RUNID)/
+IIWI_MAKE_DIR				:= $(IIWI_HOME_DIR)/harness/
+
+LOCAL_DATA					:= /local/data/
+
+#VERBOSE					:= -v		# used by wirwait only
+
+#RECIPIENTS					:= "teeple,kanoa,karun,chyan,eder,devost,tburd,ros"
+RECIPIENTS					:= "teeple"
+
+# this installation directory is for detector hosts, not reduction hosts
+IIWI_INSTALL_CALIBRATION_DIR	:= /local/data/calibration/
+
+MACHINE_CALIBRATION_DIR 	:= /data/iiwi/calibrations/
+
+VPATH		=  $(IIWI_ROOT_DIR):$(IIWI_BYPRODUCTS_DIR):$(IIWI_TMP_DIR):$(IIWI_PROCESSED_DIR):$(IIWI_REDUCTION_DIR):$(IIWI_CALIBRATION_DIR)
+
+MACHINE 	:= $(shell hostname | sed -e 's/.cfht.hawaii.edu//')
+
+#########################################################################################
+#
+# Execution Defines
+#
+# change the machines if you add a machine or want to use different machines
+# the loadmap is the number of processes sent at once to each machine
+# use this for load balancing
+# the diskmap is the disk to use /data/$)DISKMAP)
+# if a machine has more than one local disk you can add a column in each of these
+# defines giving the same machine and a different disk
+#
+# This is the one for ula/halea, for example:
+#
+# MACHINES	:= halea  ula  halea  ula   halea
+# LOADMAP	:= 1      3    2      3     2
+# DISKMAP	:= halea1 ula1 halea2 ula2  halea
+#
+#########################################################################################
+MACHINES	:= polena	halea	ula
+LOADMAP		:= 8		4		4
+DISKMAP		:= polena   halea	ula
+
+#########################################################################################
+#
+# this is a list of all the disks in use. It is used in the "clean*" targets
+#
+#########################################################################################
+DISKS		:= polena halea ula
+
+#########################################################################################
+#
+# These are used to identify which kind of image we want when querying the processdimage
+# database and we don't want to use filename like '%p.fits'
+#
+#########################################################################################
+
+RUNDATETIME	:= $(shell date '+%Y/%m/%d-%l:%M:%S%p' | sed -e 's: ::'g) 
+COMMENT		:= Run started by $(shell whoami)
+
+DIR			:= $(NIGHT)
+ROOTDIR		:= $(PWD)/
+NIGHTDIR	:= $(subst //,/,$(ROOTDIR)/$(NIGHT))
+QRUNID		:= $(shell echo $(NIGHT) | sed -e 's/-.*//' | sed -e 's:/:_:g')
+SEMESTER	:= $(shell echo $(CRUNID) | sed -e 's/\(...\).../\1/')
+DATE		:= $(shell echo $(NIGHT) | sed -e 's/.*-//' | sed -e 's:/:_:g')
+
+BADPIX		:= badpix_chihung_16bits.fits
+
+ifdef NIGHT
+	OBJECTS 	:= $(notdir $(wildcard $(NIGHTDIR)/[0-9]*[o].fits))
+	FLATS   	:= $(notdir $(wildcard $(NIGHTDIR)/[0-9]*[f].fits))
+	DARKS  		:= $(notdir $(wildcard $(NIGHTDIR)/[0-9]*[d].fits))
+	FOCUS  		:= $(notdir $(wildcard $(NIGHTDIR)/[0-9]*[x].fits))
+	ACQUIRES  	:= $(notdir $(wildcard $(NIGHTDIR)/[0-9]*[a].fits))
+endif
+
+PROCDATE	 	= $(shell date '+%Y-%m-%dHST%T')
+
+ifdef DIRECTOR_LEVEL
+	pref	= status: [$(MACHINE):$(DISK)]
+	wpref	= warning: [$(MACHINE):$(DISK)]
+	epref	= error: [$(MACHINE):$(DISK)]
+else
+	pref	=`date +'%D %H:%M:%S'` [$(MACHINE):$(DISK)] 
+	wpref	=`date +'%D %H:%M:%S'` [$(MACHINE):$(DISK)] *** Warning: 
+	epref	=`date +'%D %H:%M:%S'` [$(MACHINE):$(DISK)] *** Error: 
+endif
+
+ifdef WEB
+	pref	= <font color=seagreen>
+	wpref	= <font color=coral>
+	epref	= <font color=tomato>
+endif
+
+errfile		:= $(IIWI_LOG_DIR)/iiwi21.log
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

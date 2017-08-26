@@ -1,0 +1,13 @@
+This script runs Autotools, for use before running ./configure.
+Only use it if you cannot obtain a version of autotools with autoreconf.
+Otherwise, "autoreconf -vfi" is a better alternative to this script.
+Use this script at your own risk. If this does not work either, you can
+try each command yourself until you find where errors occur.
+
+Short summary of what each command does:
+libtoolize - copies/links support scripts e.g. ltmain.sh
+glibtoolize - same thing for other platforms i.e. Mac
+aclocal - copies over m4 macros needed by configure script
+autoconf - build configure.ac macros into configure script
+automake -  reads Makefile.am files and generates Makefile.in files
+--add-missing - adds files needed by Automake if they are not there

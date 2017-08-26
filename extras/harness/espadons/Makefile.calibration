@@ -1,0 +1,51 @@
+#########################################################################################
+# Telescope setup - only done once
+#########################################################################################
+
+telescopesetup:
+	@start=$$SECONDS; \
+	if [ ! -e $(configdir)$(observatory).telescope$(gzip) ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaTelescopeSetup \
+	--latitude=$(telescope_latitude) \
+	--longitude=$(telescope_longitude) \
+	--elevation=$(observatory_elevation) \
+	--CollectingArea=$(telescope_CollectingArea) \
+	--Aperture=$(telescope_Aperture) \
+	--FocalRatio=$(telescope_FocalRatio) \
+	--TelescopeMount=$(telescope_mount) \
+	--OpticalCoating=$(telescope_coating) \
+	--outputTelescopeFile=$(configdir)$(observatory).telescope$(gzip) $(optargs)" 2>&1 | tee -a $(logdir)$(observatory).telescopesetup.log ; \
+		echo "$(pref) Telescope setup completed in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# Spectrograph setup -- Mode / speed based
+#########################################################################################
+spectrographsetup:
+ifneq ($(DATADIR),$(queuedir)/)
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,$(observatory)_,spectrograph$(gzip)) ; \
+	echo "$(pref All modes of spectrograph setup complete in $(deltat)"
+else
+	@echo "$(pref)Please specify NIGHT= or DATADIR="
+endif
+
+%.spectrograph$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(condfigdir)$@ ] ; then \
+		echo "$(pref) Starting spectrograph setup for $(QUALIFIERS) ..." ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaSpectrographSetup \
+	--InjectionHoleDiameter=$(spectrograph_InjectionHoleDiameter) \
+	--OpticalFiber=$(spectrograph_OpticalFiber) \
+	--fiberLength=$(spectrograph_fiberLength) \
+	--fiberCoreDiameter=$(spectrograph_fiberCoreDiameter) \
+	--numberOfInputFibers=$(spectrograph_numberOfInputFibers) \
+	--numberOfSlices=$(spectrograph_numberOfSlices) \
+	--spectralResolution=$(spectrograph_spectralResolution) \
+	--pixelsize=$(spectrograph_pixelsize) \
+	--EspadonsCCDReadoutSpeed=$(spectrograph_EspadonsCCDReadoutSpeed) \
+	--SpectrographCCD=$(spectrograph_SpectrographCCD) \
+	--EspadonsInstrumentMode=$(spectrograph_InstrumentMode) \
+	--outputSpectrographFile=$(configdir)$@ $(optargs)" 2>&1 | tee -a $(logdir)$(observatory).spectrograph.log ; \
+		echo "$(pref) Spectrograph setup for $(QUALIFIERS) completed in $(deltat)" ; \
+	fi

@@ -1,0 +1,83 @@
+#########################################################################################
+#
+# Makefile name: Makefile.calibration
+# Version: 1.0
+# Description: example calibration targets
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_calibration_espadons
+#/// \brief this makefile contains core calibration targets.
+#/// \note This version implements OLAPA as well as EEV1 modes.
+#/// \note As of Sept 27 2010 there is some level of DANCE support.
+#/// 	 Note the new header keywords for DANCE:
+#/// 	DETECTOR = OLAPA
+#/// 	AMPLIST will be "a", "b", or "a,b".  
+#/// 	If AMPLIST is "a,b", then there will be GAINA/GAINB and RDNOISEA/RDNOISEB
+#/// 	instead of GAIN and READNOISE.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+# example create a single master flat
+#########################################################################################
+masterflat_$(QUALIFIERS).$(FITS)$(extension):
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)masterflat_$(QUALIFIERS).fits ] ;  then \
+		echo "$(pref) Starting master flat creation for $(QUALIFIERS)." ; \
+		flats=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/f.$(FITS)/p' | sed -e 's:^:--images=:' | tr '\n' ' '`; \
+		i=`$(bindir)operacount "$${flats}"` ; \
+		if (( i > 0 )) ; then \
+			$(bindir)operatrace $(TRACE) $(errfile) "$(bindir)operaMasterFlat \
+--output=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+$${flats} \
+--version=\"$(versionstr)\" \
+--date=\"$(shell date)\" \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile masterflat_$(QUALIFIERS)m.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) master flat for $(QUALIFIERS) complete."; \
+		fi ; \
+	fi
+
+#########################################################################################
+#///
+#///	Add your calibration targets here
+#///
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################

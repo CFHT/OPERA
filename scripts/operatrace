@@ -1,0 +1,113 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: operatrace
+# Version: 1.0
+# Description: trace a module call
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operatrace
+#/// \brief trace a module call, just execute, or trace and execute
+#/// \note operatrace 4|3|2|1|0 <errfile> <machine> "<call to trace>"
+#/// \arg 4|3|2|1|0 (valgrind, gdb, trace and execute, trace, execute only)
+#/// \arg errfile - where to log errors (defaults to ./errors.log)
+#/// \arg machine - name of the machine ths command was executed on
+#/// \arg "<call to trace>"
+#/// \ingroup scripts
+#
+#########################################################################################
+
+((traceon=0))
+errfile=./errors.log
+machine=""
+if (( $# > 1 ))
+then
+	((traceon=$1))
+	shift
+fi
+if (( $# > 1 ))
+then
+	errfile=$1
+	shift
+fi
+if (( $# > 1 ))
+then
+	machine="on $1"
+	shift
+fi
+# just execute
+if (( traceon == 0 ))
+then
+	sh -c -- "$*"
+	errcode=$?
+	if (( $errcode != 0 ))
+	then
+		echo "************** Error $errcode $machine executing \"$1\" **************" | tee -a ${errfile}
+	fi
+	exit $errcode
+fi
+# just trace
+if (( traceon == 1 ))
+then
+	echo "$@"
+	exit 0
+fi
+# trace and then execute
+if (( traceon == 2 ))
+then
+	echo "$@"
+	sh -c -- "$*"
+	errcode=$?
+	if (( $errcode != 0 ))
+	then
+		echo "************** Error $errcode $machine executing \"$1\" **************" | tee -a ${errfile}
+	fi
+	exit $errcode
+fi
+# gdb trace and then execute
+if (( traceon == 3 ))
+then
+	echo "gdb -q --args $@"
+	sh -c -- "$*"
+	errcode=$?
+	if (( $errcode != 0 ))
+	then
+		echo "************** Error $errcode $machine executing \"$1\" **************" | tee -a ${errfile}
+	fi
+	exit $errcode
+fi
+# valgrind trace and then valgrind
+if (( traceon == 4 ))
+then
+	echo "valgrind $@"
+	sh -c -- "valgrind $*"
+	errcode=$?
+	if (( $errcode != 0 ))
+	then
+		echo "************** Error $errcode $machine executing \"$1\" **************" | tee -a ${errfile}
+	fi
+	exit $errcode
+fi
+exit 0

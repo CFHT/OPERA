@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# compare upena and opera SNR from espql
+#
+if (( $# == 0 ))
+then
+	echo "usage: $(basename $0) snrlog"
+	exit 1
+fi
+opera=$HOME/opera-1.0
+bindir=${opera}/bin/
+echo "odometer upenasnr operasnr"
+exec 4< $1
+while read line <&4
+do
+	image=`${bindir}operagetword 1 ${line} | sed -e 's/://'`
+	odometer=$(basename $image o.fits)
+	operasnr=`${bindir}operagetword 6 ${line}`
+	upenasnr=`${bindir}wiropdb "select snr from op..xexp where _obsid=$odometer" | tail -1 | awk '{printf("%3d", $1)}'`
+	if (( $? == 0 ))
+	then
+		echo "$odometer     $upenasnr     $operasnr"
+	fi
+done 
+exec 4>&-
+exit 0
+

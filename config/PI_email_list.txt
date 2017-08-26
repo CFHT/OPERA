@@ -1,0 +1,11 @@
+#########################################################################################
+#
+# This text file contains a list of program ids and the associated PI(s)
+# The format is:
+# <RUNID> <EMAIL ADDRESSES SEPARATED BY COMMAS>
+# Maintained by the QSO Team.
+#
+#########################################################################################
+13AF16 teeple@cfht.hawaii.edu,manset@cfht.hawaii.edu
+13AQ87 teeple@cfht.hawaii.edu,manset@cfht.hawaii.edu
+

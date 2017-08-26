@@ -1,0 +1,51 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+
+#########################################################################################
+#
+#  iiwi-2.1 skyprobe envdb query
+#
+#  Teeple March 2013
+#
+#  
+#########################################################################################
+#. /apps/sybase/local/etc/sybase_env.sh
+# sqsh -U skyprobe -P skyprobe -S envdb -D iiwi
+#sp_help
+#go
+#
+#database connection  info:
+#
+#linux host: envdb
+#sybase server: envdb
+#database: skyprobe
+#user: skyprobe
+#pw: skyprobe 
+#
+#########################################################################################
+#
+if {[llength $argv] < 1} {
+	puts "espskyprobe: send a skyprobe query to the env database. e.g."
+	puts "espskyprobe \"select zeropoint from skyprobe where date between 'utcdate' and 'utcdate2'\""
+	puts "where date like Feb 15 2012 8:00AM"
+	exit 1
+}
+source /cfht/lib/syblib
+set usr "skyprobe"
+set pass "skyprobe"
+set query [lindex $argv 0]
+set db [sybconnect $usr $pass envdb iiwi]
+sybuse $db iiwi 
+if [catch {sybsql $db $query} msg] {
+	puts $sybmsg(msgtext)
+	exit 1
+}
+sybnext $db {
+	puts @0
+}
+catch {close $db}
+
+exit
+

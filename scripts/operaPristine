@@ -1,0 +1,66 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: operaPristine
+# Version: 1.0
+# Description: gets rid of all the autconf junk -- run in the opera root directory
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operaPristine
+#/// \brief gets rid of all the autconf junk
+#/// \note - run in the opera root directory
+#/// \ingroup scripts
+#
+#########################################################################################
+# gets rid of all the autconf junk -- run in the opera root directory
+#
+# Teeple Mar 2011
+#
+# see also distclean
+#
+if [[ "$1" == "-h" || "$1" == "--help" ]]
+then
+	echo "usage: $(basename $0) [-all]"
+	echo "Removes autconf chad"
+	echo "-all also removes the configure script and the generated Makefiles"
+	exit
+fi
+rm -f config.log
+rm -rf autom4te.cache
+for dd in . src/tools/ src/libraries/ src/core/ src/analysis/  scripts/
+do
+	rm -f $dd/Makefile.in
+	rm -f $dd/*.o
+	rm -rf .deps/
+done
+if [[ "$1" == "-all" ]]
+then
+	rm -f configure missing install-sh depcomp config.status aclocal.m4 
+	for dd in . src/tools/ src/libraries/ src/core/ src/analysis/ scripts/
+	do
+		rm -f $dd/Makefile
+	done
+fi
+

@@ -1,0 +1,7 @@
+ESPADONSPIPELINEDIR = /Users/edermartioli/opera-1.0/
+ROOTDATADIR = /data/espadons/
+ROOTPRODUCTDIR = /Users/edermartioli/Reductions/Espadons/
+DEFAULTCALIBRATIONDIR = /Users/edermartioli/opera-1.0/DefaultCalibration/
+#NIGHT = StarOnlyData
+NIGHT = 13BQ08-Nov25
+#NIGHT = 13BQ02-Aug16

@@ -1,0 +1,71 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: operagetstokes
+# Version: 1.0
+# Description: operagetstokes - get the stokes parameter from the header
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operagetstokes
+#/// \brief tease the Stokes parameter out of espadons header keywords
+#/// \ingroup scripts
+#
+# typedef enum { StokesI=0, StokesQ, StokesU, StokesV} stokes_parameter_t;
+#
+# Note that there are two cases:
+#   1) normal object header keyword CMMTSEQ (s)
+#   2) special keyword used in setup only OBJECT (ss)
+#########################################################################################
+
+bindir=$opera/bin/
+
+StokesI=0
+StokesQ=1
+StokesU=2
+StokesV=3
+
+if [[ "$1" == "--numeric" ]]
+then
+	shift
+	s=`${bindir}/operagetheader $1 --keyword=CMMTSEQ | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
+	case $s in
+		i) echo -n $StokesI;;
+		q) echo -n $StokesQ;;
+		u) echo -n $StokesU;;
+		v) echo -n $StokesV;;
+		*) ss=`${bindir}/operagetheader $1 --keyword=OBJECT | awk '{print $3}' | tr '[:upper:]' '[:lower:]'`;
+			case $ss in
+				i) echo -n $StokesI;;
+				q) echo -n $StokesQ;;
+				u) echo -n $StokesU;;
+				v) echo -n $StokesV;;
+			esac;
+		;;
+	esac
+else
+	echo -n `${bindir}/operagetheader $1 --keyword=CMMTSEQ | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
+fi
+exit
+

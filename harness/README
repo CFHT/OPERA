@@ -1,0 +1,68 @@
+
+									OPERA 1.0 HARNESS
+
+
+This is the OPERA harness, it is called from the tool "opera". The harness consists of a number of Makefiles:
+
+	- Makefile							-- the main entry point, it includes all the other Makefiles
+	- espadons/Makefile.util			-- generaly useful targets, handles multi-machine parallelization
+	- espadons/Makefile.parameters		-- contains all the OPERA module paramters
+	- espadons/Makefile.configuration	-- contains all the OPERA configuration definitions
+	- espadons/Makefile.calibration		-- the CFHT OPERA core calibration targets for espadons
+	- espadons/Makefile.core			-- the CFHT core reduction targets for espadons
+	- espadons/Makefile.analysis		-- addon analysis routines
+	- espadons/Makefile.upena			-- a CFHT-specific set of targets for distributing reductions to PIs
+
+The targets and dependencies control the overall flow of the pipeline. Thus opera is dependency-driven,
+meaning that a product is only created if it doesn't already exist. Use of "make" rather than scripts to 
+handle flow has the advantages of error-handling, cleaning up partial products on abort and parallelism.
+
+There is a "guest" subdirectory with skeleton Makefiles that you can adapt to your instrument.
+
+In general rules look like:
+
+%.ext:
+	@do stuff to create $*.ext
+
+where %.ext is the target and the steps required to create that target follow. $* means "the
+thing that % matched".
+
+Rules may have dependencies. In this case a $*.foo and an $*.bar must be created before
+the rule executes:
+
+%.ext: %.foo %.bar
+	@do stuff to create $*.ext
+
+make also handles paralellism, so in this case both foo and bar are independent and may be 
+created at the same time.
+
+Make variables look like this $(mymakevariable) are are assigned like this:
+
+mymakevariable := 2
+
+Make variables may be compound:
+
+pol_stuff := 1
+sp1_stuff := 2
+mymakevariable := $($(MODE)_stuff)
+
+Here depending on whether the value of $(MODE) is pol or sp1, mymakevariable will take on the value
+1 or 2.
+
+Shell variables look like: $${myshellvariable}
+
+While make variables have scope over the entire Makefile including included Makefiles, 
+shell variables only have scope over a single shell command:
+
+%.ext:
+	@myshellvariable=2; echo "myshellvariable is $${myshellvariable}";
+
+or
+
+%.ext:
+	@myshellvariable=2; \
+	echo "myshellvariable is $${myshellvariable}";
+
+make has many more features, please see online documentation for more details.
+
+

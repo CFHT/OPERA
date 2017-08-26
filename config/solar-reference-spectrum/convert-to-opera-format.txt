@@ -1,0 +1,2 @@
+cat sun.s | awk '{print $1, $4/1.43}' > solar_norm_with_telluric.dat
+cat sun.s | awk '{print $1, $2/2.13}' > solar_norm_from_space.dat

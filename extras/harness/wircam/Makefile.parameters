@@ -1,0 +1,129 @@
+#########################################################################################
+#
+# Makefile name: Makefile.parameters.wircam
+# Version: 1.0
+# Description: wircam parameter definitions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_parameters_wircam
+#/// \brief OPERA Instrument Parameter Definitions
+#/// \brief - all instrument-specific parameter definitions go here
+#/// \brief Parameter definitions are specific to a particular instrument.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# CFHT-specific Instrument Parameter Definitions
+#
+#########################################################################################
+
+PFITS		:= 1
+SFITS		:= 2
+MFITS		:= 3
+YFITS		:= 4
+WFITS		:= 5
+
+nlcorrectionstartdate	:= "2008_04_01"
+
+nlcorrection_2005_01_01_chip1_parg0	:= 1.0
+nlcorrection_2005_01_01_chip1_parg1	:= 0.0
+nlcorrection_2005_01_01_chip1_parg2	:= 0.0
+nlcorrection_2005_01_01_chip2_parg0	:= 1.0
+nlcorrection_2005_01_01_chip2_parg1	:= 0.0
+nlcorrection_2005_01_01_chip2_parg2	:= 0.0
+nlcorrection_2005_01_01_chip3_parg0	:= 1.0
+nlcorrection_2005_01_01_chip3_parg1	:= 0.0
+nlcorrection_2005_01_01_chip3_parg2	:= 0.0
+nlcorrection_2005_01_01_chip4_parg0	:= 1.0
+nlcorrection_2005_01_01_chip4_parg1	:= 0.0
+nlcorrection_2005_01_01_chip4_parg2	:= 0.0
+
+nlcorrection_2006_08_21_chip1_parg0	:= 0.994684
+nlcorrection_2006_08_21_chip1_parg1	:= 3.15674e-07
+nlcorrection_2006_08_21_chip1_parg2	:= 4.56215e-11
+nlcorrection_2006_08_21_chip2_parg0	:= 0.993023
+nlcorrection_2006_08_21_chip2_parg1	:= 1.57013e-06
+nlcorrection_2006_08_21_chip2_parg2	:= 3.68920e-11
+nlcorrection_2006_08_21_chip3_parg0	:= 0.992029
+nlcorrection_2006_08_21_chip3_parg1	:= 1.72587e-06
+nlcorrection_2006_08_21_chip3_parg2	:= 3.43993e-11
+nlcorrection_2006_08_21_chip4_parg0	:= 0.995496
+nlcorrection_2006_08_21_chip4_parg1	:= 8.62247e-07
+nlcorrection_2006_08_21_chip4_parg2	:= 5.30238e-11
+
+nlcorrection_2007_06_19_chip1_parg0	:= 0.998810
+nlcorrection_2007_06_19_chip1_parg1	:= 7.92059e-07
+nlcorrection_2007_06_19_chip1_parg2	:= 5.39334e-11
+nlcorrection_2007_06_19_chip2_parg0	:= 0.996922
+nlcorrection_2007_06_19_chip2_parg1	:= 1.28674e-06
+nlcorrection_2007_06_19_chip2_parg2	:= 4.18800e-11
+nlcorrection_2007_06_19_chip3_parg0	:= 0.998038
+nlcorrection_2007_06_19_chip3_parg1	:= 1.15189e-06
+nlcorrection_2007_06_19_chip3_parg2	:= 4.63836e-11
+nlcorrection_2007_06_19_chip4_parg0	:= 0.996537
+nlcorrection_2007_06_19_chip4_parg1	:= 9.29331e-07
+nlcorrection_2007_06_19_chip4_parg2	:= 5.25666e-11
+
+nlcorrection_2008_04_01_chip1_parg0	:= 0.991276
+nlcorrection_2008_04_01_chip1_parg1	:= 1.72141e-06
+nlcorrection_2008_04_01_chip1_parg2	:= 7.57266e-12
+nlcorrection_2008_04_01_chip2_parg0	:= 0.993746
+nlcorrection_2008_04_01_chip2_parg1	:= 1.82717e-06
+nlcorrection_2008_04_01_chip2_parg2	:= 1.93950e-11
+nlcorrection_2008_04_01_chip3_parg0	:= 0.994254
+nlcorrection_2008_04_01_chip3_parg1	:= 1.92776e-06
+nlcorrection_2008_04_01_chip3_parg2	:= 1.69437e-11
+nlcorrection_2008_04_01_chip4_parg0	:= 0.994799
+nlcorrection_2008_04_01_chip4_parg1	:= 1.49037e-06
+nlcorrection_2008_04_01_chip4_parg2	:= 2.85603e-11
+
+nlcorrection_chip1_parg0	:= nlcorrection_$(nlcorrectionstartdate)_chip1_parg0
+nlcorrection_chip1_parg1	:= nlcorrection_$(nlcorrectionstartdate)_chip1_parg1
+nlcorrection_chip1_parg2	:= nlcorrection_$(nlcorrectionstartdate)_chip1_parg2
+nlcorrection_chip2_parg0	:= nlcorrection_$(nlcorrectionstartdate)_chip2_parg0
+nlcorrection_chip2_parg1	:= nlcorrection_$(nlcorrectionstartdate)_chip2_parg1
+nlcorrection_chip2_parg2	:= nlcorrection_$(nlcorrectionstartdate)_chip2_parg2
+nlcorrection_chip3_parg0	:= nlcorrection_$(nlcorrectionstartdate)_chip3_parg0
+nlcorrection_chip3_parg1	:= nlcorrection_$(nlcorrectionstartdate)_chip3_parg1
+nlcorrection_chip3_parg2	:= nlcorrection_$(nlcorrectionstartdate)_chip3_parg2
+nlcorrection_chip4_parg0	:= nlcorrection_$(nlcorrectionstartdate)_chip4_parg0
+nlcorrection_chip4_parg1	:= nlcorrection_$(nlcorrectionstartdate)_chip4_parg1
+nlcorrection_chip4_parg2	:= nlcorrection_$(nlcorrectionstartdate)_chip4_parg2
+
+BADPIX		:= badpix_chihung_16bits.fits
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################

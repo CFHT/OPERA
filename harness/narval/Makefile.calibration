@@ -1,0 +1,1239 @@
+#########################################################################################
+#
+# Makefile name: Makefile.calibration
+# Version: 1.0
+# Description: espadons calibration targets
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_calibration_espadons
+#/// \brief this makefile contains core calibration targets.
+#/// \note This version implements OLAPA as well as EEV1 modes.
+#/// \note As of Sept 27 2010 there is some level of DANCE support.
+#/// 	 Note the new header keywords for DANCE:
+#/// 	DETECTOR = OLAPA
+#/// 	AMPLIST will be "a", "b", or "a,b".  
+#/// 	If AMPLIST is "a,b", then there will be GAINA/GAINB and RDNOISEA/RDNOISEB
+#/// 	instead of GAIN and READNOISE.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+gain	:= $($(DETECTOR)$(AMPLIFIER)_$(SPEED)_defaultgain)
+noise	:= $($(DETECTOR)$(AMPLIFIER)_$(SPEED)_defaultnoise)
+
+#########################################################################################
+#
+# We do this a lot so encapsulate it in a function. Iterate through all the
+# modes found in the master reduction list.
+# This one is tricky, note that it spawns child make processes for all modes/speeds
+# and then waits for all of them to complete.
+#
+#########################################################################################
+define doAllCalibrationModes
+	if [ -d $(byproductsdir) ] ; then \
+		if [ -e $(byproductsdir)master.rlst ] ; then \
+			exec 4< $(byproductsdir)master.rlst ; \
+			while read line <&4 ; \
+			do \
+				detector=`$(bindir)operagetword 1 $${line}`; \
+				mode=`$(bindir)operagetword 2 $${line}`; \
+				speed=`$(bindir)operagetword 3 $${line}`; \
+				amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+				oset=`$(bindir)operagetword 5 $${line}`; \
+				if [[ "$2" == "" ]] ; then \
+					ext="fits$(extension)" ; \
+				else \
+					ext=$2 ; \
+				fi ; \
+				($(ECHO) $(MAKE) -f $(makedir)Makefile $1$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.$${ext} DETECTOR=$${detector} MODE=$${mode} OSET=$${oset} SPEED=$${speed} AMPLIFIER=$${amplifier} DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory ); \
+			done ; \
+			wait ; \
+			exec 4>&- ; \
+		fi ; \
+	fi
+endef
+
+#########################################################################################
+#
+# These are the targets available from the command line
+#
+#########################################################################################
+
+#########################################################################################
+# All calibrations - parallel, multimachine
+#########################################################################################
+calibrations mastercalibrations: directoriescreated
+	@$(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) NIGHT=$(NIGHT) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory calibrationslog 2>&1 | tee -a $(logdir)calibration.log
+
+calibrationslog: master.rlst
+	@start=$$SECONDS; \
+	if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory calibrations; \
+		done ; \
+	else \
+		if [ -e $(outdir)Lock_$(NIGHT) ] ; then \
+			echo "$(epref) `cat <$(outdir)Lock_$(NIGHT)`" ; \
+		else \
+			echo "$(NIGHT) locked by `whoami`" >$(outdir)Lock_$(NIGHT) ; \
+			if [ ! -d $(DATADIR) ] ; then \
+				echo "$(epref) $(DATADIR) does not exist." 2>&1 | tee -a $(errfile) ; \
+			else \
+				echo "$(NIGHT) locked by `whoami`" >$(outdir)Lock_$(NIGHT) ; \
+				echo "$(pref) Starting parallel calibration $(NIGHT) using $(maxthreads) threads." ; \
+				$(ECHO) $(MAKE) -f $(makedir)Makefile RECHO=$(RECHO) DATADIR=$(DATADIR) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory parcal TARGET=wcal$(gzip) --jobs --no-print-directory; \
+				$(ECHO) $(MAKE) -f $(makedir)Makefile RECHO=$(RECHO) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory cleantmp unlock --jobs --no-print-directory; \
+				echo "$(pref) parallel calibration for $(NIGHT) complete in $(deltat)" ; \
+				if [ -s $(errfile) ] ; then \
+					echo "$(epref)Errors were encountered, please check $(errfile)." ; \
+				fi ; \
+			fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# All master calibrations - single threaded
+#########################################################################################
+calibrate calibration mastercalibration: directoriescreated
+	@$(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) NIGHT=$(NIGHT) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory calibratelog 2>&1 | tee -a $(logdir)calibration.log
+
+calibratelog: master.rlst
+	@start=$$SECONDS; \
+	if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory calibration; \
+		done ; \
+	else \
+		if [ -e $(outdir)Lock_$(NIGHT) ] ; then \
+			echo "$(epref) `cat <$(outdir)Lock_$(NIGHT)`" ; \
+		else \
+			if [ ! -d $(DATADIR) ] ; then \
+				echo "$(epref) $(DATADIR) does not exist." 2>&1 | tee -a $(errfile) ; \
+			else \
+				echo "$(NIGHT) locked by `whoami`" >$(outdir)Lock_$(NIGHT) ; \
+				echo "$(pref) Starting serial calibration $(NIGHT) using $(maxthreads) threads." ; \
+				$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" wavelengthcalibrations --jobs --no-print-directory ; \
+				$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" cleantmp unlock --jobs --no-print-directory ; \
+				echo "$(pref) serial calibration for $(NIGHT) complete in $(deltat)" ; \
+				if [ -s $(errfile) ] ; then \
+					echo "$(epref)Errors were encountered, please check $(errfile)." ; \
+				fi ; \
+			fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# Evening / Afternoon Calibrations - a CFHT-special
+# Calibrations go to the summit... DATADIR should be defined as a summit path.
+# There is no need for wavelength calibrations
+#########################################################################################
+eveningcalibrations afternooncalibrations: master.rlst
+	@start=$$SECONDS; \
+	if [ -e $(outdir)Lock_$(NIGHT) ] ; then \
+		echo "$(epref) `cat <$(outdir)Lock_$(NIGHT)`" ; \
+	else \
+		if [ ! -d $(DATADIR) ] ; then \
+			echo "$(epref) $(DATADIR) does not exist." 2>&1 | tee -a $(errfile) ; \
+		else \
+			echo "$(NIGHT) locked by `whoami`" >$(outdir)Lock_$(NIGHT) ; \
+			export COLUMNS=200 ; sessionhost=`ls -l /h/espadons/.director/sessionhost | sed -e 's/.*-> //' | sed -e 's/\..*//'` ; \
+			echo "$(pref) Starting evening calibration $(NIGHT) $${sessionhost} using $(maxthreads) threads using $(maxthreads) threads." ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) upenadir=/data/$${sessionhost}/espadons/opera/ TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" geometries --jobs --no-print-directory ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) upenadir=/data/$${sessionhost}/espadons/opera/ TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" cleantmp --jobs --no-print-directory ; \
+			rm -f $(outdir)Lock_$(NIGHT) ; \
+			echo "$(pref) evening calibration for $(NIGHT) complete in $(deltat)" ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# All master images 
+#########################################################################################
+masterimages: masterflats mastercomparisons masterfabperots masterbiases
+		@echo "$(pref) master image calibration for $(NIGHT) complete."
+
+#########################################################################################
+# Create reductionlists
+#########################################################################################
+reductionlist reductionlists reductionset rlsts: master.rlst
+		@echo "$(pref) reduction list creation for $(NIGHT) complete."
+
+master.rlst: directoriescreated
+	@start=$$SECONDS; \
+	if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory master.rlst; \
+		done ; \
+	else \
+		if [ -d $(DATADIR) ] ; then \
+			if [[ ! -s $(byproductsdir)master.rlst ]] ; \
+			then \
+				if [ -e $(outdir)Lock_$(NIGHT) ] ; then \
+					echo "$(epref) `cat <$(outdir)Lock_$(NIGHT)`" ; \
+				else \
+					echo "$(pref) Starting reduction lists for $(NIGHT)." ; \
+					if [[ "$(WHERE)" != "" ]] ;  then \
+						echo "$(pref) Using WHERE clause: $(WHERE)." ; \
+					fi ; \
+					rm -f $(byproductsdir)master.rlst ; \
+					rm -f $(byproductsdir)master.tmp ; \
+					for reductionset in $(REDUCTIONSETS) ; \
+					do \
+						detector=`echo $${reductionset} | awk -F_ '{print $$1}' | awk -F- ' {print $$1} '`; \
+						mode=`echo $${reductionset} | awk -F_ '{print $$2}'`; \
+						speed=`echo $${reductionset} | awk -F_ '{print $$3} '`; \
+						amplifier=`echo $${reductionset} | awk -F_ ' {print $$1} ' | awk -F- '{print $$2}'`; \
+						$(ECHO) $(MAKE) -f $(makedir)Makefile $${detector}$${amplifier}_$${mode}_$${speed}.rlst DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} DATADIR=$(DATADIR) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory ; \
+					done ; \
+					mv -f $(byproductsdir)master.tmp $(byproductsdir)master.rlst ; \
+					if [[ "$(VERBOSE)" == "1" ]] ; \
+					then \
+						echo "$(pref) reductionlist for the following created:" ; \
+						cat <$(byproductsdir)master.rlst | sed -e 's:_::'; \
+					fi ; \
+				fi ; \
+			fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# master flats
+#########################################################################################
+masterflats: master.rlst
+	@start=$$SECONDS; \
+	echo "$(pref) Starting masterflats for $(NIGHT)." ; \
+	$(call doAllCalibrationModes,masterflat_) ; \
+	echo "$(pref) masterflats for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# normalized flats
+#########################################################################################
+normalizedflats: master.rlst
+	@start=$$SECONDS; \
+	echo "$(pref) Starting normalizedflats for $(NIGHT)." ; \
+	$(call doAllCalibrationModes,normalizedflat_) ; \
+	echo "$(pref) normalizedflats for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# master biases
+#########################################################################################
+masterbiases: master.rlst
+	@start=$$SECONDS; \
+	echo "$(pref) Starting masterbiases for $(NIGHT)." ; \
+	$(call doAllCalibrationModes,masterbias_) ; \
+	echo "$(pref) masterbiases for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# master comparisons
+#########################################################################################
+mastercomparisons: master.rlst
+	@start=$$SECONDS; \
+	echo "$(pref) Starting mastercomparisons for $(NIGHT)." ; \
+	$(call doAllCalibrationModes,mastercomparison_) ; \
+	echo "$(pref) mastercomparisons for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# master aligns
+#########################################################################################
+masterfabperots masterfabryperots: master.rlst
+	@start=$$SECONDS; \
+	echo "$(pref) Starting masterfabperots for $(NIGHT)." ; \
+	$(call doAllCalibrationModes,masterfabperot_) ; \
+	echo "$(pref) masterfabperots for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# Flat-field flux calibrations
+#########################################################################################
+masterflatfluxcalibration masterflatfluxcalibrations: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,masterflatfluxcalibration_,fcal$(gzip)) ; \
+	echo "$(pref) masterflatfluxcalibrations for $(NIGHT) calibrations complete in $(deltat)"
+
+#########################################################################################
+# gains
+#########################################################################################
+gains: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,gain$(gzip)) ; \
+	echo "$(pref) gains for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# biases
+#########################################################################################
+biases: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,bias$(gzip)) ; \
+	echo "$(pref) biases for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# flat responses
+#########################################################################################
+flatresp flatresponse flatresponses: master.rlst
+	@start=$$SECONDS; \
+	$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) NIGHT=$(NIGHT) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory calibrations ; \
+	$(ECHO) $(MAKE) -f $(makedir)Makefile TARGET=_flat_resp.$(FITS)$(gzip) DATADIR=$(DATADIR) NIGHT=$(NIGHT) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory parintensity; \
+	echo "$(pref) flat response calibration for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# instrument profiles
+#########################################################################################
+profs instrumentprofiles profiles: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,prof$(gzip)) ; \
+	echo "$(pref) instrument profiles for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# geometries
+#########################################################################################
+geoms geometries: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,geom$(gzip)) ; \
+	echo "$(pref) geometries for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# wavelengthcalibrations
+#########################################################################################
+wcals wavelengthcalibrations: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,wcal$(gzip)) ; \
+	echo "$(pref) wavelength calibrations for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# resolutions
+#########################################################################################
+resolutions: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,res$(gzip)) ; \
+	echo "$(pref) resolutions for $(NIGHT) complete in $(deltat)"
+
+#########################################################################################
+# flux calibrations
+#########################################################################################
+masterfluxcalibration masterfluxcalibrations: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,masterfluxcalibration_,fcal$(gzip))
+
+#########################################################################################
+# Master polar flux calibration
+#########################################################################################
+masterpolarfluxcalibration masterpolarfluxcalibrations: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,masterpolarfluxcalibration_,fcal$(gzip))
+	
+#########################################################################################
+# spectral lines
+#########################################################################################
+lines spectrallines: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,th_,l$(gzip)) ; \
+	echo "$(pref) spectral lines for $(NIGHT) calibrations complete in $(deltat)"
+
+#########################################################################################
+# apertures
+#########################################################################################
+apers apertures: master.rlst
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,,aper$(gzip)) ; \
+	echo "$(pref) aperture calibrations for $(NIGHT) complete in $(deltat)"
+
+
+#########################################################################################
+# badpixelmask - from map
+#########################################################################################
+badpixelmask badpix:
+	@start=$$SECONDS; \
+	for detector in $(DETECTORS) ; do \
+		for amplifier in $(AMPLIFIERS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile $${detector}$${amplifier}_badpix.mask DETECTOR=$${detector} MODE=$${mode} OSET=$${oset} SPEED=$${speed} AMPLIFIER=$${amplifier} DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory ; \
+		done ; \
+	done ; \
+	echo "$(pref) badpixel mask complete in $(deltat)"
+
+#########################################################################################
+# Telescope setup - only done once
+#########################################################################################
+
+telescopesetup:
+	@start=$$SECONDS; \
+	if [ ! -e $(configdir)$(observatory).telescope$(gzip) ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaTelescopeSetup \
+	--latitude=$(telescope_latitude) \
+	--longitude=$(telescope_longitude) \
+	--elevation=$(observatory_elevation) \
+	--CollectingArea=$(telescope_CollectingArea) \
+	--Aperture=$(telescope_Aperture) \
+	--FocalRatio=$(telescope_FocalRatio) \
+	--TelescopeMount=$(telescope_mount) \
+	--OpticalCoating=$(telescope_coating) \
+	--outputTelescopeFile=$(configdir)$(observatory).telescope$(gzip) $(optargs)" 2>&1 | tee -a $(logdir)$(observatory).telescopesetup.log ; \
+		echo "$(pref) Telescope setup completed in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# Spectrograph setup -- Mode / speed based
+#########################################################################################
+spectrographsetup:
+ifneq ($(DATADIR),$(queuedir)/)
+	@start=$$SECONDS; \
+	$(call doAllCalibrationModes,$(observatory)_,spectrograph$(gzip)) ; \
+	echo "$(pref All modes of spectrograph setup complete in $(deltat)"
+else
+	@echo "$(pref)Please specify NIGHT= or DATADIR="
+endif
+
+%.spectrograph$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(condfigdir)$@ ] ; then \
+		echo "$(pref) Starting spectrograph setup for $(QUALIFIERS) ..." ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaSpectrographSetup \
+	--InjectionHoleDiameter=$(spectrograph_InjectionHoleDiameter) \
+	--OpticalFiber=$(spectrograph_OpticalFiber) \
+	--fiberLength=$(spectrograph_fiberLength) \
+	--fiberCoreDiameter=$(spectrograph_fiberCoreDiameter) \
+	--numberOfInputFibers=$(spectrograph_numberOfInputFibers) \
+	--numberOfSlices=$(spectrograph_numberOfSlices) \
+	--spectralResolution=$(spectrograph_spectralResolution) \
+	--pixelsize=$(spectrograph_pixelsize) \
+	--EspadonsCCDReadoutSpeed=$(spectrograph_EspadonsCCDReadoutSpeed) \
+	--SpectrographCCD=$(spectrograph_SpectrographCCD) \
+	--EspadonsInstrumentMode=$(spectrograph_InstrumentMode) \
+	--outputSpectrographFile=$(configdir)$@ $(optargs)" 2>&1 | tee -a $(logdir)$(observatory).spectrograph.log ; \
+		echo "$(pref) Spectrograph setup for $(QUALIFIERS) completed in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# This section contains the calibration steps
+#########################################################################################
+
+#########################################################################################
+# create a list of images from a single given container
+# Note 2: In the case of CFHT, the ARCHIVE keyword may be set to retrieve images from
+# the archive rather than a directory.
+# WHERE is optional and can specify a subset of objects, e.g.
+# WHERE="OBJECT=alpha_leo PI_NAME=John_Smith RUNID=11AF03"
+# The list of conditions is OR'ed
+# Use _ for spaces, no quotes
+# Handles subdirectories, the craziness in sorting sorts across subdiretory boundaries
+#########################################################################################
+ifdef ARCHIVE
+ifeq ($(observatory),CFHT)
+%.flst: directoriescreated
+ifeq ($(DATADIR),$(queuedir)/)
+	@echo "In order to use the ARCHIVE option you must specify a DATADIR or NIGHT."
+	@exit 1
+else
+	@if [ ! -e $(byproductsdir)$@ ] ;  then \
+		files=`$(archivebindir)ardrangeESP $(ARCHIVE) | tr ' ' '\n' | sed -e '/*x.$(FITS)/d'` ; \
+		for f in $$files;  do \
+				arfile=`$(archivebindir)arlocate $$f` ; \
+				if [[ "$$arfile" == "not.on.disk" ]] ; then \
+						echo "$(epref) File $$f is not currently in the archive." 2>&1 | tee -a $(errfile) ; \
+				else \
+					echo $${arfile} >> $(byproductsdir)$@; \
+				fi ; \
+		done ;\
+		if [ ! -s $(byproductsdir)$@ ] ; then \
+			echo "$(epref) *** error: files in the data range $(ARCHIVE) are not available." 2>&1 | tee -a $(errfile) ; \
+		fi ; \
+	fi
+endif
+else
+	@echo "$(epref) *** error: the archive option is only available at CFHT." 2>&1 | tee -a $(errfile)
+	@exit 1
+endif
+else
+%.flst: directoriescreated
+	@if [ ! -e $(byproductsdir)$@ ] ;  then \
+		if [[ "$(WHERE)" == "" ]] ; then \
+			find $(DATADIR) \( -name '$(ALLFILEPATTERN)' -o -name '$(ALLFILEPATTERNB)' \) -print | sed -e 's:\([.]*\([0-9]*\)[oabcf].fits\(.gz\)\{0,1\}\):\1 \2:' | awk '{printf("%s %s\n",  $$2, $$1)}' | sort -n | awk '{print $$2}' >$(byproductsdir)$@ ; \
+			if [ ! -s $(byproductsdir)$@ ] ; then \
+				echo "$(epref) *** error: No odometer image files exist in $(DATADIR)." 2>&1 | tee -a $(errfile) ; \
+			fi ; \
+		else \
+			files=`find $(DATADIR) \( -name '$(ALLFILEPATTERN)' -o -name '$(ALLFILEPATTERNB)' \) -print | sed -e 's:\([.]*\([0-9]*\)[oabcf].fits\(.gz\)\{0,1\}\):\1 \2:' | awk '{printf("%s %s\n",  $$2, $$1)}' | sort -n | awk '{print $$2}'` ; \
+			for file in $${files} ; do \
+				case $${file} in \
+					*o.fits) for clause in $(WHERE) ; do \
+								case $${clause} in \
+									OBJECT=*)  key=`echo $${clause#OBJECT=} | tr '_' ' '`;  if [[ "`$(bindir)operagetheader --keyword=OBJECT $${file} | sed -e 's: *$$::'`" == "$${key}" ]] ; then echo $${file} >>$(byproductsdir)$@; fi ;; \
+									PI_NAME=*) key=`echo $${clause#PI_NAME=} | tr '_' ' '`; if [[ "`$(bindir)operagetheader --keyword=PI_NAME $${file} | sed -e 's: *$$::'`" == "$${key}" ]] ; then echo $${file} >>$(byproductsdir)$@; fi ;; \
+									RUNID=*)   key=`echo $${clause#RUNID=} | tr '_' ' '`;   if [[ "`$(bindir)operagetheader --keyword=RUNID $${file} | sed -e 's: *$$::'`" == "$${key}" ]] ; then echo $${file} >>$(byproductsdir)$@; fi ;; \
+								esac ; \
+							done ;; \
+					*) echo $${file} >>$(byproductsdir)$@;; \
+				esac ; \
+			done ; \
+			if [ ! -s $(byproductsdir)$@ ] ; then \
+				echo "$(epref) *** error: No odometer image files exist in $(DATADIR)." 2>&1 | tee -a $(errfile) ; \
+				exit 1 ; \
+			fi ; \
+		fi ; \
+	fi
+endif
+
+#########################################################################################
+# create a reduction list
+# Note: The reduction list may be split in the case of returning to a mode with an
+# intervening mode. e.g. sp1->pol->sp1 The two sp1 sets are split with a ###### comment
+# in the output from operaReductionlist. The two sets are then split here in the harness.
+#########################################################################################
+%.rlst: %.flst
+	@start=$$SECONDS; \
+	if [ ! -e $(byproductsdir)$@ ] ;  then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaReductionSet --splitkey=$(SPLITKEY) --input=$(byproductsdir)$< --output=$(byproductsdir)$@ --qualifiers=\"$(QUALIFIERNAMELIST)\" $(word 1,$(QUALIFIERNAMELIST))=$(word 1,$(QUALIFIERNAMELIST))_$(DETECTOR) $(word 2,$(QUALIFIERNAMELIST))=$(word 2,$(QUALIFIERNAMELIST))_$(MODE) $(word 3,$(QUALIFIERNAMELIST))=$(word 3,$(QUALIFIERNAMELIST))_$(SPEED) $(word 4,$(QUALIFIERNAMELIST))=$(word 4,$(QUALIFIERNAMELIST))_$(AMPLIFIER) --etype=OBJECT --etype=FLAT --etype=BIAS --etype=COMPARISON --etype=ALIGN $(optargs)" 2>>$(errfile) 2>&1 | tee -a $(logfile) ; \
+		if [ -s $(byproductsdir)$@  ] ; then \
+			split=`$(bindir)operasplit $(byproductsdir)$@ $(tmpdir)$@` ; \
+			if (( split != 0 )) ; then \
+				((count=0)) ; \
+				mods[0]=''; mods[1]=$(word 1,$(OSETS)); mods[2]=$(word 2,$(OSETS));  mods[3]=$(word 3,$(OSETS)); \
+				while (( count <= split )) ; do \
+					if [[ "$(VERBOSE)" == "1" ]] ; then \
+						if (( count > 0 )) ; then \
+							echo "$(pref) Splitting $@$$count -> $(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst." ; \
+						else \
+							echo "$(pref) Copying $@$$count -> $(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst." ; \
+						fi ; \
+					fi ; \
+					cat <$(tmpdir)$@$$count >$(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst ; \
+					if [ -s $(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst ] ;  then \
+						echo "$(DETECTOR) $(MODE) $(SPEED) $(AMPLIFIER)_ $${mods[$$count]}" >> $(byproductsdir)master.tmp ;\
+						if [[ "$(VERBOSE)" == "1" ]] ; then \
+							files=`cat <$(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst`; \
+							echo "$(pref) RLIST Files for $(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED):" ; \
+							echo "$${files}" ;\
+						fi ; \
+						$(bindir)operatrim $(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).rlst >$(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).glst ; \
+						if [ -s $(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).glst ] ; then \
+							if [[ "$(VERBOSE)" == "1" ]] ; then \
+								files=`cat <$(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).glst`; \
+								echo "$(pref) GAINLIST Files for $(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED):" ; \
+								echo "$${files}" ;\
+							fi ; \
+						else \
+							rm -f $(byproductsdir)$(DETECTOR)$(AMPLIFIER)_$(MODE)$${mods[$$count]}_$(SPEED).glst ; \
+						fi ; \
+					fi ; \
+					((count++)) ; \
+				done ; \
+			else \
+				if [ -s $(byproductsdir)$@ ] ; then \
+					echo "$(DETECTOR) $(MODE) $(SPEED) $(AMPLIFIER)_" >> $(byproductsdir)master.tmp ;\
+					if [[ "$(DEBUG)" == "1" ]] ; then \
+						files=`cat <$(byproductsdir)$@`; \
+						echo "$(pref) RLIST Files for $(QUALIFIERS):" ; \
+						echo "$${files}" ;\
+					fi ; \
+					$(bindir)operatrim $(byproductsdir)$@ >$(byproductsdir)$*.glst ; \
+					if [ -s $(byproductsdir)$*.glst ] ; then \
+						if [[ "$(DEBUG)" == "1" ]] ; then \
+							files=`cat <$(byproductsdir)$*.glst`; \
+							echo "$(pref) GLIST Files for $(QUALIFIERS):" ; \
+							echo "$${files}" ;\
+						fi ; \
+					else \
+						rm -f $(byproductsdir)$*.glst ; \
+					fi ; \
+				else \
+					rm -f $(byproductsdir)$*.rlst ; \
+				fi ; \
+			fi ; \
+		else \
+				rm -f $(byproductsdir)$@ ; \
+		fi ; \
+		rm -f $(tmpdir)$@ ; \
+	fi
+
+#########################################################################################
+# create a single normalized flat
+#########################################################################################
+normalizedflat_$(QUALIFIERS).$(FITS)$(extension): master.rlst $(QUALIFIERS).aper$(gzip) 
+	@start=$$SECONDS; \
+	if [[ "$(CREATE_NORMALIZED_FLAT)" == "1" ]] ;  then \
+		if [ ! -e $(calibrationdir)normalizedflat_$(QUALIFIERS).$(FITS)$(extension) ] ;  then \
+			echo "$(pref) Starting normalized flat creation for $(QUALIFIERS)." ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaPixelSensitivityMap \
+--outputfilename=$(calibrationdir)normalizedflat_$(QUALIFIERS).$(FITS)$(extension) \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--masterflat=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+--badpixelmask=$(badpixelmask) $(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)normalizedflat_$(QUALIFIERS).$(FITS)$(extension)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile normalizedflat_$(QUALIFIERS)r.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) normalized flat for $(QUALIFIERS) complete in $(deltat)"; \
+		fi ; \
+	fi
+
+#########################################################################################
+# create a single master flat
+#########################################################################################
+masterflat_$(QUALIFIERS).$(FITS)$(extension): master.rlst
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) ] ;  then \
+		echo "$(pref) Starting master flat creation for $(QUALIFIERS)." ; \
+		flats=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/f.$(FITS)/p' | tr '\n' ' '`; \
+		i=`$(bindir)operacount "$${flats}"` ; \
+		if (( i > 0 )) ; then \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterFlat \
+--output=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+--images=\"$${flats}\" \
+--compressiontype=$(compressiontype) \
+--pick=$(masterflatpick) \
+--version=\"$(versionstr)\" \
+--date=\"$(shell date)\" \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile masterflat_$(QUALIFIERS)m.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) master flat for $(QUALIFIERS) complete in $(deltat)"; \
+		fi ; \
+	fi
+
+#########################################################################################
+# create a single master bias
+#########################################################################################
+masterbias_$(QUALIFIERS).$(FITS)$(extension): master.rlst
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) ] ;  then \
+		echo "$(pref) Starting master bias creation for $(QUALIFIERS)." ; \
+		biases=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/b.$(FITS)/p' | tr '\n' ' '`; \
+		i=`$(bindir)operacount "$${biases}"` ; \
+		if (( i > 0 )) ; then \
+			rm -f $(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterBias \
+--output=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--images=\"$${biases}\" \
+--compressiontype=$(compressiontype) \
+--pick=$(masterbiaspick) \
+--version=\"$(versionstr)\" \
+--date=\"$(shell date)\" \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile masterbias_$(QUALIFIERS)m.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) master bias for $(QUALIFIERS) complete in $(deltat)"; \
+		fi ; \
+	fi
+
+#########################################################################################
+# create a single master align
+#########################################################################################
+masterfabperot_$(QUALIFIERS).$(FITS)$(extension): master.rlst
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)masterfabperot_$(QUALIFIERS).$(FITS)$(extension) ] ;  then \
+		fabperots=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/a.$(FITS)/p' | tr '\n' ' '`; \
+		i=`$(bindir)operacount "$${fabperots}"` ; \
+		if (( i > 0 )) ; then \
+			echo "$(pref) Starting master fabperot creation for $(QUALIFIERS)." ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterFabPerot \
+--output=$(calibrationdir)masterfabperot_$(QUALIFIERS).$(FITS)$(extension) \
+--images=\"$${fabperots}\" \
+--compressiontype=$(compressiontype) \
+--pick=$(masterfabperotpick) \
+--version=\"$(versionstr)\" \
+--date=\"$(shell date)\" \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)masterfabperot_$(QUALIFIERS).$(FITS)$(extension) $(optargs)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile masterfabperot_$(QUALIFIERS)m.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) master fabperot for $(QUALIFIERS) complete in $(deltat)"; \
+		fi ; \
+	fi
+
+#########################################################################################
+# create a single master comparison 
+#########################################################################################
+mastercomparison_$(QUALIFIERS).$(FITS)$(extension): masterbias_$(QUALIFIERS).$(FITS)$(extension) 
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)mastercomparison_$(QUALIFIERS).$(FITS)$(extension) ] ;  then \
+		echo "$(pref) Starting master comparison creation for $(QUALIFIERS)." ; \
+		comparisons=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/c.$(FITS)/p' | tr '\n' ' '`; \
+		i=`$(bindir)operacount "$${comparisons}"` ; \
+		if (( i > 0 )) ; then \
+			files=`cat <$(byproductsdir)$(QUALIFIERS).rlst | sed -n '/c.$(FITS)/p'`; \
+			maxetime=0 ; \
+			for file in $${files} ; do \
+				etime=`$(bindir)operagetheader --keyword=EXPTIME $${file} | awk '{printf("%d", $$1);}'` ; \
+				if (( etime > maxetime )) ; then \
+					maxetime=$${etime} ; \
+				fi ; \
+			done ; \
+			if (( maxetime == 0 )) ; then \
+				maxetime=$(mastercomparison_outputExposureTime) ; \
+			fi ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterComparison \
+--output=$(calibrationdir)mastercomparison_$(QUALIFIERS).$(FITS)$(extension) \
+--images=\"$${comparisons}\" \
+--compressiontype=$(compressiontype) \
+--pick=$(mastercomparisonpick) \
+--badpixelmask=$(badpixelmask) \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--combineMethod=$(mastercomparison_combinemethod) \
+--saturationLimit=$(mastercomparison_linearityLimit) \
+--outputExposureTime=$${maxetime} \
+--biasConstant=$(mastercomparison_biasConstant) \
+--truncateOuputFluxToSaturation=$(mastercomparison_truncateOuputFluxToSaturation) \
+--expTimeFITSKeyword=EXPTIME \
+--version=\"$(versionstr)\" \
+--date=\"$(shell date)\" \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(calibrationdir)mastercomparison_$(QUALIFIERS).$(FITS)$(extension)`"; fi; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(MAKE) -f $(makedir)Makefile mastercomparison_$(QUALIFIERS)m.png DETECTOR=$${detector} MODE=$${mode} SPEED=$${speed} AMPLIFIER=$${amplifier} QUALIFIERS=$(QUALIFIERS) DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory; \
+			fi ; \
+			echo "$(pref) master comparison for $(QUALIFIERS) complete in $(deltat)"; \
+		fi ; \
+	fi
+
+#########################################################################################
+# create a single badpixel mask
+#########################################################################################
+%.mask:
+	@start=$$SECONDS; \
+	if [[ "$($*)" != "$(extension)" && -e "$($*)" && ! -e "$($*).$(FITS)$(extension)" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaCreateBadpixMask --compressiontype=$(compressiontype) --map=$($*) --mask=$($*).$(FITS)$(extension) $(optargs)" 2>&1 | tee -a $(logfile) ; \
+		if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $($*).$(FITS)$(extension)`"; fi; \
+		if [[ -e $($*).$(FITS)$(extension) ]] ; then \
+			echo rm -f $($*).$(FITS) ; \
+		fi ; \
+		echo "$(pref) badpixel mask $($*).$(FITS)$(extension) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# calculate gain for a given mode, speed amp set
+#########################################################################################
+%.gain$(gzip): %.rlst
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		if [ -s $(byproductsdir)$*.glst ] ;  then \
+			echo "$(pref) Starting gain for $(QUALIFIERS)" ;\
+			biases=`cat <$(byproductsdir)$*.glst | sed -n '/b.$(FITS)/p' | tr '\n' ' '`; \
+			flats=`cat <$(byproductsdir)$*.glst | sed -n '/f.$(FITS)/p' | tail -n $(maximumflatsforgain) | tr '\n' ' '`; \
+			count=`$(bindir)operacount "$${flats}"`; \
+			needed=$(minimumflatsforgain) ; \
+			if (( count >= needed )) ; then \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaGain \
+--DATASEC=\"$(datasec)\" \
+--DSECA=\"$(dseca)\" \
+--DSECB=\"$(dsecb)\" \
+--badpixelmask=$(badpixelmask) \
+--defaultgain=$(gain) \
+--defaultnoise=$(noise) \
+--numberofamplifiers=$($(DETECTOR)$(AMPLIFIER)_namps) \
+--subwindow=\"$(gainsubwindow)\" \
+--gainMinPixPerBin=$(gainMinPixPerBin) \
+--gainMaxNBins=$(gainMaxNBins) \
+--gainLowestCount=$(gainLowestCount) \
+--gainHighestCount=$(gainHighestCount) \
+--output=$(calibrationdir)$@ \
+--flatimgs=\"$${flats}\" \
+--biasimgs=\"$${biases}\" \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+				if [[ "$(VERBOSE)" == "1" ]] ; then \
+					((amp=0)) ; \
+					while (( amp < $($(DETECTOR)$(AMPLIFIER)_namps) )) ; do \
+						gain=`$(bindir)operagetgainnoise $(calibrationdir)$@ $${amp} gain` ; \
+						noise=`$(bindir)operagetgainnoise $(calibrationdir)$@ $${amp} noise` ; \
+						gainerr=`$(bindir)operagetgainnoise $(calibrationdir)$@ $${amp} gainerror` ; \
+						bias=`$(bindir)operagetgainnoise $(calibrationdir)$@ $${amp} bias` ; \
+						theamp=`$(bindir)operagetword $$amp $(AMPLIFIERS)` ; \
+						echo "$(pref) >>> expected gain       (e/adu): $(gain) for $(QUALIFIERS) amplifier $$theamp" ; \
+						echo "$(pref) >>> estimated gain      (e/adu): $${gain} +-$${gainerr} for $(QUALIFIERS) amplifier $$theamp" ; \
+						echo "$(pref) >>> expected readout noise  (e): $(noise) for $(QUALIFIERS) amplifier $$theamp" ; \
+						echo "$(pref) >>> estimated readout noise (e): $${noise} for $(QUALIFIERS) amplifier $$theamp" ; \
+						echo "$(pref) >>> bias                  (adu): $${bias} for $(QUALIFIERS) amplifier $$theamp" ; \
+						((amp++)) ; \
+					done ; \
+				fi ; \
+				echo "$(pref) gain for $(QUALIFIERS) complete in $(deltat)" ; \
+			else \
+				echo "$(epref) Not enough flats (only $${count}), whereas $${needed} are needed for gain calculation for $(QUALIFIERS)." 2>&1 | tee -a $(errfile) ; \
+			fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# calculate bias for a given mode, speed amp set, updating the bias calibration
+#########################################################################################
+%.bias$(gzip): %.gain$(gzip)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		if [ -s $(byproductsdir)$*.glst ] ;  then \
+			echo "$(pref) Starting bias for $(QUALIFIERS)" ;\
+			biases=`cat <$(byproductsdir)$*.glst | sed -n '/b.$(FITS)/p' | tr '\n' ' '`; \
+			count=`$(bindir)operacount "$${biases}"`; \
+			if (( count >= 1 )) ; then \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaBias \
+--bias="$${biases}" \
+--overscan \
+--numberofamplifiers=$($(DETECTOR)$(AMPLIFIER)_namps) \
+--gain=$(calibrationdir)$*.gain$(gzip) \
+--output=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+			else \
+				echo "$(epref) No biases for bias calculation for $(QUALIFIERS)." 2>&1 | tee -a $(errfile) ; \
+			fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# Master polar flux calibration.
+# Note that P3 and P4 may be empty
+# Calculates master flux calibration for sum of 4 polar sequence
+#########################################################################################
+
+masterpolarfluxcalibration_$(QUALIFIERS).fcal$(gzip) :
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		if [[ "$(MODE)" == "pol" ]] ; then \
+			echo "$(pref) Starting master polar flux calibration generation for $@ $(QUALIFIERS)" ; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				pargs="--plotfilename=$(visualsdir)masterpolarfluxcalibration_$(QUALIFIERS)fcal.eps --spectrumDataFilename=$(byproductsdir)masterpolarfluxcalibration_$(QUALIFIERS)fcal.pdat --outputDataFilename=$(byproductsdir)masterpolarfluxcalibration_$(QUALIFIERS)outputfcal.pdat --scriptfilename=$(byproductsdir)masterpolarfluxcalibration_$(QUALIFIERS)fcal.gnu" ; \
+			fi ; \
+			for seq in 1 2 3 4 ; do \
+				if [ -e $(configdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) ] ; then \
+					inputfcals="$$inputfcals --inputfcal=$(configdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip)" ; \
+				fi ; \
+			done ; \
+			if [[ "$${inputfcals}" == "" ]] ; then \
+				for seq in 1 2 3 4 ; do \
+					if [ -e $(calibrationdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) ] ; then \
+						inputfcals="$$inputfcals --inputfcal=$(calibrationdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip)" ; \
+					fi ; \
+				done ; \
+			fi ; \
+			if [[ "$${inputfcals}" == "" ]] ; then \
+				if [ -e $(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip) ] ; then \
+					inputfcals="--inputfcal=$(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip)" ; \
+				else \
+					inputfcals="--inputconstant=1.0" ; \
+				fi ; \
+			fi ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterFluxCalibration \
+$${inputfcals} \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--inputReferenceSpectrum=$(calibrationdir)th_$(QUALIFIERS).e$(gzip) \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--combineMethod=$(mastercomparison_combinemethod) \
+--minorder=$(createfluxcalibrationminorder) \
+--maxorder=$(createfluxcalibrationmaxorder) \
+$${pargs} \
+--outputfcal=$(calibrationdir)$@ $(optargs)" 2>&1 | tee -a $(logdir)$*p.log ; \
+			echo "$(pref) Master Polar Flux Calibration $@ created in $(deltat)" ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# QUAILIFIERS-based flux calibration
+#
+# NOTE: This step is done after preliminary calibration:
+#  calibration -> reduction -> masterfluxcalibration -> re-reduce
+# to create a new master.
+#
+# Note: In the case of polar, each sequence number is retained separately.
+#
+# There is another step which combines the masters over a series of NIGHTS to create the
+# config/ master. This step requires some process of combining multiple nights.
+#
+# Note: Only Grade 1 standard star images shoould be used...
+#
+#########################################################################################
+masterfluxcalibration_$(QUALIFIERS).fcal$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)masterfluxcalibration_$(QUALIFIERS)fcal.eps --spectrumDataFilename=$(byproductsdir)masterfluxcalibration_$(QUALIFIERS)fcal.pdat --outputDataFilename=$(byproductsdir)masterfluxcalibration_$(QUALIFIERS)outputfcal.pdat --scriptfilename=$(byproductsdir)masterfluxcalibration_$(QUALIFIERS)fcal.gnu" ; \
+		fi ; \
+		if [[ "`ls $(calibrationdir)[0-9]*.fcal$(gzip) 2>/dev/null`" != "" ]] ; then \
+			fcals="`ls $(calibrationdir)[0-9]*.fcal$(gzip) 2>/dev/null | xargs -n1 basename`" ; \
+		fi ; \
+		if [[ "$(MODE)" == "pol" ]] ;  then \
+			for seq in 1 2 3 4 ; do \
+				for fcal in $${fcals} ; do \
+					odometer=`echo $(basename $${fcal}) | sed -e 's:i.fcal$(gzip)::'` ; \
+					inputfits="$(DATADIR)/$${odometer}o.$(FITS)" ; \
+					if [ -e $(DATADIR)/$${odometer}o.$(FITS)$(inextension) ] ; then \
+						inputfits="$(DATADIR)/$${odometer}o.$(FITS)$(inextension)" ; \
+					fi ; \
+					mode=`$(bindir)operagetmode $${inputfits}`; \
+					sequence=`$(bindir)operagetpolarsequence $${inputfits}`; \
+					if [[ "$(MODE)" == "$${mode}" && "$${seq}" == "$${sequence}" ]] ; then \
+						inputfcals="$$inputfcals --inputfcal=$(calibrationdir)$$fcal" ; \
+					fi ; \
+				done ; \
+				if [ -e $(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip) ] ; then \
+					inputfcals="$$inputfcals --inputfcal=$(configdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip)" ; \
+				fi ; \
+				if [[ "$${inputfcals}" == "" ]] ; then \
+					if [ ! -e $(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip) ] ; then \
+						inputfcals="--inputconstant=1.0" ; \
+					fi ;\
+				fi ; \
+				if [[ ! -e $(calibrationdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) && -e $(calibrationdir)$(QUALIFIERS).wcal$(gzip) ]] ; then \
+					echo "$(pref) Starting master flux calibration for $(QUALIFIERS)$${seq}" ;\
+					$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterFluxCalibration \
+$${inputfcals} \
+--inputReferenceSpectrum=$(calibrationdir)th_$(QUALIFIERS).e$(gzip) \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--combineMethod=$(mastercomparison_combinemethod) \
+--minorder=$(createfluxcalibrationminorder) \
+--maxorder=$(createfluxcalibrationmaxorder) \
+--outputfcal=$(calibrationdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+					echo "$(pref) Copying masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) to $(configdir)" ; \
+					if [ -e $(configdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) ] ; then \
+						rm -f $(configdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) ; \
+					fi ; \
+					cp -p $(calibrationdir)masterfluxcalibration_$(QUALIFIERS)$${seq}.fcal$(gzip) $(configdir) ; \
+					echo "$(pref) master flux calibration for $(QUALIFIERS)$${sequence} complete in $(deltat)" ; \
+				fi ; \
+			done ; \
+		else \
+			for fcal in $${fcals} ; do \
+				odometer=`echo $(basename $${fcal}) | sed -e 's:i.fcal$(gzip)::'` ; \
+				inputfits="$(DATADIR)/$${odometer}o.$(FITS)" ; \
+				if [ -e $(DATADIR)/$${odometer}o.$(FITS)$(inextension) ] ; then \
+					inputfits="$(DATADIR)/$${odometer}o.$(FITS)$(inextension)" ; \
+				fi ; \
+				mode=`$(bindir)operagetmode $${inputfits}`; \
+				if [[ "$(MODE)" == "$${mode}" ]] ; then \
+					inputfcals="$$inputfcals --inputfcal=$(calibrationdir)$$fcal" ; \
+				fi ; \
+			done ; \
+			if [[ "$${inputfcals}" == "" ]] ; then \
+				if [ -e $(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip) ] ; then \
+					inputfcals="--inputfcal=$(configdir)masterfluxcalibration_$(QUALIFIERS).fcal$(gzip)" ; \
+				else \
+					inputfcals="--inputconstant=1.0" ; \
+				fi ;\
+			fi ;\
+			if [ -e $(calibrationdir)$(QUALIFIERS).wcal$(gzip) ] ; then \
+				echo "$(pref) Starting master flux calibration for $(QUALIFIERS)" ;\
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaMasterFluxCalibration \
+$${inputfcals} \
+--inputReferenceSpectrum=$(calibrationdir)th_$(QUALIFIERS).e$(gzip) \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--combineMethod=$(createfluxcalibrationcombineMethod) \
+--minorder=$(createfluxcalibrationminorder) \
+--maxorder=$(createfluxcalibrationmaxorder) \
+--outputfcal=$(calibrationdir)$@ \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+				echo "$(pref) master flux calibration for $(QUALIFIERS) complete in $(deltat)" ; \
+			fi ; \
+		fi ; \
+	fi
+
+
+#########################################################################################
+#
+# QUALIFIERS-based flux calibration based on flat field
+#
+#########################################################################################
+masterflatfluxcalibration_$(QUALIFIERS).fcal$(gzip): $(QUALIFIERS).wcar$(gzip) ff_$(QUALIFIERS).e$(gzip)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting master flat field flux calibration for $(QUALIFIERS)" ;\
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaCreateFlatFieldFluxCalibration \
+--inputMasterFlatSpectrum=$(calibrationdir)ff_$(QUALIFIERS).e$(gzip) \
+--wavelengthCalibration=$(calibrationdir)$(QUALIFIERS).wcar$(gzip) \
+--binsize=$(createfluxcalibrationbinsize) \
+--wavelengthForNormalization=$(createfluxcalibrationWavelengthForNormalization) \
+--outputFluxCalibrationFile=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+		echo "$(pref) master flat field flux calibration for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# calculate aperture for a given mode, speed amp set
+#########################################################################################
+%.aper$(gzip): %.prof$(gzip) 
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting aperture for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*aper.eps --datafilename=$(byproductsdir)$*aper.pdat --scriptfilename=$(byproductsdir)$*aper.gnu" ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaExtractionApertureCalibration \
+--inputgeom=$(calibrationdir)$*.geom$(gzip) \
+--inputprof=$(calibrationdir)$*.prof$(gzip) \
+--inputorderspacing=$(calibrationdir)$*.ordp$(gzip) \
+--numberOfBeams=$(apernumberOfBeams) \
+--gapBetweenBeams=$(apergapBetweenBeams) \
+--apertureWidth=$(apernapertureWidth) \
+--apertureHeight=$(aperapertureHeight) \
+--backgroundAperture=$(aperbackgroundAperture) \
+--pickImageRow=$(aperpickImageRow) \
+--nRowSamples=$(apernRowSamples) \
+--xbin=$(aperxbin) \
+--constantTilt=$(constanttiltflag) \
+$${pargs} \
+--ordernumber=$(ordernumber) \
+--outputApertureFile=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) aperture for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# calculate order spacing for a given mode, speed amp set
+#########################################################################################
+%.ordp$(gzip): %.gain$(gzip) masterbias_$(QUALIFIERS).$(FITS)$(extension) masterflat_$(QUALIFIERS).$(FITS)$(extension)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting order polynomial for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*ordp.eps --datafilename=$(byproductsdir)$*ordp.pdat --scriptfilename=$(byproductsdir)$*ordp.gnu" ; \
+		fi ; \
+        if [ -s $(calibrationdir)$*.gain$(gzip) ] ; then \
+            gains="--inputGainFile=$(calibrationdir)$*.gain$(gzip)" ; \
+        fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaOrderSpacingCalibration \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--masterflat=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+--badpixelmask=$(badpixelmask) \
+$${gains} \
+--subformat=\"$(geomsubformat)\" \
+--aperture=$(orderspacing_aperture) \
+--numberOfsamples=$(ordpnumberOfsamples) \
+--orderspacingoutput=$(calibrationdir)$@ \
+--sampleCenterPosition=$(sampleCenterPosition) \
+--referenceOrderNumber=$(referenceOrderNumber) \
+--referenceOrderSeparation=$(referenceOrderSeparation) \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) order polynomial for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+
+#########################################################################################
+# calculate geometry for a given mode, speed amp set
+# Note that the --witherrors option will cause errors stats to be calculated
+#########################################################################################
+%.geom$(gzip): %.ordp$(gzip)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting geometry for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*geom.eps --datafilename=$(byproductsdir)$*geom.pdat --scriptfilename=$(byproductsdir)$*geom.gnu" ; \
+		fi ; \
+        if [ -s $(calibrationdir)$*.gain$(gzip) ] ; then \
+            gains="--inputGainFile=$(calibrationdir)$*.gain$(gzip)" ; \
+        fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaGeometryCalibration \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--masterflat=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+--badpixelmask=$(badpixelmask) \
+$${gains} \
+--subformat=\"$(geomsubformat)\" \
+--aperture=$(geom_aperture) \
+--detectionMethod=$(detectionMethod) \
+--FFTfilter=$(FFTfilter) \
+--nsamples=$(nsamples) \
+--maxorders=$(maxorders) \
+--minordertouse=$(minordertouse) \
+--orderOfTracingPolynomial=$(geomnpar_$(SPEED))  \
+--binsize=$(geombinsize)  \
+--colDispersion=$(colDispersion) \
+--invertOrders=$(invertOrders) \
+--recenterIPUsingSliceSymmetry=$(recenterIPUsingSliceSymmetry) \
+--totalNumberOfSlices=$(totalNumberOfSlices) \
+--inputOrderSpacing=$(calibrationdir)$*.ordp$(gzip) \
+--referenceOrderSamplePosition=$(referenceOrderSamplePosition) \
+$${pargs} \
+--outputGeomFile=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) geometry for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# calculate instrument profile for a given mode, speed, amp, set
+# set maxthreads to 1 if you do not want lightweight threading
+# set to 2 or 3 on a machine with limited memory.
+#########################################################################################
+%.prof$(gzip): %.geom$(gzip) mastercomparison_$(QUALIFIERS).$(FITS)$(extension) masterfabperot_$(QUALIFIERS).$(FITS)$(extension)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting instrument profile for $(QUALIFIERS) using $(maxthreads) threads" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*prof.eps --datafilename=$(byproductsdir)$*prof.pdat --scriptfilename=$(byproductsdir)$*prof.gnu" ; \
+		fi ; \
+		compparm="--mastercomparison=$(calibrationdir)mastercomparison_$(QUALIFIERS).$(FITS)$(extension)" ; \
+		IPmethod=$(IPDefaultMethod) ; \
+		if [[ -e $(calibrationdir)masterfabperot_$(QUALIFIERS).$(FITS)$(extension) ]] ; then \
+			compparm="--masterfabperot=$(calibrationdir)masterfabperot_$(QUALIFIERS).$(FITS)$(extension)" ; \
+			IPmethod=$(IPWithBinningMethod) ; \
+		fi; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaInstrumentProfileCalibration \
+--geometryfilename=$(calibrationdir)$*.geom$(gzip) \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--masterflat=$(calibrationdir)masterflat_$(QUALIFIERS).$(FITS)$(extension) \
+$${compparm} \
+--badpixelmask=$(badpixelmask) \
+--xSize=$(IPXSize) \
+--ySize=$(IPYSize) \
+--xSampling=$(IPXSampling) \
+--ySampling=$(IPYSampling) \
+--minimumlines=$(IPminimumlines) \
+--binsize=$(IPBinsize) \
+--ordernumber=$(ordernumber) \
+--method=$${IPmethod} \
+--tilt=$(IPtilt) \
+--gainfilename=$(calibrationdir)$*.gain$(gzip) \
+--referenceLineWidth=$(referenceLineWidth) \
+--LocalMaxFilterWidth=$(LocalMaxFilterWidth) \
+--DetectionThreshold=$(DetectionThreshold) \
+--MinPeakDepth=$(MinPeakDepth) \
+$${pargs} \
+--spectralElementHeight=$(spectralElementHeight) \
+--maxthreads=$(maxthreads) \
+--outputProf=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) instrument profile for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# calculate wavelength calibration for a given mode, speed amp set
+#
+# thar_ref_Lovis2007.dat is used as the thorium argon reference.
+# From Lovis & Pepe, 2007, A&A 668 1115)
+# The table has 6 columns:
+# New vacuum wavelength	Uncertainty	Wavenumber	Intensity	Previous wavelength	Identification
+# [Å]						[Å]			[?]			[cm-1]		[e-]				[Å]	
+#
+# wcal_ref.dat has 40 entries that look like order & polynomial coefficients?:
+# 22
+# 1.00717488e+03 1.03210457e-02 -3.02305517e-07 -1.57730590e-12 
+# 23
+# 9.63377441e+02 9.87524329e-03 -2.90111828e-07 -1.26199550e-12 
+# 24
+# These are polynomial coefficients that are used as a first guess
+# to get the start and end wavelengths for each order.
+#
+#########################################################################################
+%.wcar$(gzip): th_$(QUALIFIERS).e$(gzip)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting wavelength calibration for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--generate3DPlot=$(wcal_generate3DPlot) --subtractCentralWavelength=$(wcal_subtractCentralWavelength) --ordersplotfilename=$(visualsdir)$(QUALIFIERS).owcar.eps --specplotfilename=$(visualsdir)$(QUALIFIERS).swcar.eps --ordersdatafilename=$(byproductsdir)$(QUALIFIERS).wcar.odat --atlasdatafilename=$(byproductsdir)$(QUALIFIERS).wcar.adat --compdatafilename=$(byproductsdir)$(QUALIFIERS).wcar.cdat --linesdatafilename=$(byproductsdir)$(QUALIFIERS).wcar.ldat --ordersscriptfilename=$(byproductsdir)$(QUALIFIERS).owcar.gnu --specscriptfilename=$(byproductsdir)$(QUALIFIERS).swcar.gnu" ; \
+		fi ; \
+		initialguess="$(configdir)wcal_ref.dat$(gzip)" ; \
+		if [ -s $(calibrationdir)$@ ] ; then \
+			initialguess=$(calibrationdir)$@ ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaWavelengthCalibration \
+--atlas_lines=$(configdir)$(thorium_argon_atlas_lines) \
+--atlas_spectrum=$(configdir)$(thorium_argon_atlas_spectrum) \
+--uncalibrated_spectrum=$(calibrationdir)th_$(QUALIFIERS).e$(gzip) \
+--uncalibrated_linewidth=$(wcal_uncalibrated_linewidth) \
+--inputGeomFile=$(calibrationdir)$(QUALIFIERS).geom$(gzip) \
+--inputWaveFile=$${initialguess} \
+--ordernumber=$(ordernumber) \
+--parseSolution=$(wavelengthgoodinitialguessnotavailable) \
+--ParRangeSizeInPerCent=$(wcalParRangeSizeInPerCent) \
+--NpointsPerPar=$(wcalNpointsPerPar) \
+--maxNIter=$(wcalmaxNIter) \
+--minNumberOfLines=$(wcalminNumberOfLines) \
+--maxorderofpolynomial=$(wcalmaxorderofpolynomial) \
+--dampingFactor=$(wcaldampingFactor) \
+--initialAcceptableMismatch=$(wcalinitialAcceptableMismatch) \
+--nsigclip=$(wcalnsigclip) \
+--normalizeUncalibratedSpectrum=$(wcal_normalizeUncalibratedSpectrum) \
+--normalizationBinSize=$(wcal_normalizationBinSize) \
+--LocalMaxFilterWidth=$(wcal_LocalMaxFilterWidth) \
+--DetectionThreshold=$(wcal_DetectionThreshold) \
+--MinPeakDepth=$(wcal_MinPeakDepth) \
+$${pargs} \
+--outputWaveFile=$(calibrationdir)$@ \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) wavelength calibration for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# Refine the wavelength calibration
+#########################################################################################
+%.wcal$(gzip): masterflatfluxcalibration_$(QUALIFIERS).fcal$(gzip)
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting Wavelength refinement with operaStitchOrders for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="" ; \
+		fi ; \
+		wcar="$(configdir)wcal_ref.dat$(gzip)" ; \
+		if [ -e $(calibrationdir)$(QUALIFIERS).wcar$(gzip) ] ; then \
+			wcar=$(calibrationdir)$(QUALIFIERS).wcar$(gzip) ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaStitchOrders \
+--inputSpectrum=$(calibrationdir)th_$(QUALIFIERS).e$(gzip) \
+--inputWaveFile=$${wcar} \
+--outputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--orderOfReference=$(stitch_orderOfReference) \
+--DWavelengthRange=$(stitch_DWavelengthRange) \
+--DWavelengthStep=$(stitch_DWavelengthStep) \
+--XCorrelationThreshold=$(stitch_XCorrelationThreshold) \
+--sigmaThreshold=$(stitch_sigmaThreshold) \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) Wavelength refinement with operaStitchOrders for $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# Calculate the Resolution
+#########################################################################################
+%.res$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(calibrationdir)$@ ] ; then \
+		echo "$(pref) Starting Resolution calculation for $(QUALIFIERS)" ;\
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*res.eps --datafilename=$(byproductsdir)$*res.pdat --scriptfilename=$(byproductsdir)$*res.gnu" ; \
+		fi ; \
+		wcar="$(configdir)wcal_ref.dat$(gzip)" ; \
+		if [ -e $(calibrationdir)$(QUALIFIERS).wcar$(gzip) ] ; then \
+			wcar=$(calibrationdir)$(QUALIFIERS).wcar$(gzip) ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaCalculateSpectralResolution \
+--inputWaveFile=$${wcar} \
+--outputResolutionFile=$(calibrationdir)$@ \
+--minorderOfLaurentPolynomial=$(dispminorderOfLaurentPolynomial) \
+--maxorderOfLaurentPolynomial=$(dispmaxorderOfLaurentPolynomial) \
+--maxorderofpolynomial=$(wcalmaxorderofpolynomial) \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile) ; \
+		echo "$(pref) Resolution calculation $(QUALIFIERS) complete in $(deltat)" ; \
+	fi
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################

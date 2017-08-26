@@ -1,0 +1,119 @@
+#########################################################################################
+# Sky Objects Standard Star name based, sorted out from odometers
+# The standard star selection is made in the .fcal rule above
+#  
+#########################################################################################
+
+%.skyobj$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(configdir)standardstars/$@ ] ; then \
+		inputfits="$(DATADIR)/$*o.$(FITS)" ; \
+		if [ -e $(DATADIR)/$*o.$(FITS)$(inextension) ] ; then \
+			inputfits="$(DATADIR)/$*o.$(FITS)$(inextension)" ; \
+		fi ; \
+		object=`$(bindir)operagetheader --keyword=OBJECT $${inputfits} | sed -e 's: ::g'` ; \
+		runid=`$(bindir)operagetheader --keyword=RUNID $${inputfits} | sed -e 's: ::'` ; \
+		echo "$(pref) Starting sky object creation for $$runid $$object $(QUALIFIERS)" ;\
+		line=`grep $${object} $(configdir)standardstars/operaStandardStars.dat` ; \
+		if [[ "$${line}" != "" ]] ; then \
+			ra=`echo $${line} | awk '{print $$2}'` ; \
+			dec=`echo $${line} | awk '{print $$3}'` ; \
+			ProperMotionRA=`echo $${line} | awk '{print $$4}'` ; \
+			ProperMotionDec=`echo $${line} | awk '{print $$5}'` ; \
+			Parallax=`echo $${line} | awk '{print $$6}'` ; \
+			V_magnitude=`echo $${line} | awk '{print $$7}'` ; \
+			EffectiveTemperature=`echo $${line} | awk '{print $$8}'` ; \
+			RadialVelocity=`echo $${line} | awk '{print $$9}'` ; \
+			SpectralType=`echo $${line} | awk '{print $$10}'` ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaObjectInTheSkySetup \
+--sourceID=\"$${object}\" \
+--RA=$${ra} \
+--Dec=$${dec} \
+--ProperMotion=\"$${ProperMotionRA} $${ProperMotionDec}\" \
+--Parallax=$${Parallax} \
+--V_magnitude=$${V_magnitude} \
+--EffectiveTemperature=$${EffectiveTemperature} \
+--RadialVelocity=$${RadialVelocity} \
+--SpectralType=$${SpectralType} \
+--outputObjectInTheSkyFile=$(configdir)standardstars/$@ \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+			echo "$(pref) sky object creation for $@ $$runid $$object $(QUALIFIERS) complete in $(deltat)" ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# Observing Conditions - Odometer based
+# MOONANGL=               111.00 / Angle from object to moon at start in degrees  
+# MOONPHAS=                 0.62 / Moon phase @ 0 HST, 0..1 new>full, -1..0 >new  
+# MOONUP  = 'True    '           / Moon up? True or False                         
+# MOONALT =                12.90 / Moon altitude at start in degrees              
+# MOONAZ  =               247.10 / Moon azimuth at start in deg, 0=N 90=E 270=W  
+#  
+#########################################################################################
+%.obscond$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(spectradir)$@ ] ; then \
+		inputfits="$(DATADIR)/$*o.$(FITS)" ; \
+		if [ -e $(DATADIR)/$*o.$(FITS)$(inextension) ] ; then \
+			inputfits="$(DATADIR)/$*o.$(FITS)$(inextension)" ; \
+		fi ; \
+		etime=`$(bindir)operagetheader --keyword=EXPTIME $${inputfits} | awk '{printf("%d", $$1);}'` ; \
+		MJDATE=`$(bindir)operagetheader --keyword=MJDATE $${inputfits}` ; \
+		airmass=`$(bindir)operagetheader --keyword=AIRMASS $${inputfits}` ; \
+		moonphase=`$(bindir)operagetheader --keyword=MOONPHAS $${inputfits}` ; \
+		moonangle=`$(bindir)operagetheader --keyword=MOONANGL $${inputfits}` ; \
+		moonalt=`$(bindir)operagetheader --keyword=MOONALT $${inputfits}` ; \
+		if [[ "`grep $* $(configdir)standardstars/operaStandardObservingConditions.dat`" != "" ]] ; then \
+			imagequality="--imageQuality=`grep $* $(configdir)standardstars/operaStandardObservingConditions.dat | awk '{print $$2}'`" ; \
+		fi  ; \
+		if [[ "$(USE_SYBASE)" == "1" ]] ; then \
+			photometric="--photometric=`$(bindir)wiropdb \"select is_phot from xexp where _obsid=$*\" | tail -1`" ; \
+			observercomments="--observercomments=\"`$(bindir)/espgetobscomment type=obs $(NIGHT) | grep $*o | tr '\n' ' ' | tr '"' ' '`\"" ; \
+			qccomments="--qccomments=\"`$(bindir)/espgetobscomment type=qc $(NIGHT) | grep $*o | tr '\n' ' ' | tr '"' ' '`\"" ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaObservingConditionsSetup \
+--JDTime=$${MJDATE} \
+--exposureTime=$${etime} \
+--airmass=$${airmass} \
+$${imagequality} \
+$${photometric} \
+$${observercomments} \
+$${qccomments} \
+--moonphase=$${moonphase} \
+--moonalt=$${moonalt} \
+--angularDistFromMoon=$${moonangle} \
+--outputObservingConditionsFile=$(spectradir)$@ \
+$${pargs} \
+$(optargs)" 2>&1 | tee -a $(logfile); \
+		echo "$(pref) Observing conditions for $* completed in $(deltat)" ; \
+	fi
+
+#########################################################################################
+# line spectrum from master comparison.
+# Note: Although normalized flat is listed as a dependency, in fact it is optional
+# and creation of the flat is signaled by a flag "CREATE_NORMALIZED_FLAT" in the
+# Makefile.parameters
+#########################################################################################
+
+%.l$(gzip): normalizedflat_$(QUALIFIERS).$(FITS)$(extension)
+	@start=$$SECONDS; \
+	if [ ! -e $(spectradir)$@ ] ; then \
+		echo "$(pref) Starting spectral line generation for $@" ; \
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(visualsdir)$*l.eps --linesdatafilename=$(byproductsdir)$*l.ldat --specdatafilename=$(byproductsdir)$*l.sdat --scriptfilename=$(byproductsdir)$*l.gnu" ; \
+		fi ; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaExtractSpectralLines \
+--inputGeometryFile=$(calibrationdir)$(QUALIFIERS).geom$(gzip) \
+--inputInstrumentProfileFile=$(calibrationdir)$(QUALIFIERS).prof$(gzip) \
+--mastercomparison=$(calibrationdir)mastercomparison_$(QUALIFIERS).$(FITS)$(extension) \
+--masterbias=$(calibrationdir)masterbias_$(QUALIFIERS).$(FITS)$(extension) \
+--badpixelmask=$(badpixelmask) \
+--gain=$(calibrationdir)$(QUALIFIERS).gain$(gzip) \
+--referenceLineWidth=$(referenceLineWidth) \
+--spectralElementHeight=$(spectralElementHeight) \
+--ordernumber=$(ordernumber) \
+$${pargs} \
+--outputSpectraFile=$(spectradir)$@ $(optargs)" 2>&1 | tee -a $(logdir)$*.log ; \
+		echo "$(pref) Spectral lines $@ created in $(deltat)" ; \
+	fi

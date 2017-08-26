@@ -1,0 +1,1236 @@
+#########################################################################################
+#
+# Makefile name: Makefile.util
+# Version: 1.0
+# Description: espadons utility functions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_util_espadons
+#/// \brief utility functionss
+#/// \note This is where the multi-machine targets reside.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+# This section is generic stuff
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+help:	
+	@opera --help
+
+#########################################################################################
+# The current configuration
+#########################################################################################
+
+who:
+	@echo "Who is processing..." ; \
+	locks=`ls $(outdir)Lock_* 2>/dev/null` ; \
+	for lock in $${locks} ; do \
+		cat <$${lock} ; \
+	done
+
+status:
+	@echo "$(pref) ************ Status for $(shell date) ************"
+	@echo "$(pref)Observatory   $(observatory)"
+	@echo "$(pref)Mauna Kea RA  $(MaunaKeaRA)"
+	@echo "$(pref)Mauna Kea Dec $(MaunaKeaDec)"
+	@echo "$(pref)Coordinates   $(observatory_coords)"
+	@echo "$(pref)NIGHT         $(NIGHT)"
+	@if [[ -e $(outdir)Lock_$(NIGHT) ]] ; then \
+	 	echo "$(pref)            `cat <$(outdir)Lock_$(NIGHT)`" ; \
+	fi
+	@echo "$(pref)PROCESSING  `ls  $(outdir)Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'| tr '\n' ' '` "
+	@if [ -e $(byproductsdir)master.rlst ] ; then \
+	 	echo "$(pref)DETECTORS/MODES/SPEEDS/AMPS:"; \
+	 	echo "`cat <$(byproductsdir)master.rlst | tr '_' ' '`"; \
+	fi
+	@echo "$(pref)HOST        $(MACHINE)"
+	@echo -n "$(pref)MACHINES "
+	@for m in $(MACHINES) ; do \
+		echo -n "`echo $$m | awk '{printf("%9s",$$1)}'`" ; \
+	done
+	@echo
+	@echo -n "$(pref)LOADAVERAGES" ; \
+	for m in $(MACHINES) ; do \
+		loadavg=`rsh $$m cat /proc/loadavg 2>/dev/null` ; \
+		echo -n "`$(bindir)operagetword 1 $$loadavg | awk '{printf("%9.2f",$$1)}'`" ; \
+	done
+	@echo 
+	@for m in $(MACHINES) ; do \
+		if [ "$${m}" == "$${HOSTNAME}" ] ; then \
+			makes=`ps -eo stat,comm | grep make` ; \
+		else \
+			makes=`$(remoteshell) $$m ps -eo stat,comm | grep make` ; \
+		fi  ; \
+		if [[ "$${makes}" != "" ]] ; then \
+			if [[ "`echo $${makes} | grep defunct | grep zombie`" != "" ]] ; then \
+				echo "$(pref)$$m has a defunct make zombie and is hung." ; \
+			else \
+				echo "$(pref)$$m `echo $${makes} | wc -l` processes are running." ; \
+			fi ; \
+		else \
+			echo "$(pref)$$m is OK, not in use at the moment." ; \
+		fi ; \
+	done
+	@for m in $(MACHINES) ; do \
+		echo "$${m}:"; \
+		ps -eo time,pid,pmem,pcpu,stat,comm | head -1 ; \
+		if [ "$${m}" == "$${HOSTNAME}" ] ; then \
+			ps -eo time,pid,pmem,pcpu,stat,comm | grep opera | sort -r ; \
+		else \
+			$(remoteshell) $$m ps -eo time,pid,pmem,pcpu,stat,comm | grep opera | sort -r ; \
+		fi  ; \
+	done
+	@if [ -e $(byproductsdir)master.rlst ] ; then \
+		echo -n "$(pref)CALIBRATIONS " ; \
+		exec 4< $(byproductsdir)master.rlst ; \
+		while read line <&4 ; \
+		do \
+			detector=`$(bindir)operagetword 1 $${line}`; \
+			mode=`$(bindir)operagetword 2 $${line}`; \
+			speed=`$(bindir)operagetword 3 $${line}`; \
+			amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+			oset=`$(bindir)operagetword 5 $${line}`; \
+			if [[ -e $(calibrationdir)/$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.wcal$(gzip) ]] ; then \
+				echo -n "$$detector$${amplifier} $$mode$${oset} $$speed, " ; \
+			fi ; \
+		done ; \
+		echo ; \
+		exec 4>&- ; \
+	fi 
+	@echo "$(pref) ************   Source Files     ************" 
+	@echo "$(pref)OBJECTS     `ls $(DATADIR)/$(OBJECTFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)FLATS       `ls $(DATADIR)/$(FLATFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)BIASES      `ls $(DATADIR)/$(BIASFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)THORIUM     `ls $(DATADIR)/$(THORIUMFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)FABPER      `ls $(DATADIR)/$(FABPERFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref) ************   Output Files     ************" 
+	@echo "$(pref)SPECTRA     `ls $(spectradir)$(INTENSITYFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)POLAR       `ls $(spectradir)$(POLARIMETRYFILEPATTERN)  2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)CALS        `ls $(spectradir)$(CALSFILEPATTERN)  2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)SNR         `ls $(spectradir)$(SNRFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)MASTERFLATS `ls $(calibrationdir)masterflat* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)MASTERBIAS  `ls $(calibrationdir)masterbias* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)MASTERCOMP  `ls $(calibrationdir)mastercomp* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)MASTERFABP  `ls $(calibrationdir)masterfab* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)GAIN        `ls $(calibrationdir)*.gain* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)ORDP        `ls $(calibrationdir)*.ordp* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)GEOM        `ls $(calibrationdir)*.geom* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)WCAL        `ls $(calibrationdir)*.wcal* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)WCAR        `ls $(calibrationdir)*.wcar* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)FCAL        `ls $(calibrationdir)*.fcal* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)PROF        `ls $(calibrationdir)*.prof* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)APER        `ls $(calibrationdir)*.aper* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@echo "$(pref)DISP        `ls $(calibrationdir)*.disp* 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w`" 
+	@if [ -s $(logdir)errlog ] ; then \
+		echo "$(epref)There are errors, see $(logdir)errlog." ; \
+	else \
+		echo "$(pref)There are no errors." ; \
+	fi
+	@if [[ "`ls $(calibrationdir)*.disp* 2>/dev/null`" == "" ]] ; then \
+		echo "$(pref)Calibration is not complete." ; \
+	else \
+		echo "$(pref)Calibration is complete." ; \
+	fi
+	@sourcecount=`ls $(DATADIR)/$(OBJECTFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+	spectrumcount=`ls $(spectradir)$(INTENSITYFILEPATTERN) 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+	if (( sourcecount != spectrumcount )) ; then \
+		if (( 0 == spectrumcount )) ; then \
+			echo "$(pref)No reduction data is available." ; \
+		else \
+			if (( sourcecount > 0 )) ; then \
+				percent=`echo "$$spectrumcount * 100 / $$sourcecount" | bc` ; \
+				echo "$(pref)Reduction of $(NIGHT) is about $${percent}% complete." ; \
+			fi ; \
+		fi ; \
+	else \
+		if (( spectrumcount == 0 )) ; then \
+			echo "$(pref)Reduction has not been done." ; \
+		else \
+			echo "$(pref)Reduction is complete." ; \
+		fi ; \
+	fi
+
+modes:
+	@files=`ls $(DATADIR)/$(OBJECTFILEPATTERN) 2>/dev/null` ; \
+	for file in $${files} ; do \
+		echo "`basename $${file}` `$(bindir)operagetdetector $${file}` `$(bindir)operagetamplifier $${file}` `$(bindir)operagetmode $${file}` `$(bindir)operagetspeed $${file}`" ; \
+	done 
+
+config configuration:
+	@echo $(versionstr)
+	@echo "badpix         = $($(DETECTOR)_badpix)"
+	@echo "DATADIR        = $(DATADIR)"
+	@echo "NIGHT          = $(NIGHT)"
+	@echo "homedir        = $(homedir)"
+	@echo "spectradir     = $(spectradir)"
+	@echo "calibrationdir = $(calibrationdir)"
+	@echo "byproductsdir  = $(byproductsdir)"
+	@echo "processeddir   = $(processeddir)"
+	@echo "approveddir    = $(approveddir)"
+	@echo "visualsdir     = $(visualsdir)"
+	@echo "tmpdir         = $(tmpdir)"
+	@echo "logdir         = $(logdir)"
+	@echo "DETECTORS      = $(DETECTORS)"
+	@echo "QUALIFIERS     = $(QUALIFIERS)"
+	@echo "QUALIFIERLIST  = $(QUALIFIERLIST)"
+	@echo "MODES          = $(MODES)"
+	@echo "SPEEDS         = $(SPEEDS)"
+	@echo "DETECTOR       = $(DETECTOR)"
+	@echo "MODE           = $(MODE)"
+	@echo "SPEED          = $(SPEED)"
+	@echo "MACHINES       = $(MACHINES)"
+	@echo "LOADAVERAGES   = $(LOADAVERAGES)"
+	@echo "MACHINE        = $(MACHINE)"
+	@echo "TRACE          = $(TRACE)"
+
+#########################################################################################
+# The current paramter values for a mode/speed
+#########################################################################################
+
+parameters:
+	@echo "OPERA_PARAM EEV1_namps := $(EEV1_namps)"
+	@echo "OPERA_PARAM OLAPAa_namps := $(OLAPAa_namps)"
+	@echo "OPERA_PARAM OLAPAab_namps := $(OLAPAab_namps)"
+	@echo "OPERA_PARAM minimumflatsforgain := $(minimumflatsforgain)"
+	@echo "OPERA_PARAM gainsubwindow := $(gainsubwindow)"
+	@echo "OPERA_PARAM gainMinPixPerBin := $(gainMinPixPerBin)"
+	@echo "OPERA_PARAM gainMaxNBins := $(gainMaxNBins)"
+	@echo "OPERA_PARAM gainLowestCount := $(gainLowestCount)"
+	@echo "OPERA_PARAM gainHighestCount := $(gainHighestCount)"
+	@echo "OPERA_PARAM geom_limit := $(geom_limit)"
+	@echo "OPERA_PARAM geomsubformat := $(geomsubformat)"
+	@echo "OPERA_PARAM maxorders := $(maxorders)"
+	@echo "OPERA_PARAM spectralsampling := $(spectralsampling)"
+	@echo "OPERA_PARAM colDispersion := $(colDispersion)"
+	@echo "OPERA_PARAM invertOrders := $(invertOrders)"
+	@echo "OPERA_PARAM aperture := $(aperture)"
+	@echo "OPERA_PARAM detectionMethod := $(detectionMethod)"
+	@echo "OPERA_PARAM FFTfilter := $(FFTfilter)"
+	@echo "OPERA_PARAM orderOfTracingPolynomial := $($(geomnpar_$(SPEED)))"
+	@echo "OPERA_PARAM geombinsize := $(geombinsize)"
+	@echo "OPERA_PARAM nsamples := $(nsamples)"
+	@echo "OPERA_PARAM recenterIPUsingSliceSymmetry := $(recenterIPUsingSliceSymmetry)"
+	@echo "OPERA_PARAM minordertouse := $(minordertouse)"
+	@echo "OPERA_PARAM totalNumberOfSlices := $(totalNumberOfSlices)"
+	@echo "OPERA_PARAM referenceOrderNumber := $(referenceOrderNumber)"
+	@echo "OPERA_PARAM referenceOrderSeparation := $(referenceOrderSeparation_$(MODE))"
+	@echo "OPERA_PARAM referenceOrderSamplePosition := $(referenceOrderSamplePosition)"
+	@echo "OPERA_PARAM thorium_argon_atlas_lines := $(thorium_argon_atlas_lines)"
+	@echo "OPERA_PARAM thorium_argon_atlas_spectrum := $(thorium_argon_atlas_spectrum)"
+	@echo "OPERA_PARAM wcal_uncalibrated_linewidth := $($(MODE)_wcal_uncalibrated_linewidth)"
+	@echo "OPERA_PARAM wcal_use_spectral_lines := $(wcal_use_spectral_lines)"
+	@echo "OPERA_PARAM wavelengthgoodinitialguessnotavailable := $(wavelengthgoodinitialguessnotavailable)"
+	@echo "OPERA_PARAM wcalParRangeSizeInPerCent := $(wcalParRangeSizeInPerCent)"
+	@echo "OPERA_PARAM wcalNpointsPerPar := $(wcalNpointsPerPar)"
+	@echo "OPERA_PARAM wcalmaxNIter := $(wcalmaxNIter)"
+	@echo "OPERA_PARAM wcalminNumberOfLines := $(wcalminNumberOfLines)"
+	@echo "OPERA_PARAM wcalmaxorderofpolynomial := $(wcalmaxorderofpolynomial)"
+	@echo "OPERA_PARAM wcaldampingFactor := $(wcaldampingFactor)"
+	@echo "OPERA_PARAM wcalinitialAcceptableMismatch := $(wcalinitialAcceptableMismatch)"
+	@echo "OPERA_PARAM wcalnsigclip := $(wcalnsigclip)"
+	@echo "OPERA_PARAM IPDimensions := $($(MODE)_IPDimensions)"
+	@echo "OPERA_PARAM spectralElementHeight := $(spectralElementHeight)"
+	@echo "OPERA_PARAM DetectionThreshold := $(DetectionThreshold)"
+	@echo "OPERA_PARAM referenceLineWidth := $(referenceLineWidth)"
+	@echo "OPERA_PARAM IPtilt := $(IPtilt)"
+	@echo "OPERA_PARAM IPDefaultMethod := $(IPDefaultMethod)"
+	@echo "OPERA_PARAM IPBinsize := $(IPBinsize)"
+	@echo "OPERA_PARAM CREATE_NORMALIZED_FLAT := $(CREATE_NORMALIZED_FLAT)"
+	@echo "OPERA_PARAM normalizedflataperture := $(normalizedflataperture)"
+	@echo "OPERA_PARAM normalizedflatbinsiz := $(normalizedflatbinsiz)"
+	@echo "OPERA_PARAM FourierFilterWidthNormal := $(FourierFilterWidthNormal)"
+	@echo "OPERA_PARAM numberOfBeams := $($(MODE)_numberOfBeams)"
+	@echo "OPERA_PARAM apertureWidth := $($(MODE)_apertureWidth)"
+	@echo "OPERA_PARAM apertureHeight := $($(MODE)_apertureHeight)"
+	@echo "OPERA_PARAM backgroundAperture := $($(MODE)_backgroundAperture)"
+	@echo "OPERA_PARAM gapBetweenBeams := $($(MODE)_gapBetweenBeams)"
+	@echo "OPERA_PARAM apernumberOfBeams := $(apernumberOfBeams)"
+	@echo "OPERA_PARAM apernapertureWidth := $(apernapertureWidth)"
+	@echo "OPERA_PARAM aperapertureHeight := $(aperapertureHeight)"
+	@echo "OPERA_PARAM aperbackgroundAperture := $(aperbackgroundAperture)"
+	@echo "OPERA_PARAM apergapBetweenBeams := $(apergapBetweenBeams)"
+	@echo "OPERA_PARAM aperpickImageRow := $(aperpickImageRow)"
+	@echo "OPERA_PARAM spectrumordercol := $(spectrumordercol)"
+	@echo "OPERA_PARAM spectrumdistcol := $(spectrumdistcol)"
+	@echo "OPERA_PARAM spectrumfluxcol := $(spectrumfluxcol)"
+	@echo "OPERA_PARAM spectrumvariancecol := $(spectrumvariancecol)"
+	@echo "OPERA_PARAM spectrumintegratedcol := $(spectrumintegratedcol)"
+	@echo "OPERA_PARAM snrordercol := $(snrordercol)"
+	@echo "OPERA_PARAM snrdistcol := $(snrdistcol)"
+	@echo "OPERA_PARAM snrcol := $(snrcol)"
+	@echo "OPERA_PARAM snrintegratedcol := $(snrintegratedcol)"
+	@echo "OPERA_PARAM wcalordercol := $(wcalordercol)"
+	@echo "OPERA_PARAM wcalwavelengthcol := $(wcalwavelengthcol)"
+	@echo "OPERA_PARAM wcalintensitycol := $(wcalintensitycol)"
+	@echo "OPERA_PARAM wcaltitlecol := $(wcaltitlecol)"
+	@echo "OPERA_PARAM normalize_usePolynomial := $(normalize_usePolynomial)"
+	@echo "OPERA_PARAM normalize_binsize := $(normalize_binsize)"
+	@echo "OPERA_PARAM extraction_backgroundBinsize := $(extraction_backgroundBinsize)"
+	@echo "OPERA_PARAM extraction_sigmaclip := $(extraction_sigmaclip)"
+	@echo "OPERA_PARAM extraction_usePolynomialFit := $(extraction_usePolynomialFit)"
+	@echo "OPERA_PARAM RawSpectrum := $(RawSpectrum)"
+	@echo "OPERA_PARAM StandardSpectrum := $(StandardSpectrum)"
+	@echo "OPERA_PARAM OptimalSpectrum := $(OptimalSpectrum)"
+	@echo "OPERA_PARAM OperaOptimalSpectrum := $(OperaOptimalSpectrum)"
+	@echo "OPERA_PARAM RawBeamSpectrum := $(RawBeamSpectrum)"
+	@echo "OPERA_PARAM StandardBeamSpectrum := $(StandardBeamSpectrum)"
+	@echo "OPERA_PARAM OptimalBeamSpectrum := $(OptimalBeamSpectrum)"
+	@echo "OPERA_PARAM OperaOptimalBeamSpectrum := $(OperaOptimalBeamSpectrum)"
+	@echo "OPERA_PARAM CalibratedRawSpectrum := $(CalibratedRawSpectrum)"
+	@echo "OPERA_PARAM CalibratedStandardSpectrum := $(CalibratedStandardSpectrum)"
+	@echo "OPERA_PARAM CalibratedOptimalSpectrum := $(CalibratedOptimalSpectrum)"
+	@echo "OPERA_PARAM CalibratedOperaOptimalSpectrum := $(CalibratedOperaOptimalSpectrum)"
+	@echo "OPERA_PARAM CalibratedRawBeamSpectrum := $(CalibratedRawBeamSpectrum)"
+	@echo "OPERA_PARAM CalibratedStandardBeamSpectrum := $(CalibratedStandardBeamSpectrum)"
+	@echo "OPERA_PARAM CalibratedOptimalBeamSpectrum := $(CalibratedOptimalBeamSpectrum)"
+	@echo "OPERA_PARAM CalibratedOperaOptimalBeamSpectrum := $(CalibratedOperaOptimalBeamSpectrum)"
+	@echo "OPERA_PARAM DefaultSpectrumTypeName := $(DefaultSpectrumTypeName)"
+	@echo "OPERA_PARAM DefaultSpectrumType := $(DefaultSpectrumType)"
+	@echo "OPERA_PARAM DefaultCalibratedSpectrumType := $(DefaultCalibratedSpectrumType)"
+	@echo "OPERA_PARAM StokesI := $(StokesI)"
+	@echo "OPERA_PARAM StokesQ := $(StokesQ)"
+	@echo "OPERA_PARAM StokesU := $(StokesU)"
+	@echo "OPERA_PARAM StokesV := $(StokesV)"
+	@echo "OPERA_PARAM stokesparameter := $(stokesparameter)"
+	@echo "OPERA_PARAM difference := $(difference)"
+	@echo "OPERA_PARAM ratio := $(ratio)"
+	@echo "OPERA_PARAM polarmethod := $(polarmethod)"
+	@echo "OPERA_PARAM polarnormalize := $(polarnormalize)"
+	@echo "OPERA_PARAM cNone := $(cNone)"
+	@echo "OPERA_PARAM cRICE := $(cRICE)"
+	@echo "OPERA_PARAM cGZIP := $(cGZIP)"
+	@echo "OPERA_PARAM cHCOMPRESS := $(cHCOMPRESS)"
+	@echo "OPERA_PARAM cPLIO := $(cPLIO)"
+	@echo "OPERA_PARAM compressiontype := $(compressiontype)"
+	@echo "OPERA_PARAM extension := $(extension)"
+	@echo "OPERA_PARAM gzip := $(gzip)"
+	@echo "OPERA_PARAM DETECTOR := $(DETECTOR)"
+	@echo "OPERA_PARAM AMPLIFIER := $(AMPLIFIER)"
+	@echo "OPERA_PARAM MODE := $(MODE)"
+	@echo "OPERA_PARAM SPEED := $(SPEED)"
+	@echo "OPERA_PARAM OSET := $(OSET)"
+	@echo "OPERA_PARAM apernumberOfBeams := $($(MODE)_numberOfBeams)"
+	@echo "OPERA_PARAM apernapertureWidth := $($(MODE)_apertureWidth)"
+	@echo "OPERA_PARAM aperapertureHeight := $($(MODE)_apertureHeight)"
+	@echo "OPERA_PARAM aperbackgroundAperture := $($(MODE)_backgroundAperture)"
+	@echo "OPERA_PARAM apergapBetweenBeams := $($(MODE)_gapBetweenBeams)"
+	@echo "OPERA_PARAM apernRowSamples := $(apernRowSamples)"
+	@echo "OPERA_PARAM aperMinTiltAngle := $(aperMinTiltAngle)"
+	@echo "OPERA_PARAM aperMaxTiltAngle := $(aperMaxTiltAngle)"
+	@echo "OPERA_PARAM apertiltAnglePrecision := $(apertiltAnglePrecision)"
+	@echo "OPERA_PARAM extraction_minorder := $(extraction_minorder)"
+	@echo "OPERA_PARAM extraction_maxorder := $(extraction_maxorder)"
+	@echo "OPERA_PARAM extractor := $(extractor_$(MODE))"
+	@echo "OPERA_PARAM polarbinningsize := $(polarbinningsize)"
+	@echo "OPERA_PARAM ordpnumberOfsamples := $(ordpnumberOfsamples)"
+	@echo "OPERA_PARAM dispminorderOfLaurentPolynomial := $(dispminorderOfLaurentPolynomial)"
+	@echo "OPERA_PARAM dispmaxorderOfLaurentPolynomial := $(dispmaxorderOfLaurentPolynomial)"
+	
+#########################################################################################
+# getorder - given a wavelength in nm, figure out what order that is.
+#########################################################################################
+getorder:
+	@start=$$SECONDS; \
+	wcal="$(configdir)wcal_ref.dat$(gzip)" ; \
+	if [ -e $(calibrationdir)$(QUALIFIERS).wcal$(gzip) ] ; then \
+		wcal=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) ; \
+	fi ; \
+	$(bindir)operatrace $(TRACE) "$(bindir)operaimagestats --getorder --wl=$(WL) --wavefilename=$${wcal} $(optargs)"
+
+#########################################################################################
+# targets - figure out PI, target name, odometer for NIGHT.
+#########################################################################################
+targets:
+	@start=$$SECONDS; \
+	if [ -d $(DATADIR) ] ; then \
+		if [ -e $(byproductsdir)master.rlst ] ; then \
+			exec 4< $(byproductsdir)master.rlst ; \
+			while read line <&4 ; \
+			do \
+				detector=`$(bindir)operagetword 1 $${line}`; \
+				mode=`$(bindir)operagetword 2 $${line}`; \
+				speed=`$(bindir)operagetword 3 $${line}`; \
+				amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+				oset=`$(bindir)operagetword 5 $${line}`; \
+				echo "------------ $${detector}$${amplifier} $$mode$${oset} $${speed} ------------" ; \
+				if [ -s $(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst ] ; then \
+					files=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)'`; \
+					if [[ "$${files}" != "" ]] ; then \
+						for file in $${files} ; do \
+							object=`$(bindir)operagetheader --keyword=OBJECT $${file}` ; \
+							piname=`$(bindir)operagetheader --keyword=PI_NAME $${file}` ; \
+							runid=`$(bindir)operagetheader --keyword=RUNID $${file}` ; \
+							crunid=`$(bindir)operagetheader --keyword=CRUNID $${file}` ; \
+							echo "`basename $${file}` $${crunid} $${runid} $${piname} $${object}" ; \
+						done ; \
+					fi ; \
+				fi ; \
+			done ; \
+			exec 4>&- ; \
+		else \
+			files=`ls $(DATADIR)/$(OBJECTFILEPATTERN) 2>/dev/null` ; \
+			for file in $${files} ; do \
+				object=`$(bindir)operagetheader --keyword=OBJECT $${file}` ; \
+				piname=`$(bindir)operagetheader --keyword=PI_NAME $${file}` ; \
+				runid=`$(bindir)operagetheader --keyword=RUNID $${file}` ; \
+				crunid=`$(bindir)operagetheader --keyword=CRUNID $${file}` ; \
+				echo "`basename $${file}` $${crunid} $${runid} $${piname} $${object}" ; \
+			done ; \
+		fi ; \
+	else \
+		echo "$(epref) $(DATADIR) does not exist." ; \
+	fi
+
+#########################################################################################
+# standardstars - figure out which standards have been taken.
+#########################################################################################
+standardstars:
+	@start=$$SECONDS; \
+	if [ -d $(DATADIR) ] ; then \
+		if [ -e $(byproductsdir)master.rlst ] ; then \
+			exec 4< $(byproductsdir)master.rlst ; \
+			while read line <&4 ; \
+			do \
+				detector=`$(bindir)operagetword 1 $${line}`; \
+				mode=`$(bindir)operagetword 2 $${line}`; \
+				speed=`$(bindir)operagetword 3 $${line}`; \
+				amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+				oset=`$(bindir)operagetword 5 $${line}`; \
+				if [ -s $(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst ] ; then \
+					files=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)'`; \
+					if [[ "$${files}" != "" ]] ; then \
+						for file in $${files} ; do \
+							runid=`$(bindir)operagetheader --keyword=RUNID $${file} | sed -e 's: ::'` ; \
+							if [[ $$runid =~ [.]*Q78 || $$runid =~ [.]*Q79 || $$runid =~ [.]*E87 ]] ; then \
+								object=`$(bindir)operagetheader --keyword=OBJECT $${file} | sed -e 's: ::g'` ; \
+								detector=`$(bindir)operagetdetector $${file}` ; \
+								amplifier=`$(bindir)operagetamplifier $${file}` ; \
+								mode=`$(bindir)operagetmode $${file}` ; \
+								crunid=`$(bindir)operagetheader --keyword=CRUNID $${file}` ; \
+								standardstars=`ls $(configdir)standardstars/*_operaFluxCal.dat | xargs -n1 basename | sed -e 's:\(.*\)_operaFluxCal.dat:\\1:'` ; \
+								((found=0)) ; \
+								for standardstar in $${standardstars} Moon ; do \
+									photometric="unknown" ; \
+									if [[ "$(USE_SYBASE)" == "1" ]] ; then \
+										odometer=`basename $${file} o.fits` ; \
+										photometric="`$(bindir)wiropdb \"select is_phot from xexp where _obsid=$${odometer}\" | tail -1`" ; \
+									fi ; \
+									if [[ $${object} =~ $${standardstar} ]] ; then \
+										echo "Found `basename $${file}` $${crunid} $${runid} $${detector}$${amplifier}_$${mode} $${object} photometric=$${photometric}" ; \
+										((found=1)) : \
+									fi ; \
+								done ; \
+								if (( found == 0 )) ; then \
+									echo "Skipped `basename $${file}` $${crunid} $${runid} $${detector}$${amplifier}_$${mode} $${object} photometric=$${photometric}" ; \
+								fi ; \
+							fi ; \
+						done ; \
+					fi ; \
+				fi ; \
+			done ; \
+			exec 4>&- ; \
+		else \
+			files=`ls $(DATADIR)/$(OBJECTFILEPATTERN) 2>/dev/null` ; \
+			for file in $${files} ; do \
+				runid=`$(bindir)operagetheader --keyword=RUNID $${file} | sed -e 's: ::'` ; \
+				if [[ $$runid =~ [.]*Q78 || $$runid =~ [.]*Q79 || $$runid =~ [.]*E87 ]] ; then \
+					object=`$(bindir)operagetheader --keyword=OBJECT $${file} | sed -e 's: ::g'` ; \
+					detector=`$(bindir)operagetdetector $${file}` ; \
+					amplifier=`$(bindir)operagetamplifier $${file}` ; \
+					mode=`$(bindir)operagetmode $${file}` ; \
+					crunid=`$(bindir)operagetheader --keyword=CRUNID $${file}` ; \
+					standardstars=`ls $(configdir)standardstars/*_operaFluxCal.dat | xargs -n1 basename | sed -e 's:\(.*\)_operaFluxCal.dat:\\1:'` ; \
+					((found=0)) ; \
+					for standardstar in $${standardstars} Moon ; do \
+						photometric="unknown" ; \
+						if [[ "$(USE_SYBASE)" == "1" ]] ; then \
+							odometer=`basename $${file} o.fits` ; \
+							photometric="`$(bindir)wiropdb \"select is_phot from xexp where _obsid=$${odometer}\" | tail -1`" ; \
+						fi ; \
+						if [[ $${object} =~ $${standardstar} ]] ; then \
+							echo "Found `basename $${file}` $${crunid} $${runid} $${detector}$${amplifier}_$${mode} $${object} photometric=$${photometric}" ; \
+							((found=1)) ; \
+						fi ; \
+					done ; \
+					if (( found == 0 )) ; then \
+						echo "Skipped `basename $${file}` $${crunid} $${runid} $${detector}$${amplifier}_$${mode} $${object} photometric=$${photometric}" ; \
+					fi ; \
+				fi ; \
+			done ; \
+		fi ; \
+	else \
+		echo "$(epref) $(DATADIR) does not exist." ; \
+	fi
+
+version:
+	@if [ -e TIMESTAMP ] ; then \
+		cat <TIMESTAMP ; \
+	else \
+		echo $(version) ; \
+	fi
+
+compress:
+	@start=$$SECONDS; \
+	if [[ "$(FILE)" == "" ]] ; then \
+		echo "$(epref) Please specify FILE=<filename>" 2>&1 | tee -a $(errfile) ; \
+	else \
+		echo "$(pref) Starting compression for file $(FILE)."; \
+			$(bindir)operatrace $(TRACE) "$(bindir)operacompress --compressiontype=$(compressiontype) $(FILE) $(optargs)" 2>&1 | tee -a $(logfile) ; \
+			if  (( $(TRACE) != 1 )) ; then echo "$(pref) fits `$(bindir)operafitsverify $(VERBOSE) $(FILE)$(extension)`"; fi; \
+		echo "$(pref) compression time $(deltat)." ; \
+	fi
+
+decompress uncompress:
+	@start=$$SECONDS; \
+	if [[ "$(DATADIR)" == "" ]] ; then \
+		echo "$(epref) Please specify DATADIR=... WHAT=<extension>" ; \
+		echo "$(epref) opera DATADIR=/data/uhane5/opera/spectra/13AQ02-Feb20 WHAT=.sn.gz" ; \
+	else \
+		files=`ls $(DATADIR)*$(WHAT)` ; \
+		for file in $${files} ; do \
+			echo "$(pref) Starting decompression for file $${file}."; \
+				$(bindir)operatrace $(TRACE) "$(bindir)operadecompress --uncompress $${file} $(optargs)" 2>&1 | tee -a $(logfile) ; \
+			done ; \
+		echo "$(pref) decompression time $(deltat)." ; \
+	fi
+
+#########################################################################################
+#
+# make sure the directories are there
+#
+#########################################################################################
+directoriescreated:
+	@if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory directoriescreated; \
+		done ; \
+	else \
+		if [ -d $(DATADIR) ] ; then \
+			if [ ! -d $(spectradir) ]		; then mkdir -p $(spectradir); chmod a+rw $(spectradir) ; fi ; \
+			if [ ! -d $(calibrationdir) ]	; then mkdir -p $(calibrationdir); chmod a+rw $(calibrationdir) ; fi ; \
+			if [ ! -d $(byproductsdir) ]	; then mkdir -p $(byproductsdir); chmod a+rw $(byproductsdir) ; fi ; \
+			if [ ! -d $(processeddir) ]		; then mkdir -p $(processeddir); chmod a+rw $(processeddir) ; fi ; \
+			if [ ! -d $(approveddir) ]		; then mkdir -p $(approveddir); chmod a+rw $(approveddir) ; fi ; \
+			if [ ! -d $(visualsdir) ]		; then mkdir -p $(visualsdir); chmod a+rw $(visualsdir) ; fi ; \
+			if [ ! -d $(analysesdir) ]		; then mkdir -p $(analysesdir); chmod a+rw $(analysesdir) ; fi ; \
+			if [ ! -d $(tmpdir) ]			; then mkdir -p $(tmpdir); chmod a+rw $(tmpdir) ; fi ; \
+			if [ ! -d $(logdir) ]			; then mkdir -p $(logdir); chmod a+rw $(logdir) ; fi ; \
+		else \
+			echo "$(epref) $(DATADIR) does not exist." ; \
+		fi ; \
+	fi
+
+#########################################################################################
+#
+# the clean targets
+#
+#########################################################################################
+clean:	cleancals cleanrlist cleanalltargets cleanvisuals cleanbyproducts cleanallproducts cleanquicklook cleananalyses cleantmp unlock
+ifeq ($(DATADIRS),)
+	@if [ -e $(outdir)Lock_$(NIGHT) ] ; then \
+		echo "$(epref) `cat <$(outdir)Lock_$(NIGHT)`" ; \
+	else \
+		if [ ! -d $(DATADIR) ] ; then \
+			echo "$(wpref) $(DATADIR) does not exist." ; \
+		else \
+			if [ -d $(spectradir) ] ; then rmdir $(spectradir) 2>/dev/null ; fi ; \
+			if [ -d $(calibrationdir) ] ; then rmdir $(calibrationdir) 2>/dev/null ; fi ; \
+			if [ -d $(byproductsdir) ] ; then rmdir $(byproductsdir) 2>/dev/null ; fi ; \
+			if [ -d $(processeddir) ] ; then rmdir $(processeddir) 2>/dev/null ; fi ; \
+			if [ -d $(visualsdir) ] ; then rmdir $(visualsdir) 2>/dev/null ; fi ; \
+			if [ -d $(analysesdir) ] ; then rmdir $(visualsdir) 2>/dev/null ; fi ; \
+			if [ -d $(tmpdir) ] ; then rmdir $(tmpdir) 2>/dev/null ; fi ; \
+			if [ -d $(logdir) ] ; then rmdir $(logdir) 2>/dev/null ; fi ; \
+			for machine in $(MACHINES) ; do \
+				if [ "$${machine}" != "$${HOSTNAME}" ] ; then \
+					$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then rm -rf $(tmpdir) 2>/dev/null; fi" ; \
+				fi ; \
+			done ; \
+		fi ; \
+	fi
+else
+	@for datadir in $(DATADIRS) ; do \
+		$(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory clean; \
+	done
+endif
+
+cleanit:
+ifdef WHAT
+	@if [ "$$(basename $(DATADIR))" == "espadons" ] ; then \
+		echo "$(epref) Please specify a DATADIR= or NIGHT=" 2>&1 | tee -a $(errfile) ; \
+	else \
+		echo "$(pref) Cleaning \"$(WHAT)\" in directory $(DATADIR)..." ; \
+		for what in $(WHAT) ; do \
+			case "$${what}" in \
+				prof)  what=prof;; \
+				geom)  what=geom;; \
+				aper)  what=aper;; \
+				gain)  what=gain;; \
+				biase) what=bias;; \
+				fcal)  what=fcal;; \
+				line)  what=l;; \
+				disp)  what=disp;; \
+				visual) rm -f $(visualsdir)*.*; what="";; \
+				pol|pols|polars|polarimetry) $(MAKE) -f $(makedir)Makefile cleanpol DATADIR=$(DATADIR) --no-print-directory; what="";; \
+				spectra|int|nts|intensities|intensity) $(MAKE) -f $(makedir)Makefile cleanint DATADIR=$(DATADIR) --no-print-directory; what="";; \
+				cal|cals|calibrations) rm -f $(calibrationdir)*.*; what="";; \
+				snr!snrs) what=sn;; \
+				rlist|rlists|reductionlists) rm -f $(byproductsdir)*.rlst; rm -f $(byproductsdir)*.flst; what="";; \
+				tmp|tmps|temps|temp) rm -f $(tmpdir)*.*; what="";; \
+				log|logs) rm -f $(logdir)*.*; what="";; \
+				lock|locks) rm -f $(outdir)Lock_$$(basename $(DATADIR)); what="";; \
+				*) ;; \
+			esac ; \
+			if [ "$${what}" != "" ] ; then \
+				rm -f $(spectradir)*$${what}$(gzip) ; \
+				rm -f $(spectradir)*$${what} ; \
+				rm -f $(byproductsdir)*$${what}$(gzip) ; \
+				rm -f $(calibrationdir)*$${what}$(gzip) ; \
+				rm -f $(processeddir)*$${what}$(gzip) ; \
+				rm -f $(visualsdir)*.${what} ; \
+				rm -f $(tmpdir)*$${what} ; \
+				rm -f $(logdir)*$${what} ; \
+			fi ; \
+		done ; \
+	fi
+endif
+
+cleansemester:
+	@if [[ "$(SEMESTER)" == "" ]] ; then \
+		echo "$(epref) Please specify SEMESTER= e.g. SEMESTER=12A" ; \
+	else \
+		nights=`ls -d $(outdir)/$(SEMESTER)* 2>/dev/null` ; \
+		for night in $${nights} ; do \
+			echo "$(pref) Cleaning $(basename $${night})" ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile NIGHT=$(basename $${night}) --no-print-directory clean; \
+		done ; \
+		nights=`ls -d $(spectradir)/$(SEMESTER)* ` ; \
+		for night in $${nights} ; do \
+			echo "$(pref) Cleaning $(basename $${night})" ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile NIGHT=$(basename $${night}) --no-print-directory clean; \
+		done ; \
+		nights=`ls -d $(calibrationdir)/$(SEMESTER)* 2>/dev/null` ; \
+		for night in $${nights} ; do \
+			echo "$(pref) Cleaning $(basename $${night})" ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile NIGHT=$(basename $${night}) --no-print-directory clean; \
+		done ; \
+		nights=`ls -d $(byproductsdir)/$(SEMESTER)* 2>/dev/null` ; \
+		for night in $${nights} ; do \
+			echo "$(pref) Cleaning $(basename $${night})" ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile NIGHT=$(basename $${night}) --no-print-directory clean; \
+		done ; \
+		nights=`ls -d $(tmpdir)/$(SEMESTER)* 2>/dev/null` ; \
+		for night in $${nights} ; do \
+			echo "$(pref) Cleaning $(basename $${night})" ; \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile NIGHT=$(basename $${night}) --no-print-directory clean; \
+		done ; \
+	fi
+
+cleanodometer cleanodo:
+	@if [[ "$(ODO)" == "" ]] ; then \
+		echo "$(epref) Please specify ODO= e.g. ODO=128945" ; \
+	else \
+		rm -f $(spectradir)$(ODO)* ; \
+		rm -f $(visualsdir)$(ODO)* ; \
+		rm -f $(byproductsdir)$(ODO)* ; \
+	fi 
+
+cleanpol cleanpolarimetry:
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning polarimetry in $(spectradir)..." ; \
+		rm -f $(spectradir)*.p$(gzip) ; \
+		rm -f $(spectradir)*e.p$(gzip) ; \
+		rm -f $(spectradir)*p.s$(gzip) ; \
+		rm -f $(spectradir)*pu.s$(gzip) ; \
+		rm -f $(spectradir)*pn.s$(gzip) ; \
+		rm -f $(spectradir)*puw.s$(gzip) ; \
+		rm -f $(spectradir)*pnw.s$(gzip) ; \
+		rm -f $(spectradir)*p.$(FITS)$(extension) ; \
+		rm -f $(spectradir)*.obscond$(gzip) ; \
+	fi
+
+cleanint cleanintensity: cleansnr
+	@if [ -d $(spectradir) ] ; then \
+		echo "$(pref) cleaning intensity in $(spectradir)..." ; \
+		rm -f $(spectradir)*iu.s$(gzip) ; \
+		rm -f $(spectradir)*in.s$(gzip) ; \
+		rm -f $(spectradir)*iuw.s$(gzip) ; \
+		rm -f $(spectradir)*inw.s$(gzip) ; \
+		rm -f $(spectradir)*i.$(FITS)$(extension) ; \
+		rm -f $(spectradir)*e.i$(gzip) ; \
+		rm -f $(spectradir)*.obscond$(gzip) ; \
+	fi
+
+cleanproducts: cleanintensity cleansnr cleanpol
+	@if [ -d $(spectradir) ] ; then \
+		echo "$(pref) cleaning FITS products in $(spectradir)..." ; \
+		rm -f $(spectradir)*m.$(FITS) ; \
+		rm -f $(spectradir)*p.$(FITS)$(extension) ; \
+		rm -f $(spectradir)*i.$(FITS)$(extension) ; \
+	fi
+
+cleanallproducts: cleanallintensity cleanproducts ;
+
+cleanallintensity: cleanintensity
+	@if [ -d $(spectradir) ] ; then rm -f $(spectradir)*.e$(gzip) ; fi
+
+cleanalltarget cleanalltargets cleanallreduction: cleanlogs cleantmp cleanallproducts cleanvisuals cleantell cleanrvel cleanfcal cleanspectra ;
+
+cleantarget cleantargets cleanreduction: cleanlogs cleantmp cleanproducts cleanintensity cleanpolarimetry cleanvisuals cleantell cleanrvel cleanfcal ;
+
+cleantell:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning tell in $(calibrationdir)..." ; rm -f $(calibrationdir)*tell$(gzip) ; fi
+
+cleanrvel:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning rvel in $(calibrationdir)..." ; rm -f $(calibrationdir)*.rvel$(gzip) ; fi
+
+cleanfcal:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning fcal in $(calibrationdir)..." ; rm -f $(calibrationdir)*.fcal$(gzip) ; fi
+
+cleananalyses:
+	@if [ -d $(analysesdir) ] ; then echo "$(pref) cleaning analyses in $(analysesdir)..." ; rm -rf $(analysesdir) ; fi
+
+cleanbyproducts:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(byproductsdir) ] ; then echo "$(pref) cleaning byproducts in $(byproductsdir)..." ; rm -rf $(byproductsdir) ; fi
+endif
+
+cleanspectra:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning spectradir in $(spectradir)..." ; rm -rf $(spectradir) ; fi
+endif
+
+cleanapproved:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(approveddir) ] ; then echo "$(pref) cleaning approved in $(approveddir)..." ; rm -rf $(approveddir) ; fi
+endif
+
+cleanprocessed:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(processeddir) ] ; then echo "$(pref) cleaning processed in $(processeddir)..." ; rm -rf $(processeddir) ; fi
+endif
+
+cleanvisuals:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(visualsdir) ] ; then echo "$(pref) cleaning visuals in $(visualsdir)..." ; rm -rf $(visualsdir) ; fi
+	@if [ -d $(byproductsdir) ] ; then echo "$(pref) cleaning visuals in $(byproductsdir)..." ; rm -f $(byproductsdir)*dat ; rm -f $(byproductsdir)*.gnu ; fi
+endif
+
+cleanquicklook:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(visualsdir) ] ; then echo "$(pref) cleaning quicklook in $(visualsdir)..." ; rm -f $(visualsdir)*q.$(FITS) ; rm -f $(visualsdir).*t.$(FITS) ; rm -f $(visualsdir).*qsn.$(FITS) ; fi
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning quicklook in $(spectradir)..." ; rm -f $(spectradir)*q$(gzip) ; rm -f $(spectradir).*q.sn$(gzip) ; fi
+endif
+
+cleaneveningcals:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d /data/niele/espadons/opera/$(NIGHT)/calibrations/ ] ; then echo "$(pref) cleaning evening calibrations in /data/niele/espadons/opera/$(NIGHT)/calibrations/..." ; rm -f /data/niele/espadons/opera/$(NIGHT)/calibrations/* ; fi
+endif
+
+cleanrlist cleanrlists:
+	@if [ -d $(byproductsdir) ] ; then echo "$(pref) cleaning reduction lists in $(byproductsdir)..." ; rm -f $(byproductsdir)*.rlst ; rm -f $(byproductsdir)*.glst; rm -f $(byproductsdir)*.flst ; fi
+
+cleangain:
+	@if [ -d $(byproductsdir) ] ; then echo "$(pref) cleaning gains and biases in $(byproductsdir)..." ; rm -f $(byproductsdir)*.gain ; rm -f $(byproductsdir)*.bias ; fi
+
+cleanprof:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning profiles in $(calibrationdir)..." ; rm -f $(calibrationdir)*prof$(gzip) ; fi
+
+cleangeom:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning geoms and ords in $(calibrationdir)..." ; rm -f $(calibrationdir)*.geom ; rm -f $(calibrationdir)*.ordp ; fi
+
+cleandisp:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning disps in $(calibrationdir)..." ; rm -f $(calibrationdir)*.disp$(gzip) ; fi
+
+cleanwcal:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning wcals in $(calibrationdir)..." ; rm -f $(calibrationdir)*.wcal$(gzip) ; rm -f $(calibrationdir)*.wcar$(gzip) ; fi
+
+cleanaper:
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning apers in $(calibrationdir)..." ; rm -f $(calibrationdir)*.aper$(gzip) ; fi
+
+cleanlines:
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning lines in $(spectradir)..." ; rm -f $(spectradir)*.l$(gzip) ; fi
+
+cleansnr:
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning snr in $(spectradir)..." ; rm -f $(spectradir)*.sn$(gzip) ; fi
+
+cleansetup:
+	@$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIR=$(DATADIR) TYPE=setup --no-print-directory clean
+
+cleantmp:
+	@for machine in $(MACHINES) ; do \
+		if [ "$${machine}" == "$${HOSTNAME}" ] ; then \
+			if [ -d $(tmpdir) ] ; then echo "$(pref) cleaning $${machine} $(tmpdir)..." ; rm -rf $(tmpdir) ; fi ; \
+		else \
+			$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then echo \"$(pref) cleaning $${machine} $(tmpdir)...\" ; rm -rf $(tmpdir) ; fi" ; \
+		fi ; \
+	done
+
+cleanlogs: 
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(logdir) ] ; then echo "$(pref) cleaning logs $(logdir)..." ; rm -rf $(logdir) ; fi
+endif
+
+cleancals:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning calibrations in $(calibrationdir)..." ; rm -rf $(calibrationdir) ; fi
+endif
+
+cleanbadpix cleanbadpixelmask:
+	@if [ -d $(configdir) ] ; then echo "$(pref) cleaning bad pixel masks in $(configdir)..." ; rm -f $(configdir)badpix*.$(FITS)* ; fi
+
+clean%:
+	@echo "$(epref)Unknown clean target \"$@\"."
+	@echo "$(pref)The clean targets are:"
+	@echo "$(pref) clean cleancals cleanrlist(s) cleanalltargets cleantmp cleanapproved cleanprocessed cleanvisuals cleanbyproducts cleanallproducts cleanquicklook cleananalyses"
+	@echo "$(pref) cleanbadpix cleanlogs cleansnr cleanlines cleanaper cleangeom cleanwcal cleandisp cleanprof cleantell cleanrvel cleanfcal"
+	@echo "$(pref) cleansemester SEMESTER=<semester>"
+	@echo "$(pref) cleanit WHAT=<suffix>"
+
+#########################################################################################
+# unlock a night directory, typically after a user started a reduction and aborted
+# leaving the directory locked. Locking prevents two or more users from trying to
+# reduce the same data at the same time.
+#########################################################################################
+unlock:
+	@if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory unlock; \
+		done ; \
+	else \
+        if [ -e $(outdir)Lock_$$(basename $(DATADIR)) ] ; then \
+            rm -f $(outdir)Lock_$$(basename $(DATADIR)) ; \
+        else \
+			if [ -d $(outdir) ] ; then \
+				echo "$(wpref)$$(basename $(DATADIR)) is not locked." ; \
+			else \
+				echo "$(epref)$(DATADIR) does not exist." ; \
+			fi ; \
+        fi ; \
+	fi
+
+#########################################################################################
+# a special rule to figure out what defines the compiler has on this machine
+#########################################################################################
+compilerdefines:
+	@touch ./dummy.hxx
+	@cpp -dM ./dummy.hxx
+	@rm ./dummy.hxx
+
+#########################################################################################
+#########################################################################################
+#
+# These are internal targets, starting with the parallel makelist generation
+# for each of intensity, polarimetry and calibration
+#
+#########################################################################################
+#########################################################################################
+
+#########################################################################################
+#
+# General purpose parallel targets, transforms $(INPUT) to $(TARGET)
+# Arguments:
+#  INPUT=...
+#  TARGET=...
+#  MODE=... (optional)
+#  OBJECT=... (optional)
+#
+#########################################################################################
+
+partarget:
+	@start=$$SECONDS; \
+	((j=1)); ((index=1)); makelist=""; filelist=""; \
+	oset="" ; \
+	((pulls=0)) ; \
+	((lcount=1)) ; \
+	for l in $(LOADAVERAGES) ; do \
+		theload[$$lcount]=$$l ; \
+		((pulls+=l)) ; \
+		((lcount++)) ; \
+	done ; \
+	((mcount=1)) ; \
+	for machine in $(MACHINES) ; do \
+		themachine[$$mcount]=$$machine ; \
+		((mcount++)) ; \
+	done ; \
+	if (( mcount != lcount )) ; then \
+		echo "$(epref) Configuration problem - the $$mcount machines don't match the $$lcount load averages... aborting!" 2>&1 | tee -a $(errfile) ; \
+		exit 1 ; \
+	fi ; \
+	exec 4< $(byproductsdir)master.rlst ; \
+	while read line <&4 ; \
+	do \
+		detector=`$(bindir)operagetword 1 $${line}`; \
+		mode=`$(bindir)operagetword 2 $${line}`; \
+		speed=`$(bindir)operagetword 3 $${line}`; \
+		amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+		oset=`$(bindir)operagetword 5 $${line}`; \
+		linecount=`cat <$(byproductsdir)master.rlst | wc -l`; \
+		if [ -s $(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst ] ; then \
+			filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)'`; \
+			if [[ "$${filelist}" != "" ]] ; then \
+				if [[ "$(MODE)" == "$${mode}" || "$(MODE)" == "" ]] ; then \
+					filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)' | xargs -n1 basename`; \
+					objects="`$(bindir)operaslice $$index $$pulls \"$$filelist\"`" ; \
+					count=`$(bindir)operacount "$$objects"`; \
+					while [[ $$objects ]] ; do \
+						while (( j <= $(words $(MACHINES)) && count > 0 )) ; do \
+							machine=$${themachine[$$j]}; \
+							stride=$${theload[$$j]} ; \
+							shortlist=`$(bindir)operagetwords 1 $$stride $$objects` ; \
+							if [[ "$(OBJECT)" != "" ]] ; then \
+								newlist="" ; \
+								for image in $${shortlist} ; do \
+									obj=`$(bindir)operagetheader --keyword=OBJECT $(DATADIR)/$${image}` ; \
+									if [[ "$${obj}" == "$(OBJECT)" ]] ; then \
+										newlist="$${newlist} $${image}" ; \
+									fi ; \
+								done ; \
+								count=`$(bindir)operacount "$${newlist}"`; \
+								if (( count > 0 )) ; then \
+									targets=`echo "$${newlist}" | sed -e 's/$(INPUT)/$(TARGET)/g' -e 's/^ //' -e s'/ /_/'g`; \
+									makelist="$$makelist $$machine.cpu MACHINE=$${machine} $${machine}SPECTRA=$${targets} $${machine}MODE=$${mode} $${machine}SPEED=$${speed} OSET=$${oset} $${machine}DETECTOR=$${detector} $${machine}AMPLIFIER=$${amplifier} $${machine}QUALIFIERS=$${detector}$${amplifier}_$${mode}$${oset}_$${speed} "; \
+									if [ "$${machine}" == "$${HOSTNAME}" ] ; then \
+										echo "$(pref) Building $${newlist} $${detector} $${mode} $${oset} $${speed} $(INPUT) -> $(TARGET)."; \
+									else \
+										echo "$(pref) Sending $${newlist} $${detector} $${mode} $${oset} $${speed} to $${machine} $(INPUT) -> $(TARGET)."; \
+									fi ; \
+								fi ; \
+							else \
+								count=`$(bindir)operacount "$${shortlist}"`; \
+								if (( count > 0 )) ; then \
+									targets=`echo "$${shortlist}" | sed -e 's/$(INPUT)/$(TARGET)/g' -e 's/^ //' -e s'/ /_/'g`; \
+									makelist="$$makelist $$machine.cpu MACHINE=$${machine} $${machine}SPECTRA=$${targets} $${machine}MODE=$${mode} $${machine}SPEED=$${speed} OSET=$${oset} $${machine}DETECTOR=$${detector} $${machine}AMPLIFIER=$${amplifier} $${machine}QUALIFIERS=$${detector}$${amplifier}_$${mode}$${oset}_$${speed} "; \
+									if [ "$${machine}" == "$${HOSTNAME}" ] ; then \
+										echo "$(pref) Building $${shortlist} $${detector} $${mode} $${oset} $${speed} $(INPUT) -> $(TARGET)."; \
+									else \
+										echo "$(pref) Sending $${shortlist} $${detector} $${mode} $${oset} $${speed} to $${machine} $(INPUT) -> $(TARGET)."; \
+									fi ; \
+								fi ; \
+							fi ; \
+							((j++)); \
+							objects=`$(bindir)operasublist "$${shortlist}" "$$objects"`; \
+							shortlist="" ; \
+						done ; \
+						if (( j > $(words $(MACHINES)) )) ; then \
+							if [[ "$$makelist" != "" ]] ; then \
+								$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+							fi ; \
+							((j=1)); makelist="";\
+						fi ; \
+						if [[ linecount == 1 && "$$makelist" != "" ]] ; then \
+							$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+							((j=1)); makelist="";\
+						fi ; \
+						if [[ "$$filelist" != "" ]] ; then \
+							((index+=pulls)) ; \
+							objects="`$(bindir)operaslice $$index $$pulls \"$$filelist\"`" ; \
+							count=`$(bindir)operacount "$$objects"`; \
+							((j=1)); makelist="";\
+						fi ; \
+					done ; \
+				fi ; \
+				if [[ "$$makelist" != "" ]] ; then \
+					$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+					((j=1)); makelist="";\
+				fi ; \
+			fi ; \
+		fi ; \
+		((j=1)); ((index=1)); makelist=""; filelist=""; \
+	done ; \
+	exec 4>&-
+	
+#########################################################################################
+#
+# all spectra
+#
+#########################################################################################
+
+parall: parintensity parpolarimetry ;
+
+#########################################################################################
+#
+# Parallel Intensity spectra
+#
+#########################################################################################
+
+parintensity parallelintensity:
+	@start=$$SECONDS; \
+	((j=1)); ((index=1)); makelist=""; filelist=""; \
+	((pulls=0)) ; \
+	((lcount=1)) ; \
+	for l in $(LOADAVERAGES) ; do \
+		theload[$$lcount]=$$l ; \
+		((pulls+=l)) ; \
+		((lcount++)) ; \
+	done ; \
+	((mcount=1)) ; \
+	for machine in $(MACHINES) ; do \
+		themachine[$$mcount]=$$machine ; \
+		((mcount++)) ; \
+	done ; \
+	if (( mcount != lcount )) ; then \
+		echo "$(epref) Configuration problem - the $$mcount machines don't match the $$lcount load averages... aborting!" 2>&1 | tee -a $(errfile) ; \
+		exit 1 ; \
+	fi ; \
+	exec 4< $(byproductsdir)master.rlst ; \
+	while read line <&4 ; \
+	do \
+		detector=`$(bindir)operagetword 1 $${line}`; \
+		mode=`$(bindir)operagetword 2 $${line}`; \
+		speed=`$(bindir)operagetword 3 $${line}`; \
+		amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+		oset=`$(bindir)operagetword 5 $${line}`; \
+		linecount=`cat <$(byproductsdir)master.rlst | wc -l`; \
+		if [ -s $(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst ] ; then \
+			filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)'`; \
+			if [[ "$${filelist}" != "" ]] ; then \
+				filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst | grep '$(OBJECTFILEPATTERN)' | xargs -n1 basename`; \
+				amp=1 ; \
+				objects="`$(bindir)operaslice $$index $$pulls \"$$filelist\"`" ; \
+				count=`$(bindir)operacount "$$objects"`; \
+				while [[ $$objects ]] ; do \
+					while (( j <= $(words $(MACHINES)) && count > 0 )) ; do \
+						machine=$${themachine[$$j]}; \
+						stride=$${theload[$$j]} ; \
+						shortlist=`$(bindir)operagetwords 1 $$stride $$objects` ; \
+						count=`$(bindir)operacount "$${shortlist}"`; \
+						if (( count > 0 )) ; then \
+							spectra=`echo "$${shortlist}" | sed -e 's/$(OBJECTROOTPATTERN)/$(TARGET)/g' -e 's/^ //' -e s'/ /_/'g`; \
+							makelist="$$makelist $$machine.cpu MACHINE=$${machine} $${machine}SPECTRA=$${spectra} $${machine}MODE=$${mode} $${machine}SPEED=$${speed} OSET=$${oset} $${machine}DETECTOR=$${detector} $${machine}AMPLIFIER=$${amplifier} $${machine}QUALIFIERS=$${detector}$${amplifier}_$${mode}$${oset}_$${speed} "; \
+						fi ; \
+						((j++)); \
+						objects=`$(bindir)operasublist "$${shortlist}" "$$objects"`; \
+						shortlist="" ; \
+					done ; \
+					if (( j > $(words $(MACHINES)) )) ; then \
+						$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+						((j=1)); makelist="";\
+					fi ; \
+					if [[ linecount == 1 && "$$makelist" != "" ]] ; then \
+						$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+						((j=1)); makelist="";\
+					fi ; \
+					if [ "$$filelist" != "" ] ; then \
+						((index+=pulls)) ; \
+						objects="`$(bindir)operaslice $$index $$pulls \"$$filelist\"`" ; \
+					fi ; \
+				done ; \
+			fi ; \
+			if [ "$$makelist" != "" ] ; then \
+				$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+				((j=1)); makelist="";\
+			fi ; \
+		fi ; \
+		((j=1)); ((index=1)); makelist=""; filelist=""; \
+	done ; \
+	exec 4>&-
+
+#########################################################################################
+#
+# Parallel Polarimetry
+#
+#########################################################################################
+parpolarimetry parallelpolarimetry:
+	@start=$$SECONDS; \
+	((j=1)); ((index=1)); makelist=""; filelist=""; \
+	((pulls=0)) ; \
+	((lcount=1)) ; \
+	for l in $(LOADAVERAGES) ; do \
+		theload[$$lcount]=$$l ; \
+		((pulls+=l)) ; \
+		((lcount++)) ; \
+	done ; \
+	((mcount=1)) ; \
+	for machine in $(MACHINES) ; do \
+		themachine[$$mcount]=$$machine ; \
+		((mcount++)) ; \
+	done ; \
+	if (( mcount != lcount )) ; then \
+		echo "$(epref) Configuration problem - the $$mcount machines don't match the $$lcount load averages... aborting!" 2>&1 | tee -a $(errfile) ; \
+		exit 1 ; \
+	fi ; \
+	linecount=`cat <$(byproductsdir)master.rlst | wc -l`; \
+	exec 4< $(byproductsdir)master.rlst ; \
+	while read line <&4 ; \
+	do \
+		detector=`$(bindir)operagetword 1 $${line}`; \
+		mode=`$(bindir)operagetword 2 $${line}`; \
+		speed=`$(bindir)operagetword 3 $${line}`; \
+		amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+		oset=`$(bindir)operagetword 5 $${line}`; \
+		if [[ "$${mode}" == "pol" && -s $(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst ]] ; then \
+			filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst  | grep '$(OBJECTROOTPATTERN)' | tr '\n' ' '`; \
+			if [[ "$${filelist}" != "" ]] ; then \
+				filelist=`cat <$(byproductsdir)$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.rlst  | grep '$(OBJECTROOTPATTERN)' | tr '\n' ' '`; \
+				count=`$(bindir)operacount "$$filelist"`; \
+				while (( count > 0 )) ; do \
+					quadpath=`$(bindir)operagetpolarquad $$filelist | tr '\n' ' '`; \
+					quad=`echo "$$quadpath" | xargs -n1 basename | tr '\n' ' '`; \
+					obj1=`$(bindir)operagetword 2 $$quad` ; \
+					obj1path=`$(bindir)operagetword 2 $$quadpath` ; \
+					if [[ `$(bindir)operagetword 1 $$quad` == 4 || `$(bindir)operagetword 1 $$quad` == 2 ]] ; then \
+						machine=$${themachine[$$j]}; \
+						stride=$${theload[$$j]} ; \
+						objects="`$(bindir)operagetword 2 $$quad` `$(bindir)operagetword 3 $$quad` `$(bindir)operagetword 4 $$quad` `$(bindir)operagetword 5 $$quad`"; \
+						spectra=`echo "$$obj1" | sed -e 's:$(OBJECTROOTPATTERN):$(POLARIMETRYROOTPATTERN):'`; \
+						p1=`$(bindir)operagetword 2 $$quad | sed -e 's:$(OBJECTROOTPATTERN)::'` ; \
+						p2=`$(bindir)operagetword 3 $$quad | sed -e 's:$(OBJECTROOTPATTERN)::'` ; \
+						p3=`$(bindir)operagetword 4 $$quad | sed -e 's:$(OBJECTROOTPATTERN)::'` ; \
+						p4=`$(bindir)operagetword 5 $$quad | sed -e 's:$(OBJECTROOTPATTERN)::'` ; \
+						makelist="$$makelist $$machine.cpu MACHINE=$${machine} $${machine}P1=$${p1} $${machine}P2=$${p2} $${machine}P3=$${p3} $${machine}P4=$${p4} $${machine}SPECTRA=$$spectra $${machine}MODE=$${mode} $${machine}OSET=$${oset} $${machine}SPEED=$$speed $${machine}DETECTOR=$$detector $${machine}AMPLIFIER=$${amplifier} $${machine}QUALIFIERS=$${detector}$${amplifier}_$${mode}$${oset}_$${speed} "; \
+						((j--)); \
+						if (( j == 0 )) ; then \
+							if [[ `$(bindir)operagetword 1 $$quad` == 2 ]] ; then \
+								$(RECHO) $(MAKE) -f $(makedir)Makefile POL=2 START=$(START) --no-print-directory $$makelist ; \
+							else \
+								$(RECHO) $(MAKE) -f $(makedir)Makefile POL=4 START=$(START) --no-print-directory $$makelist ; \
+							fi  ; \
+							makelist="" ; \
+						fi ; \
+						if [[ linecount == 1 && "$$makelist" != "" ]] ; then \
+							$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+							makelist="" ; \
+						fi ; \
+						if (( j < 1 )) ; then ((j=$(words $(MACHINES)))); fi ;\
+						((polplusone=$(POL)+1)) ; \
+						filelist=`echo "$$filelist" | cut -d ' ' -f $${polplusone}-`; \
+					else \
+						echo "$(wpref) *** WARNING $$obj1 skipped as out of sequence."; \
+						filelist=`$(bindir)operasublist "$$obj1path" "$$filelist"`; \
+						filelist=`echo "$$filelist" | cut -d ' ' -f 2-`; \
+					fi ; \
+					count=`$(bindir)operacount "$$filelist"`; \
+				done ; \
+			fi ; \
+		fi ; \
+		if [[ "$$makelist" != "" ]] ; then \
+			if [[ `$(bindir)operagetword 1 $$quad` == 2 ]] ; then \
+				$(RECHO) $(MAKE) -f $(makedir)Makefile POL=2 START=$(START) --no-print-directory $$makelist ; \
+			else \
+				$(RECHO) $(MAKE) -f $(makedir)Makefile POL=4 START=$(START) --no-print-directory $$makelist ; \
+			fi  ; \
+			makelist="" ; \
+		fi ; \
+		((j=1)); ((index=1)); makelist=""; filelist=""; \
+	done ; \
+	exec 4>&-
+
+#########################################################################################
+#
+# Parallel Calibrations
+#
+# Note: The load is set to 1 to spread the cals across more machines,
+# since only the detector_mode_speed's are done in parallel.
+#	theload[$$lcount]=1 ;
+#
+#########################################################################################
+parcal parallelcalibration:
+	@start=$$SECONDS; \
+	((j=1)); makelist=""; \
+	((pulls=0)) ; \
+	((lcount=1)) ; \
+	for l in $(CALLOADAVERAGES) ; do \
+		theload[$$lcount]=1 ; \
+		((pulls+=l)) ; \
+		((lcount++)) ; \
+	done ; \
+	((mcount=1)) ; \
+	for machine in $(MACHINES) ; do \
+		themachine[$$mcount]=$$machine ; \
+		((mcount++)) ; \
+	done ; \
+	if (( mcount != lcount )) ; then \
+		echo "$(epref) Configuration problem - the $$mcount machines don't match the $$lcount load averages... aborting!" 2>&1 | tee -a $(errfile) ; \
+		exit 1 ; \
+	fi ; \
+	linecount=`cat <$(byproductsdir)master.rlst | wc -l`; \
+	exec 4< $(byproductsdir)master.rlst ; \
+	while read line <&4 ; \
+	do \
+		detector=`$(bindir)operagetword 1 $${line}`; \
+		mode=`$(bindir)operagetword 2 $${line}`; \
+		speed=`$(bindir)operagetword 3 $${line}`; \
+		amplifier=`$(bindir)operagetword 4 $${line} | sed -e 's:_::'`; \
+		oset=`$(bindir)operagetword 5 $${line}`; \
+		machine=$${themachine[$$j]}; \
+		stride=$${theload[$$j]} ; \
+		makelist="$$makelist $$machine.cal MACHINE=$${machine} $${machine}DETECTOR=$${detector} $${machine}MODE=$${mode} $${machine}OSET=$${oset} $${machine}SPEED=$${speed} $${machine}AMPLIFIER=$${amplifier} $${machine}QUALIFIERS=$${detector}$${amplifier}_$${mode}$${oset}_$${speed} $${machine}CAL=$${detector}$${amplifier}_$${mode}$${oset}_$${speed}.$(TARGET) "; \
+		if [ "$${machine}" == "$${HOSTNAME}" ] ; then \
+			echo "$(pref) Calibration for $${detector} $${mode}$$oset $$speed."; \
+		else \
+			echo "$(pref) Calibration for $${detector} $${mode}$$oset $$speed sent to $$machine."; \
+		fi ; \
+		((j++)); \
+		if (( j > $(words $(MACHINES)) )) ; then \
+			if [[ "$$makelist" != "" ]] ; then \
+				$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+			fi ; \
+			((j=1)); makelist="";\
+		fi ; \
+		if [[ linecount == 1 && "$makelist" != "" ]] ; then \
+			$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+			makelist="";\
+		fi ; \
+	done ; \
+	if [ "$$makelist" != "" ] ; then \
+		$(RECHO) $(MAKE) -f $(makedir)Makefile $$makelist ; \
+	fi ; \
+	exec 4>&-
+
+#########################################################################################
+# Remote Execution
+# If this is a single machine reduction and it is this machine
+# then don't do remote execution...
+# Brings it's own issues in that rsh doesn't take the environment with it...
+#########################################################################################
+
+%.cpu:
+	@if [ "$*" == "$${HOSTNAME}" ] ; then \
+		$(RRECHO) $(MAKE) -f $(makedir)Makefile prefix=$(prefix) --no-print-directory MACHINE=$* P1=$($*P1) P2=$($*P2) P3=$($*P3) P4=$($*P4) POL=$(POL) START=$(START) DETECTOR=$($*DETECTOR) MODE=$($*MODE) SPEED=$($*SPEED) AMPLIFIER=$($*AMPLIFIER) OSET=$($*OSET) QUALIFIERS=$($*QUALIFIERS) DIR=$(DIR) DATADIR=$(DATADIR) NIGHT=$(NIGHT) TYPE=$(TYPE) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) OUT=$(OUT) TEMPLATE=$(TEMPLATE) OBJECT="$(OBJECT)" optargs="$(optargs)" RECHO=$(RECHO) --no-print-directory `echo $($*SPECTRA) | sed -e 's/_/ /g'` ; \
+	else  \
+		$(RRECHO) $(remoteshell) $* "export opera=$(opera) ; export PATH=$$PATH ; $(MAKE) -f $(makedir)Makefile prefix=$(prefix) --no-print-directory MACHINE=$* P1=$($*P1) P2=$($*P2) P3=$($*P3) P4=$($*P4) POL=$(POL) START=$(START) DETECTOR=$($*DETECTOR) MODE=$($*MODE) SPEED=$($*SPEED) AMPLIFIER=$($*AMPLIFIER) OSET=$($*OSET) QUALIFIERS=$($*QUALIFIERS) DIR=$(DIR) DATADIR=$(DATADIR) NIGHT=$(NIGHT) TYPE=$(TYPE) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) OUT=$(OUT) TEMPLATE=$(TEMPLATE) OBJECT=$(OBJECT) optargs=\"$(optargs)\" RECHO=$(RECHO) --jobs --no-print-directory `echo \"$($*SPECTRA)\" | sed -e 's/_/ /g'`" ; \
+	fi
+
+%.cal:
+	@if [ "$*" == "$${HOSTNAME}" ] ; then \
+		$(RRECHO) $(MAKE) -f $(makedir)Makefile prefix=$(prefix) --no-print-directory MACHINE=$* MODE=$($*MODE) DETECTOR=$($*DETECTOR) SPEED=$($*SPEED) AMPLIFIER=$($*AMPLIFIER) OSET=$($*OSET) QUALIFIERS=$($*QUALIFIERS) DATADIR=$(DATADIR) NIGHT=$(NIGHT) TYPE=$(TYPE) WHERE="$(WHERE)" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" RECHO=$(RECHO) $($*CAL) ; \
+	else \
+		$(RRECHO) $(remoteshell) $* "export opera=$(opera) ; export PATH=$$PATH ; $(MAKE) -f $(makedir)Makefile prefix=$(prefix) --no-print-directory MACHINE=$* MODE=$($*MODE) DETECTOR=$($*DETECTOR) SPEED=$($*SPEED) AMPLIFIER=$($*AMPLIFIER) OSET=$($*OSET) QUALIFIERS=$($*QUALIFIERS) DATADIR=$(DATADIR) NIGHT=$(NIGHT) TYPE=$(TYPE) WHERE=\"$(WHERE)\" TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs=\"$(optargs)\" --jobs --no-print-directory RECHO=$(RECHO) $($*CAL)" ; \
+	fi
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

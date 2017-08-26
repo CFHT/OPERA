@@ -1,0 +1,114 @@
+
+	Notes on interpreting the HITRAN Tables
+	---------------------------------------
+	        Eder Martioli Oct 2012
+
+
+**********************************************
+How to convert wavenumber [cm-1] to wavelength 
+**********************************************
+
+	wavelength [m]
+	lambda_in_m = 1e-2/(wn_in_cm)
+
+	wavelength [cm]
+	lambda_in_cm = 1/(wn_in_cm)
+
+	wavelength [mm]
+	lambda_in_mm = 10/(wn_in_cm)
+
+	wavelength [microns]
+	lambda_in_microns = 1e4/(wn_in_cm)
+
+	wavelength [nm]
+	lambda_in_nm = 1e7/(wn_in_cm)
+
+
+********************************************
+How to fix spaceless issue with HITRAN08.par 
+(In some cases the first column of the table
+runs in to the second column)
+********************************************
+
+cat HITRAN08-extracted.par | sed -e 's/\(^...\)/\1 /' > opera_HITRAN08-extracted.par
+
+
+**********************************************
+Wavelength ranges covered by full HITRAN08.par
+**********************************************
+
+first line #1
+ 
+ wavenumber = 0.000001 cm^-1
+ wavelength = 1e-2/0.000001 = 1000 m -> far in the radio
+ 
+line #1000:
+ 
+ wavenumber = 0.014620 cm^-1
+ wavelength = 1/0.014620 = 68 cm -> short radio
+ 
+line #3000:
+ 
+ wavenumber = 0.393233 cm^-1 
+ wavelength = 1/0.393233 = 2.54 cm -> microwave
+  
+line #15,000:
+ 
+ wavenumber = 5.464156 cm^-1 
+ wavelength = 10/5.464156 = 1.83 mm -> milimeter
+
+line #50,000:
+ 
+ wavenumber = 5.464156 cm^-1 
+ wavelength = 10/5.464156 = 0.5721916 mm -> submilimeter
+
+line #150,000:
+ 
+ wavenumber = 50.096473 cm^-1 
+ wavelength = 1e4/50.096473 = 199.6148511293 microns -> far infrared
+
+line #500,000:
+ 
+ wavenumber = 625.143841 cm^-1 
+ wavelength = 1e4/625.143841 = 15.9963185177 microns -> infrared
+ 
+line #1,000,000:
+ 
+ wavenumber =  936.795590 cm^-1 
+ wavelength = 1e4/936.795590 = 10.6746873136 microns -> infrared
+ 
+line #2,000,000:
+ 
+ wavenumber =  2587.652550 cm^-1 
+ wavelength = 1e4/2587.652550  =  3.8645064617 microns -> near infrared
+
+line #2,500,000:
+ 
+ wavenumber =  4920.667880 cm^-1 
+ wavelength = 1e4/4920.667880  =  2.0322444521 microns -> near infrared
+
+line #2,650,000:
+ 
+ wavenumber =  8312.974400  cm^-1 
+ wavelength = 1e4/8312.974400   =  1.2029388663 microns -> near infrared
+
+line #2,675,000:
+ 
+ wavenumber =  9140.989900  cm^-1 
+ wavelength = 1e7/9140.989900  =  1093.9734219 nm -> infrared end of optical range
+
+line #2,700,000:
+ 
+ wavenumber =  13980.645720  cm^-1 
+ wavelength = 1e7/13980.645720  =  715.2745446 nm -> optical
+
+last line #2,713,968:
+
+ wavenumber = 25232.004100 cm^-1
+ wavelength = 1e7/25232.004100 = 396.32206622858 nm -> ultraviolet end of optical range
+
+***************************************************************
+*** The current version of OPERA uses a subset of HITRAN08  ***
+*** which is restricted to wavelengths ranging from the     *** 
+*** infrared end of optical to ultraviolet.                 ***
+***************************************************************

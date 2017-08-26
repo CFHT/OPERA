@@ -1,0 +1,41 @@
+To: |EMAIL|
+From: opera@cfht.hawaii.edu
+Subject: OPERA Installation Final Instructions
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+Dear Dr. |PI|,
+
+Welcome to opera-1.0. We would like to proceed with the installation installation
+in careful steps.
+
+The third step is to install opera itself on your computer:
+
+1. Download the compressed file: opera-1.0.zip from sourceforge.net:
+
+	http://sourceforge.net/projects/opera-pipeline/files/opera-1.0/opera-1.0-Jul01-2013.zip/download
+
+2. Remove an existing copy if you have one:
+
+   cd ~
+   rm -rf opera-1.0/
+   
+3. Unpack this file in your home directory:
+   unzip opera-1.0.zip
+
+4. Open a terminal and access the directory 
+   cd $HOME/opera-1.0/ 
+
+5. Run the configuration file, thusly if you have libpng installed:
+   ./configure --prefix=$HOME/opera-1.0/ --enable-LIBPNG=true
+   or if not:
+   ./configure --prefix=$HOME/opera-1.0/
+     
+6. Build: 
+   make install
+   . ./setup.sh
+
+If the installation was successful please read all the documentation in the doc/ directory before processding.
+
+Regards,
+The OPERA Team

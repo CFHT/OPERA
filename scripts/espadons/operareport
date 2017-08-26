@@ -1,0 +1,1650 @@
+#!/bin/bash
+#########################################################################################
+#
+# Script name: operareport
+# Version: 1.0
+# Description: Generate a CFHT NIGHT report.
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011,2012,2013  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operareport
+#/// \brief Generate a NIGHT report
+#/// \ingroup scripts
+#
+#########################################################################################
+#
+#  opera espadons report script (rewrite me in something that makes sense...)
+#  A CFHT-specific script
+#
+#  Teeple May 2008/2012/2013
+#
+#
+#########################################################################################
+
+export COLUMNS=200
+sessionhost=`ls -l /h/espadons/.director/sessionhost | sed -e 's/.*-> //' | sed -e 's/\..*//'`
+
+bindir=$HOME/opera-1.0/bin/
+espadonsdir="/data/${sessionhost}/espadons/"
+operadir=/data/uhane5/opera
+rlistdir=${operadir}/byproducts/
+logdir=${operadir}/logs/
+processeddir=${operadir}/processed/
+approveddir=${operadir}/approved/
+
+night=""
+dir=""
+verbose=1
+runid="all"
+runids=""
+mailto=""
+director=""
+reporttype=""
+intensity=1
+polarimetry=1
+html=0
+gz=".gz"
+extension=".fz"
+
+pref=""
+wpref=""
+epref=""
+
+function usage() {
+	echo "${pref}report [NIGHT=][<night>] [RUNID=][<runid>] type=[Approval|Preliminary]"
+	echo "${pref}     generates a report for the <night> reduction."
+	echo "${pref}     <night> is of the form: QRUNID-Mmmdd e.g. 08AQ11-Jul07"
+	echo "${pref}     <night> defaults to the last night."
+	echo "${pref}     <runid> is the PI runid e.g. 08AC20"
+   return 0
+}
+
+function html () {
+	if (( html ))
+	then
+		echo "<$1html>"
+	fi
+}
+function body () {
+	if (( html ))
+	then
+		echo "<$1body $2>"
+	fi
+}
+function hr () {
+	if (( html ))
+	then
+		echo "<hr>"
+	fi
+}
+function h1 () {
+	if (( html ))
+	then
+		echo "<h1><i><center>$1</center></i></h1>"
+	else
+		echo "${pref} $1"
+	fi
+}
+function h2 () {
+	if (( html ))
+	then
+		echo "<h2><i><center>$1</center></i></h2>"
+	else
+		echo "${pref} $1"
+	fi
+}
+function h3 () {
+	if (( html ))
+	then
+		echo "<h3><center>$1</center></h3>"
+	else
+		echo "${pref} $1"
+	fi
+}
+function formatit () {
+	if (( $# > 0 ))
+		then
+		w=`echo "$@" | wc -c`
+		((m=(80-w)/2))
+		if (( $# == 1 ))
+		then
+			echo $m $@ | awk '{printf("%+-*.*s %s %+-*.*s\n", 0, $1, "*********************************", $2, 0, $1, "*********************************")}'
+		fi
+		if (( $# == 2 ))
+		then
+			echo $m $@ | awk '{printf("%+-*.*s %s %s %+-*.*s\n", 0, $1, "*********************************", $2, $3, 0, $1, "*********************************")}'
+		fi
+		if (( $# == 3 ))
+		then
+			echo $m $@ | awk '{printf("%+-*.*s %s %s %s %+-*.*s\n", 0, $1, "*********************************", $2, $3, $4, 0, $1, "*********************************")}'
+		fi
+		if (( $# == 4 ))
+		then
+			echo $m $@ | awk '{printf("%+-*.*s %s %s %s %s %+-*.*s\n", 0, $1, "*********************************", $2, $3, $4, $5, 0, $1, "*********************************")}'
+		fi
+		if (( $# == 5 ))
+		then
+			echo $m $@ | awk '{printf("%+-*.*s %s %s %s %s %s %+-*.*s\n", 0, $1, "*********************************", $2, $3, $4, $5, $6, 0, $1, "*********************************")}'
+		fi
+	fi
+}
+function table () {
+	mod=""
+	if [[ $1 == "/" ]]
+	then
+		mod=$1
+		shift
+	fi
+	if (( html ))
+	then
+		if [[ $mod != "" ]]
+		then
+			echo "<${mod}table>"
+		else
+			if (( $# == 2 ))
+			then
+				echo "<table $1 width=100%><caption>$2</caption>"
+			else
+				echo "<table border=1 width=100%><caption>$1</caption>"
+			fi
+		fi
+	else
+		if (( $# == 1 ))
+		then
+			if [[ "$1" != "" ]]
+			then
+				echo "${pref} $(formatit $1)"
+			fi
+		fi
+		if (( $# == 2 ))
+		then
+			if [[ "$2" != "" ]]
+			then
+				echo "${pref} $(formatit $2)"
+			fi
+		fi
+	fi
+}
+function tablerow () {
+	mod=""
+	ctr=""
+	endctr=""
+	p=${pref}
+	c=""
+	if [[ "$1" == "-m" ]]
+	then
+		mod="-e"
+		p="\n${pref}"
+		shift
+	fi
+	if [[ "$1" == "-n" ]]
+	then
+		mod=$1
+		shift
+	fi
+	if [[ "$1" == "-w" ]]
+	then
+		p=${wpref}
+		c="bgcolor=#fff66"
+		shift
+	fi
+	if [[ "$1" == "-e" ]]
+	then
+		p=${epref}
+		c="bgcolor=#ff0066"
+		shift
+	fi
+	if [[ "$1" == "-c" ]]
+	then
+		ctr="<center>"
+		endctr="</center>"
+		shift
+	fi
+	if [[ "$1" == "-50" ]]
+	then
+		c="$c width=50%"
+		shift
+	fi
+	if (( html ))
+	then
+		if (( $# == 1 ))
+		then
+			echo "<tr><td colspan=2 $c>${ctr}$1${endctr}</td></tr>"
+		fi
+		if (( $# == 2 ))
+		then
+			echo "<tr><td $c>${ctr}$1${endctr}</td><td $c>${ctr}$2${endctr}</td></tr>"
+		fi
+		if (( $# == 3 ))
+		then
+			echo "<tr><td $c>${ctr}$1${endctr}</td><td $c>${ctr}$2${endctr}</td><td $c>${ctr}$3${endctr}</td></tr>"
+		fi
+	else
+		echo $mod "${p} $1 $2 $3"
+	fi
+}
+function tablehead () {
+	mod=""
+	if [[ "$1" == "-n" ]]
+	then
+		mod=$1
+		shift
+	fi
+	if (( html ))
+	then
+		if (( $# == 1 ))
+		then
+			echo "<tr><th colspan=2>$1</th></tr>"
+		fi
+		if (( $# == 2 ))
+		then
+			echo "<tr><th>$1</th><th>$2</th></tr>"
+		fi
+		if (( $# == 3 ))
+		then
+			echo "<tr><th>$1</th><th>$2</th><th>$3</th></tr>"
+		fi
+		if (( $# == 4 ))
+		then
+			echo "<tr><th $2 colspan=2>$1</th></tr>"
+		fi
+	else
+		if (( $# == 1 ))
+		then
+			echo $mod "${pref} $(formatit $1)"
+		fi
+		if (( $# == 2 ))
+		then
+			echo $mod "${pref} $(formatit $1 $2)"
+		fi
+		if (( $# == 3 ))
+		then
+			echo $mod "${pref} $(formatit $1 $2 $3)"
+		fi
+		if (( $# == 4 ))
+		then
+			echo $mod "${pref} $(formatit $1)"
+		fi
+	fi
+}
+function tr_ () {
+	if (( html ))
+	then
+		echo "<$1tr>"
+	fi
+}
+function trd_ () {
+	if (( html ))
+	then
+		echo "<$1tr>"
+	fi
+	mod=""
+	pre=""
+	if (( $# > 0 ))
+	then
+		if [[ "$1" == "/" ]]
+		then
+			pre="$1"
+		else
+			mod="colspan=$1"
+		fi
+	fi
+	if (( html ))
+	then
+		echo "<${pre}td $mod>"
+	fi
+}
+function td_ () {
+	mod=""
+	pre=""
+	if (( $# > 0 ))
+	then
+		if [[ "$1" == "/" ]]
+		then
+			pre="$1"
+		else
+			mod="colspan=$1"
+		fi
+	fi
+	if (( html ))
+	then
+		echo "<${pre}td $mod>"
+	fi
+}
+function center () {
+	if (( html ))
+	then
+		echo "<$1center>"
+	fi
+}
+function th_ () {
+	if (( html ))
+	then
+		echo "<th>$1</th>"
+	else
+		echo "${pref} $1"
+	fi
+}
+function p_ () {
+	if (( html ))
+	then
+		echo "<p>$1</p>"
+	else
+		echo "${pref} $1"
+	fi
+}
+function br_ () {
+	if (( html ))
+	then
+		echo "<br>"
+	fi
+}
+function say() {
+	mod=""
+	if [[ "$1" == "-n" ]]
+	then
+		mod=$1
+		shift
+	fi
+	if (( html ))
+	then
+		echo "$1"
+	else
+		echo $mod "${pref} $1"
+	fi
+}
+for arg in $@
+do
+   case ${arg} in
+     *help) 
+         usage;
+         exit 0;
+         ;;
+     -verbose=*) 
+        verbose=${arg#-verbose=};
+		  ;;
+     -v*) 
+        verbose=1;
+		  ;;
+     *html*) 
+        html=1;
+		  ;;
+     type=*) 
+        reporttype=${arg#type=};
+        ;;
+     mailto=*) 
+        mailto=${arg#mailto=};
+        ;;
+     RUNID=[0-9][0-9][AB][A-Z][0-9][0-9]) 
+        runid=${arg#RUNID=};
+        ;;
+     RUNID=all) 
+        runid=${arg#RUNID=};
+        ;;
+     [0-9][0-9][AB][A-Z][0-9][0-9]) 
+         runid="$arg";
+			;;
+     [0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]) 
+         night=$arg;
+			;;
+     [0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9][abc-]*) 
+         night=$arg;
+			;;
+     NIGHT=[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]) 
+         night=${arg#NIGHT=};
+			;;
+     NIGHT=[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9][abc-]*) 
+         night=${arg#NIGHT=};
+			;;
+     DATADIR=*) 
+         nightdir=${arg#DATADIR=};
+			;;
+      *) 
+		 echo "Invalid argument: $arg";
+         usage;
+         exit 1;
+         ;;
+   esac 
+done
+nights=`ls -t ${operadir}/byproducts/ 2>/dev/null | sed -e 's:/::' | grep "[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]" | tr '\n' ' '` 
+if [[ $night == "" ]]
+then
+	night=`echo ${nights} | awk '{print $1}'`
+fi
+if [[ $nightdir == "" ]]
+then 
+	nightdir=${espadonsdir}/${night}/ 
+	if [ ! -d ${nightdir} ]
+	then
+		nightdir=${operadir}/${night}/
+		if [ ! -d ${nightdir} ]
+		then 
+			echo "$night is an invalid format, it should be of the format 08AQ13-Jul20"
+			usage
+			exit 0
+		fi
+	fi
+fi
+calibrationsdir=${operadir}/calibrations/${night}/ 
+byproductsdir=${operadir}/byproducts/${night}/ 
+spectradir=${operadir}/spectra/${night}/ 
+tmpdir=/tmp/${night}/ 
+date=`echo ${night} | sed -e 's/.*-//' | sed -e 's:/:_:g'`
+when="`ls -l ${operadir}/byproducts/ 2>/dev/null | grep ${night} | awk '{printf(\"%s %s %s\", $6, $7, $8)}'`"
+cd ${nightdir}
+if [[ "$dir" != "" ]]
+then
+	night=`echo ${dir} | sed -e 's:/:_:g'`
+fi
+if [[ "$DIRECTOR_LEVEL" != "" || "$director" != "" ]]
+then
+	pref="status: "
+	wpref="warning: "
+	epref="error: "
+fi
+#
+# Send out a multipart MIME message, one with text for old mail clients
+# and one with HTML.
+#
+if [[ "$mailto" != "" ]]
+then
+	echo "To: $mailto"
+	echo "From: qsoteam@cfht.hawaii.edu"
+	echo "Subject: OPERA 1.0 $reporttype Report of `date`"
+	if (( html ))
+	then
+		echo "MIME-version: 1.0"
+		echo 'Content-type: multipart/alternative; boundary="theBoundaryString"'
+		echo
+		echo "This is a message with multiple parts in MIME format."
+		echo "--theBoundaryString"
+		echo "Content-Type: text/plain"
+		echo "Content-Transfer-Encoding: 7bit"
+		echo
+		echo 
+		${bindir}/operareport type=$reporttype DATADIR=${nightdir} NIGHT=${night}
+		echo
+		echo "--theBoundaryString"
+		echo "Content-Type: text/html"
+		echo "Content-Transfer-Encoding: 7bit"
+		echo "Content-Disposition: inline"
+		echo "Content-Base: \"http://www.cfht.hawaii.edu/\""
+	else
+		echo "Content-Type: text/plain"
+		echo "Content-Transfer-Encoding: 7bit"
+		echo
+		echo 
+	fi
+	echo
+	echo
+fi
+html
+	body "" "bgcolor=Linen"
+		if [ ! -d $nightdir ]
+		then
+			h3 "${night} does not exist."
+			body /
+			html /
+			exit
+		fi
+		hr
+		h2 "OPERA $reporttype Reduction Date $when for ${night}."
+		hr
+		table "border=2 bgcolor=LightCyan" ""
+		tablehead "OPERA 1.0 Report for ${night}" "bgcolor=#FFCC00" "" ""
+			if [ -e ${byproductsdir}master.rlst ]
+			then 
+				tablehead "Modes" "bgcolor=#CCFFCC" "" ""
+				tr_
+				td_ 2
+				center
+				exec 4< ${byproductsdir}master.rlst
+				while read line <&4
+				do
+					detector=`${bindir}operagetword 1 ${line}`
+					mode=`${bindir}operagetword 2 ${line}`
+					speed=`${bindir}operagetword 3 ${line}`
+					amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+					oset=`${bindir}operagetword 5 ${line}`
+					echo "${detector}${amplifier} ${mode}${oset} ${speed} "
+					br_
+				done 
+				exec 4>&-
+				echo 
+				center /
+				td_ /
+				tr_ /
+			fi 
+			if [ -e ${byproductsdir}/pirunid.dat ]
+			then 
+				tablehead "Runids and PIs" "bgcolor=#CCFFCC" "" ""
+				tr_
+				td_ 2
+				center
+				exec 4< ${byproductsdir}/pirunid.dat
+				while read line <&4
+				do
+					echo "${line}"
+					br_
+				done 
+				exec 4>&-
+				echo 
+				center /
+				td_ /
+				tr_ /
+				runids=`cat <${byproductsdir}/pirunid.dat | awk '{print $1}'`
+			fi 
+			sourcecount=`ls ${nightdir}/*o.fits 2>/dev/null | wc -l` 
+			spectrumcount=`ls ${spectradir}/*.e${gz} 2>/dev/null | wc -l` 
+			tablehead "Image Count" "bgcolor=#CCFFCC" "" ""
+			tablerow -c "${spectrumcount} / ${sourcecount}" 
+			if [[ -e ${byproductsdir}master.rlst ]]
+			then
+				for runid in $runids
+				do
+					piname=""
+					tr_
+					td_ 2
+					table  "border=1 bgcolor=LightCyan" ""
+					tablehead "Runid $runid Report" "bgcolor=#CCFFCC" "" ""
+					total=0
+					exec 4< ${byproductsdir}master.rlst
+					while read line <&4
+					do
+						detector=`${bindir}operagetword 1 ${line}`
+						mode=`${bindir}operagetword 2 ${line}`
+						speed=`${bindir}operagetword 3 ${line}`
+						amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+						oset=`${bindir}operagetword 5 ${line}`
+						objectlist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						objects=""
+						for object in ${objectlist}
+						do
+							orunid=`${bindir}/operagetheader ${object} --keyword=RUNID | sed -e 's/ //g'`
+							if [[ "$runid" == "$orunid" ]]
+							then
+								objects="${objects} `basename ${object}`"
+								piname=`${bindir}/operagetheader ${object} --keyword=PI_NAME | sed -e 's/ $//'`
+							fi
+						done
+						if [[ "${objects}" != "" ]]
+						then
+							count=`${bindir}/operacount ${objects}`
+							((total=count+total))
+							tablehead "${piname} ${detector} ${mode}${oset} ${speed}"  "bgcolor=#CCFFCC" "" ""
+							for object in ${objects}
+							do
+								tr_
+								td_ 2
+								echo -n "${object} "
+								base=`basename ${object} o.fits`
+								list=`ls ${spectradir}${base}* ${calibrationsdir}${base}* 2>/dev/null | sed -e 's:${spectradir}::'`
+								for f in $list
+								do 
+									echo -n "`basename $f` "
+								done
+								echo
+								td_ /
+								tr_ /
+							done
+							tablehead "Maximal SNR Values" "bgcolor=#CCFFCC" "" ""
+							if [[ "$mode" == "pol" ]]
+							then
+								objectlist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst | xargs -n1 basename 2>/dev/null`
+								objects=""
+								for object in ${objectlist}
+								do
+									orunid=`${bindir}/operagetheader ${object} --keyword=RUNID | sed -e 's/ //g'`
+									if [[ "$runid" == "$orunid" ]]
+									then
+										objects="${objects} `basename ${object}`"
+										piname=`${bindir}/operagetheader ${nightdir}/${object} --keyword=PI_NAME | sed -e 's/ $//'`
+									fi
+								done
+								count=`${bindir}/operacount ${objects}`
+								while (( count > 0 ))
+								do
+									quad=`${bindir}/operagetpolarquad ${objects}`
+									obj1=`${bindir}/operagetword 2 $quad` 
+									base1=`basename $obj1 o.fits`
+									obj2=`${bindir}/operagetword 3 $quad` 
+									base2=`basename $obj2 o.fits`
+									obj3=`${bindir}/operagetword 4 $quad` 
+									base3=`basename $obj3 o.fits`
+									obj4=`${bindir}/operagetword 5 $quad` 
+									base4=`basename $obj4 o.fits`
+									if [[ `${bindir}/operagetword 1 $quad` == 4 ]]
+									then
+										quadset="$obj1 $obj2 $obj3 $obj4"
+										objects=`${bindir}/operasublist "$quadset" "${objects}"`
+										if [ -e ${spectradir}/${base1}.p${gz} ]
+										then
+											for i in 5 4 3 2
+											do
+												obj=`${bindir}/operagetword $i $quad`
+												base=`basename $obj o.fits`
+												etime=`${bindir}/operagetheader ${nightdir}/$obj --keyword=EXPTIME | sed -e 's/ //g'`
+												target=`${bindir}/operagetheader ${nightdir}/$obj --keyword=OBJECT | sed -e 's/ $//' | sed -e 's/_/ /g'`
+												airmass=`${bindir}/operagetheader ${nightdir}/$obj --keyword=AIRMASS | sed -e 's/ //g'`
+												tr_
+												td_ 2
+												table "${base}, $target, airmass $airmass, etime $etime seconds"
+												tablehead "Order" "Wavelength" "SNR"
+												lines=`${bindir}catz <${spectradir}/${base}i.sn${gz} | tail --lines=+12 | tr ' ' '_'`
+												maximumsnr=0
+												for line in $lines
+												do
+													l=`echo $line | tr '_' ' '`
+													if [[ "`echo $l | awk '{print $3}'`" != "inf" ]] 
+													then
+														centersnr=`echo $l | awk '{printf("%d", $3)}'`
+														if (( centersnr > maximumsnr ))
+														then
+															maximumsnr=$centersnr
+															centerorder=`echo $l | awk '{printf("%d",$1)}'`
+														fi
+													fi
+												done
+												((startorder=(centerorder-2)))
+												((endorder=(centerorder+2)))
+												for line in $lines
+												do
+													l=`echo $line | tr '_' ' '`
+													if [[ "`echo $l | awk '{print $3}'`" != "inf" ]] 
+													then
+														centersnr=`echo $l | awk '{printf("%d", $3)}'`
+														if (( centersnr >= 10 ))
+														then
+															wl=`echo $l | awk '{printf("%.4f",$2)}'`
+															order=`echo $l | awk '{printf("%d",$1)}'`
+															
+															if (( order >= startorder && order <= endorder ))
+															then
+																tablerow -c "${order}" "${wl}nm" "${centersnr} / `echo ${centersnr} | awk '{printf(\"%.0f\", $1*sqrt(2.6/1.8));}'`"
+															fi
+														fi
+													fi
+												done
+												table /
+												td_ /
+												tr_ /
+											done
+											if [[ -e ${logdir}/${night}/comments.log ]]
+											then
+												cmmt=`cat <${logdir}/${night}/comments.log | grep $base1 | sed -e 's/[0-9]*o: //'`
+												if [[ "$cmmt" != "" ]]
+												then
+													tr_
+													td_ 2
+													table ""
+														tablehead "Comments" "bgcolor=#CCFFCC" "" ""
+														tablerow -c "$base1: $cmmt"
+														cmmt2=`cat <${logdir}/${night}/comments.log | grep $base2 | sed -e 's/[0-9]*o: //' -e 's/  / /g'`
+														if [[ "$cmmt" != "$cmmt2" && "$cmmt2" != "" && "$cmmt2" != " " ]]
+														then
+															tablerow -c "$base2: $cmmt2"
+														fi
+														cmmt3=`cat <${logdir}/${night}/comments.log | grep $base3 | sed -e 's/[0-9]*o: //' -e 's/  / /g'`
+														if [[ "$cmmt" != "$cmmt3" && "$cmmt2" != "$cmmt3" && "$cmmt3" != " " ]]
+														then
+															tablerow -c "$base3: $cmmt3"
+														fi
+														cmmt4=`cat <${logdir}/${night}/comments.log | grep $base4 | sed -e 's/[0-9]*o: //' -e 's/  / /g'`
+														if [[ "$cmmt" != "$cmmt4" && "$cmmt3" != "$cmmt4" && "$cmmt4" != " " ]]
+														then
+															tablerow -c "$base4: $cmmt4"
+														fi
+													table /
+													td_ /
+													tr_ /
+												fi
+											fi
+										fi
+									else
+										objects="`${bindir}/operasublist $obj1 \"${objects}\"`"
+									fi 
+									count=`${bindir}/operacount "${objects}"`
+								done 
+							else	# mode != pol
+								for object in ${objects}
+								do
+									base=`basename ${object} o.fits`
+									if [ -e ${spectradir}/${base}i.sn${gz} ]
+									then
+										etime=`${bindir}/operagetheader ${nightdir}/${object} --keyword=EXPTIME | sed -e 's/ //g'`
+										target=`${bindir}/operagetheader ${nightdir}/${object} --keyword=OBJECT | sed -e 's/ $//' | sed -e 's/_/ /g'`
+										airmass=`${bindir}/operagetheader ${nightdir}/${object} --keyword=AIRMASS | sed -e 's/ //g'`
+										tr_
+										td_ 2
+										table "${base}i.sn, $target, airmass $airmass, etime $etime seconds"
+										tablehead "Order" "Wavelength" "SNR"
+										lines=`${bindir}catz <${spectradir}/${base}i.sn${gz} | tail --lines=+12 | tr ' ' '_'`
+										maximumsnr=0
+										for line in $lines
+										do
+											l=`echo $line | tr '_' ' '`
+											if [[ "`echo $l | awk '{print $3}'`" != "inf" ]] 
+											then
+												centersnr=`echo $l | awk '{printf("%d", $3)}'`
+												if (( centersnr > maximumsnr ))
+												then
+													maximumsnr=$centersnr
+													centerorder=`echo $l | awk '{printf("%d",$1)}'`
+												fi
+											fi
+										done
+										((startorder=(centerorder-2)))
+										((endorder=(centerorder+2)))
+										for line in $lines
+										do
+											l=`echo $line | tr '_' ' '`
+											if [[ "`echo $l | awk '{print $3}'`" != "inf" ]] 
+											then
+												centersnr=`echo $l | awk '{printf("%d", $3)}'`
+												if (( centersnr >= 10 ))
+												then
+													wl=`echo $l | awk '{printf("%.4f",$2)}'`
+													order=`echo $l | awk '{printf("%d",$1)}'`
+													
+													if (( order >= startorder && order <= endorder ))
+													then
+														tablerow -c "${order}" "${wl}nm" "${centersnr} / `echo ${centersnr} | awk '{printf(\"%.0f\", $1*sqrt(2.6/1.8));}'`"
+													fi
+												fi
+											fi
+										done
+										table /
+										td_ /
+										tr_ /
+										if [[ -e ${logdir}/${night}/comments.log ]]
+										then
+											cmmt=`cat <${logdir}/${night}/comments.log | grep $base | sed -e 's/[0-9]*o: //'`
+											if [[ "${cmmt}" != "" ]]
+											then
+												tr_
+												td_ 2
+												table ""
+													tablehead "Comments" "bgcolor=#CCFFCC" "" ""
+													tablerow -c "$base: $cmmt"
+												table /
+												td_ /
+												tr_ /
+											fi
+										fi
+									fi
+								done
+							fi
+							tablehead "Calibrations" "bgcolor=#CCFFCC" "" ""
+							tr_
+							td_ 2
+							therest=`grep '[0-9]*[abfc].fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+							for f in $therest
+							do
+								echo -n "`basename $f 2>/dev/null` "
+							done
+							echo
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.gain${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.geom${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.wcal${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.disp${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.prof${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.aper${gz} 2>/dev/null  | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.ordp${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}th_${detector}${amplifier}_${mode}*_${speed}.e${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							echo
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}ff_${detector}${amplifier}_${mode}*_${speed}.e${gz} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							echo
+							td_ /
+							tr_ /
+							tr_
+							td_ 2
+							list=`ls ${calibrationsdir}*${detector}${amplifier}_${mode}*_${speed}.fits${extension} 2>/dev/null | xargs -n1 basename 2>/dev/null`
+							for f in $list
+							do
+								echo -n "${f} "
+							done
+							echo
+							td_ /
+							tr_ /
+						fi
+					done
+					exec 4>&-
+					if [[ "$piname" != "" ]]
+					then
+						thetotal="$total images"
+						if (( total == 1 ))
+						then
+							thetotal="$total image"
+						fi
+						tablehead "$piname, $thetotal" "bgcolor=#FFFFCC" "" ""
+					fi
+					td_ /
+					tr_ /
+					table /
+				done
+			fi
+			td_ /
+			tr_ /
+			tr_
+			td_
+			table "border=1 bgcolor=#CCFFCC" ""
+			tablehead "File Consistency" "bgcolor=#CCFF99" "" ""
+			if [ -e ${byproductsdir}/master.rlst ]
+			then 
+				table "border=1 bgcolor=LightCyan" ""
+				tablehead "Part 1. Reduction List Check" "bgcolor=#CCFFCC" "" ""
+				ok=1
+				exec 4< ${byproductsdir}master.rlst
+				while read line <&4
+				do
+					detector=`${bindir}operagetword 1 ${line}`
+					mode=`${bindir}operagetword 2 ${line}`
+					speed=`${bindir}operagetword 3 ${line}`
+					amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+					oset=`${bindir}operagetword 5 ${line}`
+					if [ -s ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst ]
+					then
+						filelist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						if [[ "${filelist}" == "" ]]
+						then
+							tablerow -w " *** WARNING - No object files for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+							ok=0
+						fi
+						filelist=`grep '[0-9]*f.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						flatcount=`echo $filelist | wc -w`
+						if (( flatcount == 0 ))
+						then
+							tablerow -w " *** WARNING - No flat files for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+							ok=0
+						else
+							if (( flatcount < 4 ))
+							then
+								tablerow -w " *** WARNING - Less than 4 flat files ($flatcount) for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+								ok=0
+							fi
+						fi
+						filelist=`grep '[0-9]*b.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						if [[ "${filelist}" == "" ]]
+						then
+							tablerow -w " *** WARNING - No bias files for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+							ok=0
+						fi
+						filelist=`grep '[0-9]*a.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						if [[ "${filelist}" == "" ]]
+						then
+							tablerow -w " *** WARNING - No align files for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+							ok=0
+						fi
+						filelist=`grep '[0-9]*c.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+						if [[ "${filelist}" == "" ]]
+						then
+							tablerow -w " *** WARNING - No comparison files for ${detector} mode ${mode}${oset} ${speed} were available for reduction." 
+							ok=0
+						fi 
+					fi 
+				done 
+				exec 4>&-
+				if (( ok == 1 ))
+				then
+					tablerow -m -c "OK"
+				fi
+				table /
+			fi 
+			ok=1
+			if [ -e ${byproductsdir}/master.rlst ]
+			then 
+				table "border=1 bgcolor=LightCyan" ""
+				tablehead "Part 2. Calibrations" "bgcolor=#CCFFCC" "" ""
+				exec 4< ${byproductsdir}master.rlst
+				((ocount=0))
+				while read line <&4
+				do
+					detector=`${bindir}operagetword 1 ${line}`
+					mode=`${bindir}operagetword 2 ${line}`
+					speed=`${bindir}operagetword 3 ${line}`
+					amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+					oset=`${bindir}operagetword 5 ${line}`
+					linecount=`cat <${byproductsdir}master.rlst | wc -l`
+					tablehead "Checking ${detector} ${mode}${oset} ${speed}..." "bgcolor=#FFFFCC" "" ""
+					if [[ ! -s ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst ]]
+					then
+						tablerow -e "*** ERROR Reduction list for ${detector} ${mode}${oset} ${speed} does not exist."
+						ok=0
+					else
+						filelist=`grep '[0-9]*o.fits' ${byproductsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.rlst | wc -l`
+						ocount=`${bindir}/operacount "${filelist}"`
+						if (( ocount == 0 )) ; then 
+							tablerow " *** NOTE - no objects of ${detector} ${mode}${oset} ${speed} were available for reduction."
+						fi 
+						if [ ! -e ${calibrationsdir}/th_${detector}${amplifier}_${mode}${oset}_${speed}.e${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data th_${detector}${amplifier}_${mode}${oset}_${speed}.e${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/ff_${detector}${amplifier}_${mode}${oset}_${speed}.e${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data ff_${detector}${amplifier}_${mode}${oset}_${speed}.e${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.geom${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.geom${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.gain${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.gain${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.wcal${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.wcal${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.wcar${gz} ] ; then 
+							tablerow -e "*** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.wcar${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.disp${gz} ] ; then 
+							echo "${pref} *** ERROR Calibration data ${detector}_${mode}${oset}_${speed}.disp${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.ordp${gz} ] ; then 
+							echo "${pref} *** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.ordp${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.prof${gz} ] ; then 
+							echo "${pref} *** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.prof${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/${detector}${amplifier}_${mode}${oset}_${speed}.aper${gz} ] ; then 
+							echo "${pref} *** ERROR Calibration data ${detector}${amplifier}_${mode}${oset}_${speed}.aper${gz} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/masterflat_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} ] ; then 
+							tablerow -e "*** ERROR Calibration data masterflat_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/masterfabperot_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} ] ; then 
+							tablerow -w "*** NOTE Calibration data masterfabperot_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/mastercomparison_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} ] ; then 
+							tablerow -e "*** ERROR Calibration data mastercomparison_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} does not exist."
+							ok=0
+						fi 
+						if [ ! -e ${calibrationsdir}/masterbias_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} ] ; then 
+							tablerow -e "*** ERROR Calibration data masterbias_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} does not exist."
+							ok=0
+						fi
+						if [[ "${mode}" == pol ]]
+						then
+							if [ ! -e ${calibrationsdir}/masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}1.fcal${gz} ] ; then 
+								tablerow -e "*** ERROR Calibration data masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}1.fcal${gz} does not exist."
+								ok=0
+							fi 
+							if [ ! -e ${calibrationsdir}/masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}2.fcal${gz} ] ; then 
+								tablerow -e "*** ERROR Calibration data masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}2.fcal${gz} does not exist."
+								ok=0
+							fi 
+							if [ ! -e ${calibrationsdir}/masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}3.fcal${gz} ] ; then 
+								tablerow -e "*** ERROR Calibration data masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}3.fcal${gz} does not exist."
+								ok=0
+							fi 
+							if [ ! -e ${calibrationsdir}/masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}4.fcal${gz} ] ; then 
+								tablerow -e "*** ERROR Calibration data masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}4.fcal${gz} does not exist."
+								ok=0
+							fi
+						else
+							if [ ! -e ${calibrationsdir}/masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}.fcal${gz} ] ; then 
+								tablerow -e "*** ERROR Calibration data masterfluxcalibration_${detector}${amplifier}_${mode}${oset}_${speed}.fcal${gz} does not exist."
+								ok=0
+							fi 
+						fi
+					fi
+				if (( ok == 1 ))
+				then
+					tablerow -m -c "OK"
+				fi
+				done 
+				exec 4>&-
+				table /
+			fi
+			if (( intensity ))
+				then
+				table "border=1 bgcolor=LightCyan" ""
+				if (( spectrumcount > 0 ))
+				then 
+					tablehead "Part 3. Spectra" "bgcolor=#CCFFCC" "" ""
+					objects=`ls ${nightdir}/*o.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' '`
+					spectra=`ls ${spectradir}/*i.fits${extension} 2>/dev/null | sed -e s:.*/:: | tr '\n' ' '` 
+					tablehead "Checking that there is a spectrum for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${spectradir}/${base}i.fits${extension} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}i.fits${extension}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					tablehead "Checking that there is an m.fits for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${spectradir}/${base}m.fits ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}m.fits."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					if (( ok == 1 ))
+					then
+						tablerow -m -c "OK"
+					fi
+					tablehead "Checking that there is a SNR table for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [[ ! -e ${spectradir}/${base}i.sn${gz} ]]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}i.sn${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					if (( ok == 1 ))
+					then
+						tablerow -m -c "OK"
+					fi
+					tablehead "Checking that there is an .e${gz} table for each object." "bgcolor=#FFFFCC" ""  ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${spectradir}/${base}.e${gz} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}.e${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					if (( ok == 1 ))
+					then
+						tablerow -m -c "OK"
+					fi
+					tablehead "Checking that there is an iu.s${gz} table for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${spectradir}/${base}iu.s${gz} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}iu.s${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					tablehead "Checking that there is an in.s${gz} table for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${spectradir}/${base}in.s${gz} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}in.s${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					tablehead "Checking that there is an .tell${gz} table for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${calibrationsdir}/${base}i.tell${gz} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}i.tell${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					tablehead "Checking that there is an .rvel${gz} table for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [ ! -e ${calibrationsdir}/${base}i.rvel${gz} ]
+						then
+							tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}i.rvel${gz}."
+							tr_
+							td_ 2
+							ok=0
+						fi
+						echo -n "."
+					done
+					td_ /
+					tr_ /
+					if (( ok == 1 ))
+					then
+						tablerow -m -c "OK"
+					fi
+					tablehead "Checking telluric wavelength consistency for each object." "bgcolor=#FFFFCC" "" ""
+					tr_
+					td_ 2
+					for object in ${objects}
+					do
+						base=`echo ${object} | sed -e 's/o.fits//'`
+						if [[ -e ${spectradir}/${base}inw.s${gz} || -e ${spectradir}/${base}iuw.s${gz} ]]
+						then
+							if [ ! -e ${spectradir}/${base}inw.s${gz} ]
+							then
+								tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}inw.s${gz}."
+								tr_
+								td_ 2
+								ok=0
+							fi
+							if [ ! -e ${spectradir}/${base}iuw.s${gz} ]
+							then
+								tablerow -e " *** ERROR ${object} exists but there is no corresponding ${base}iuw.s${gz}."
+								tr_
+								td_ 2
+								ok=0
+							fi
+							echo -n "."
+						fi
+					done
+					td_ /
+					tr_ /
+					if (( ok == 1 ))
+					then
+						tablerow -m -c "OK"
+					fi
+					table /
+				fi
+				if (( polarimetry ))
+				then
+					echo
+					table "border=1 bgcolor=LightCyan" ""
+					if (( spectrumcount > 0 ))
+					then 
+						tablehead "Part 4. Polarimetry" "bgcolor=#CCFFCC" "" ""
+						tablehead "Checking polarimetry files..." "bgcolor=#FFFFCC" "" ""
+						tr_
+						td_ 2
+						for object in ${objects}
+						do
+							base=`echo ${object} | sed -e 's/o.fits//'`
+							if [[ -e ${spectradir}/${base}pn.s${gz} || -e ${spectradir}/${base}pu.s${gz} || -e ${spectradir}/${base}p.fits${extension} ]]
+							then
+								if [ ! -e ${spectradir}/${base}p.fits${extension} ]
+								then
+									tablerow -e " *** ERROR ${base}p.fits${extension} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								if [ ! -e ${spectradir}/${base}pu.s${gz} ]
+								then
+									tablerow -e " *** ERROR ${base}pu.s${gz} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								if [ ! -e ${spectradir}/${base}pn.s${gz} ]
+								then
+									tablerow -e " *** ERROR ${base}pn.s${gz} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								if [ ! -e ${spectradir}/${base}puw.s${gz} ]
+								then
+									tablerow -e " *** ERROR ${base}puw.s${gz} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								if [ ! -e ${spectradir}/${base}pnw.s${gz} ]
+								then
+									tablerow -e " *** ERROR ${base}pnw.s${gz} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+							fi
+							echo -n "."
+						done
+						td_ /
+						tr_ /
+						if (( ok == 1 ))
+						then
+							tablerow -m -c "OK"
+						fi
+					fi
+				fi
+				tr_ /
+				td_ /
+				table /
+				echo
+			fi
+			if (( polarimetry ))
+			then
+				table "border=1 bgcolor=LightCyan" ""
+				tablehead "Checking polarimetry quads..." "bgcolor=#FFFFCC"  "" ""
+				if (( spectrumcount > 0 ))
+				then 
+					exec 4< ${byproductsdir}master.rlst
+					while read line <&4
+					do
+						detector=`${bindir}operagetword 1 ${line}`
+						mode=`${bindir}operagetword 2 ${line}`
+						speed=`${bindir}operagetword 3 ${line}`
+						amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+						oset=`${bindir}operagetword 5 ${line}`
+						tablehead "Checking ${detector} ${mode}${oset} ${speed}..." "bgcolor=#FFFFCC" "" ""
+						if [[ -s ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst ]]
+						then
+							if [[ $mode == "pol" ]]
+							then
+								objectlist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst`
+								count=`${bindir}/operacount ${objectlist}`
+								while (( count > 0 ))
+								do
+									quad=`${bindir}/operagetpolarquad ${objectlist}`
+									obj1=`${bindir}/operagetword 2 $quad` 
+									base1=`basename $obj1 o.fits`
+									obj2=`${bindir}/operagetword 3 $quad` 
+									base2=`basename $obj2 o.fits`
+									obj3=`${bindir}/operagetword 4 $quad` 
+									base3=`basename $obj3 o.fits`
+									obj4=`${bindir}/operagetword 5 $quad` 
+									base4=`basename $obj4 o.fits`
+									if [[ `${bindir}/operagetword 1 $quad` == 4 ]]
+									then
+										objects="$obj1 $obj2 $obj3 $obj4"
+										objectlist=`${bindir}/operasublist "${objects}" "${objectlist}"`
+										tablerow "Checking $base1 $base2 $base3 $base4"
+										if [ ! -e ${spectradir}/${base1}p.fits${extension} ]
+										then
+											tablerow -e " *** ERROR ${base1}p.fits${extension} is missing."
+											ok=0
+										fi
+										if [ ! -e ${spectradir}/${base1}pu.s${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}pu.s${gz} is missing."
+											ok=0
+										fi
+										if [ ! -e ${spectradir}/${base1}pn.s${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}pn.s${gz} is missing."
+											ok=0
+										fi
+										if [ ! -e ${spectradir}/${base1}puw.s${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}puw.s${gz} is missing."
+											ok=0
+										fi
+										if [ ! -e ${spectradir}/${base1}pnw.s${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}pnw.s is missing."
+											ok=0
+										fi
+										if [ ! -e ${calibrationsdir}/${base1}p.tell${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}p.tell${gz} is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+										if [ ! -e ${calibrationsdir}/${base1}p.rvel${gz} ]
+										then
+											tablerow -e " *** ERROR ${base1}p.rvel${gz} is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+									else
+										tablerow -w  " *** $base1 skipped as out of sequence."
+										objectlist=`${bindir}/operasublist "$obj1" "${objectlist}"`
+									fi 
+									count=`${bindir}/operacount "${objectlist}"`
+								done 
+							fi
+						fi
+					done 
+					exec 4>&-
+				fi 
+				table /
+			fi
+			if [ -e ${logdir}/${night}/distribute.log ]
+			then 
+				table "border=1 bgcolor=LightCyan" ""
+				tablehead "Part 5. Checking Distribution" "bgcolor=#CCFFCC" "" ""
+				if [ -e ${byproductsdir}master.rlst ]
+				then 
+					tr_
+					td_ 2
+					ok=1
+					exec 4< ${byproductsdir}master.rlst
+					while read line <&4
+					do
+						detector=`${bindir}operagetword 1 ${line}`
+						mode=`${bindir}operagetword 2 ${line}`
+						speed=`${bindir}operagetword 3 ${line}`
+						amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+						oset=`${bindir}operagetword 5 ${line}`
+						if [ -s ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst ]
+						then
+							objectlist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst | xargs -n1 basename 2>/dev/null`
+							runids=""
+							for object in ${objectlist} 
+							do 
+								runid=`${bindir}/operagetheader ${nightdir}/${object} --keyword=RUNID | sed -e 's/ //g'`
+								piname=`${bindir}/operagetheader ${nightdir}/${object} --keyword=PI_NAME`
+								if [[ ! -e ${processeddir}/$runid/${object} ]]
+								then
+									tablerow -e " *** ERROR processed/$runid/${object} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								base=`basename ${object} .fits${extension} | sed -e 's/o//'`
+								list=`ls ${spectradir}${base}* 2>/dev/null | sed -e "s:${spectradir}::"`
+								for f in $list
+								do
+									if [ ! -e ${processeddir}/$runid/$f ]
+									then
+										tablerow -e " *** ERROR processed/$runid/$f is missing."
+										tr_
+										td_ 2
+										ok=0
+									fi
+								done
+								if [[ "`${bindir}/operafindword $runid $runids`" == "" ]] 
+								then 
+									runids="$runids $runid"
+								fi
+								echo -n "."
+							done
+							if [[ "${objectlist}" != "" ]] 
+							then 
+								therest=`grep '[0-9]*[abfc].fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst | xargs -n1 basename 2>/dev/null`
+								for r in $runids
+								do 
+									for f in $therest
+									do
+										if [[ ! -e ${processeddir}/${r}/$f ]]
+										then
+											tablerow -e " *** ERROR processed/${r}/$f is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+									done
+									list=`ls ${spectradir}*${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} 2>/dev/null | sed -e "s:${spectradir}::"`
+									for f in $list
+									do
+										if [ ! -e ${processeddir}/${r}/${f} ]
+										then
+											tablerow -e " *** ERROR processed/${r}/${f} is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+									done
+									echo -n "."
+								done
+							fi
+						fi
+					done 
+					exec 4>&-
+					td_ /
+					tr_ /
+					echo
+				fi 
+				if (( ok == 1 ))
+				then
+					tablerow -m -c "OK"
+				fi
+				table /
+			fi
+			if [[ -e ${logdir}/${night}/approve.log && $ok == 1 && "$reporttype" == "Approval" ]]
+			then 
+				table "border=1 bgcolor=LightCyan" ""
+				tablehead "Part 6. Checking Final Approval" "bgcolor=#CCFFCC" "" ""
+				if [ -e ${byproductsdir}master.rlst ]
+				then 
+					tr_
+					td_ 2
+					exec 4< ${byproductsdir}master.rlst
+					while read line <&4
+					do
+						detector=`${bindir}operagetword 1 ${line}`
+						mode=`${bindir}operagetword 2 ${line}`
+						speed=`${bindir}operagetword 3 ${line}`
+						amplifier=`${bindir}operagetword 4 ${line} | sed -e 's:_::'`
+						oset=`${bindir}operagetword 5 ${line}`
+						if [ -s ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst ]
+						then
+							objectlist=`grep '[0-9]*o.fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst | xargs -n1 basename 2>/dev/null`
+							runids=""
+							for object in ${objectlist} 
+							do 
+								runid=`${bindir}/operagetheader ${nightdir}/${object} --keyword=RUNID | sed -e 's/ //g'`
+								piname=`${bindir}/operagetheader ${nightdir}/${object} --keyword=PI_NAME`
+								if [ ! -e ${approveddir}/$runid/raw/${object} ]
+								then
+									tablerow -e " *** ERROR approved/$runid/raw/${object} is missing."
+									tr_
+									td_ 2
+									ok=0
+								fi
+								base=`basename ${object} .fits${extension} | sed -e 's/o//'`
+								list=`ls ${spectradir}${base}* 2>/dev/null | sed -e "s:${spectradir}::"`
+								for f in $list
+								do 
+									if [ ! -e ${approveddir}/$runid/spectra/$f ]
+									then
+										tablerow -e " *** ERROR approved/$runid/spectra/$f is missing."
+										tr_
+										td_ 2
+										ok=0
+									fi
+								done
+								if [[ "`${bindir}/operafindword $runid $runids`" == "" ]] 
+								then 
+									runids="$runids $runid"
+								fi
+								echo -n "."
+							done
+							if [[ ${objectlist} != "" ]] 
+							then 
+								therest=`grep '[0-9]*[abfc].fits' ${byproductsdir}${detector}${amplifier}_${mode}${oset}_${speed}.rlst | xargs -n1 basename 2>/dev/null`
+								for r in $runids
+								do 
+									for f in $therest
+									do
+										if [ ! -e ${approveddir}/${r}/ancillary/${f} ]
+										then
+											tablerow -e " *** ERROR approved/${r}/ancillary/${f} is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+									done
+									list=`ls ${spectradir}th_${detector}${amplifier}_${mode}${oset}_${speed}.fits${extension} 2>/dev/null | sed -e "s:${spectradir}::"`
+									for f in $list
+									do
+										if [ ! -e ${approveddir}/${r}/${f} ]
+										then
+											tablerow -e " *** ERROR approved/${r}/${f} is missing."
+											tr_
+											td_ 2
+											ok=0
+										fi
+									done
+									echo -n "."
+								done
+							fi
+						fi
+					done 
+					exec 4>&-
+					echo
+					td_ /
+					tr_ /
+				fi
+				if (( ok == 1 ))
+				then
+					tablerow -m -c "OK"
+				fi
+				table /
+			fi
+			td_ /
+			tr_ /
+			tr_
+			td_
+				table "border=1 bgcolor=LavenderBlush" ""
+					tablehead "End of ${night} report for reduction done on $when" "bgcolor=#CCFFCC" "" ""
+				table /
+			td_ /
+			tr_ /
+		table /
+	body /
+html /
+if [[ $mailto != "" && $html == 1 ]]
+then
+	echo
+	echo "--theBoundaryString--"
+	echo
+fi
+exit 0

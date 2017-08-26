@@ -1,0 +1,38 @@
+********** OPERA Module Generator **********
+
+In order to quickly start using the OPERA Module Generator 
+follow the instructions below.
+
+1. Download the gen_template.c file
+
+2. Compile it as follows:
+
+   $gcc -o gen_template gen_template.c
+
+   or 
+
+   $make gen_template
+   
+   Tested on both Mac OSX 10.4.11 and Linux Ubuntu.
+
+3. Create a new directory where you want to build your module source code
+   e.g.
+   $ mkdir MODULE_NAME
+   $ cd MODULE_NAME
+   $ mkdir src
+   $ cd src
+
+4. Run $/../gen_template inside of that directory
+   One should provide the module name as an argument, like
+   
+   $ /../gen_template MODULE_NAME
+
+After running gen_template, try to compile the template that has been
+generated, just by typing
+
+   $ gcc -o MODULE_NAME MODULE_NAME.c -lm -lcfitsio
+
+Try to use your module by typing ./MODULE_NAME. It should not
+do much but show the "help" menu. If one types all the arguments
+correctly, as shown in the example, it should print out the name of the 
+relevant arguments.

@@ -1,0 +1,17 @@
+http://rredc.nrel.gov/solar/spectra/am1.5/
+ASTM G173-03 Reference Spectra
+Derived from SMARTS v. 2.9.2
+Wavelength (nm) 
+ETR (W*m-2*nm-1)
+Global Tilt (W*m-2*nm-1)
+Direct + Circumsolar (W*m-2*nm-1)
+
+	
+ETR = Extraterrestrial Radiation (solar spectrum at top of atmosphere) at mean Earth-Sun distance.
+
+Direct = Direct Normal Irradiance Nearly parallel (0.5 deg divergent cone) radiation on surface with surface normal tracking (pointing to) the sun, excluding scattered sky and reflected ground radiation
+
+Circumsolar = Spectral irradiance within +/- 2.5 degree (5 degree diameter) field of view centered on the 0.5 deg diameter solar disk, but excluding the radiation from the disk
+
+"Global Tilt" = spectral radiation from solar disk plus sky diffuse and diffuse reflected from ground on south facing surface tilted 37 deg from horizontal 
+

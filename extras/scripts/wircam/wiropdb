@@ -1,0 +1,94 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+# Kanoa Withington CFHT 2003
+#########################################################################################
+# Name                           Owner                          Object_type
+# ------------------------------ ------------------------------ --------------------------------
+# op..xexp                       dbo                            
+#
+# qrunid  qobseqid qobiter
+# qicseqid
+# runid
+# obsid exptime
+# mjd#obs
+# ccdbin1
+# ccdbin2
+# filter
+# date#obs
+# utc#obs object  observer piname filename ra dec obstype raster  instrume qcoord  qobserve telfocus rotangle dettem  equinox xprobe  yprobe  zprobe  airmass shutopen shutclos darktime date telstat telconf hsttime imageswv conswv  detstat timesys lst#obs qid cmmtobs guira guidec  guiequin cmmtseq reldate qoffid  instmode regmode  objra objdec  raoff decoff  guiobjn guiobjn1  guira1  guidec1 guiequi1 guirapm1 guidepm1 guimagn1 guiobjn2 guira2  guidec2 guiequi2 guirapm2 guidepm2 guimagn2 mdcoords mdrepeat nexp cmpltexp
+# wcaqgdst
+# wcaqptst
+# wcptrao
+# wcptdeco
+# wcgdra1
+# wcgddec1
+# wcgdmag1
+# wcgdra2
+# wcgddec2
+# wcgdmag2
+# wcgdra3
+# wcgddec3
+# wcgdmag3
+# wcgdra4
+# wcgddec4
+# wcgdmag4
+# wcalgo
+# wcrotate
+# wcfoctmp
+# trgtype
+# focstart
+# focstep
+# 
+# In DBS12 (or DBW12 or dbs) server,  a query using the odometer number will get your data:
+# 
+# select <field list> from op..xexp where _obsid=<odometer>
+#########################################################################################
+# PH2_OG   = 30          / PH2 Observing Group Number
+# PH2_PATT = DP21 or WDP3 or NDP / PH2 Observing Pattern Name
+# PH2_IND  = 19         / PH2 Current Dither Index
+# PH2_NIND = 21         / PH2 Total Number of Dither Positions
+# PH2_DRA  = +412.0 or -123.3 / Dither Offset in RA (arcsec)
+# PH2_DDEC = -32.0 or +1.4 / Dither Offset in DEC (arcsec)
+# 
+# We also need to have the infamous Pointing Offset passed as well:
+# 
+# PH2_PRA  = in arcsec please / PH2 Target Pointing Offset in RA (arcsec)
+# PH2_PDEC = in arcsec please / PH2 Target Pointing Offset in DEC (arcsec)
+# 
+# Non-exisiting yet but added to ph2 soon (hopefully):
+# 
+# PH2_TGTP = 'extended' or 'point source' or 'deep field' or 'crowded field' / PH2 Target Type
+# PH2_TGSZ = in arcsec / PH2 Extended Target Size (diameter - arcsec)
+#
+#########################################################################################
+
+
+	if {[llength $argv] < 1} {
+   	puts "wiropdb: select <field list> from op..xexp where _obsid=<odometer>."
+   	exit
+	}
+	
+	source /cfht/lib/syblib
+
+	set usr "qso_neo"
+	set pass "op2qsoneo"
+	set query [lindex $argv 0]
+	#set dbname [exec ssGet /d/host]
+	set dbname "pono"
+	# was DBS12
+	set dbh [sybconnect $usr $pass $dbname iiwi]
+	sybuse $dbh op
+	#puts "$query"
+	set sybmsg(nullvalue) NULL
+	if {[catch {sybsql $dbh $query} msg]} {puts "$msg";}
+	set columns [sybcols $dbh]
+	puts "$columns"
+	set row [sybnext $dbh]
+	while {$sybmsg(nextrow) == "REG_ROW"} {
+		puts "$row"
+		set row [sybnext $dbh]
+	}
+	catch syb_disconnect $dbh
+exit

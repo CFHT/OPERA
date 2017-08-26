@@ -1,0 +1,51 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+
+#########################################################################################
+#
+#  iiwi-2.1 dimm envdb query
+#
+#  Teeple March 2013
+#
+#  
+#########################################################################################
+#. /apps/sybase/local/etc/sybase_env.sh
+# sqsh -U dimm -P dimmdimm -S envdb -D iiwi
+#sp_help
+#go
+#
+#database connection  info:
+#
+#linux host: envdb
+#sybase server: envdb
+#database: dimm
+#user: dimm
+#pw: dimmdimm 
+#
+#########################################################################################
+#
+if {[llength $argv] < 1} {
+	puts "espdimm: send a dimm seeing query to the env database. e.g."
+	puts "espdimm \"select avgseeing from dimm_3 where date between 'utcdate' and 'utcdate2'\""
+	puts "where date like Feb 15 2012 8:00AM"
+	exit 1
+}
+source /cfht/lib/syblib
+set usr "dimm"
+set pass "dimmdimm"
+set query [lindex $argv 0]
+set db [sybconnect $usr $pass envdb iiwi]
+sybuse $db iiwi 
+if [catch {sybsql $db $query} msg] {
+	puts $sybmsg(msgtext)
+	exit 1
+}
+sybnext $db {
+	puts @0
+}
+catch {close $db}
+
+exit
+

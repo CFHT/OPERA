@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# create a directory in waimea file system that links to
+# the archive as a workaround for not being able to see
+# summit-mounted directories
+#
+if (( $# == 0 ))
+then
+	echo "usage: $(basename $0) [-d]  <night>"
+	exit
+fi
+deleting=0
+archivedir=/h/archive/sw/tools/
+basedir=/data/niele/espadons
+if [[ "$1" == "-d" ]]
+then
+	deleting=1
+	shift
+fi
+night=$1
+nightdir=$basedir/$night
+uhanedir=/data/uhane5/opera/$night
+if (( deleting == 1 ))
+then
+	rm -rf $uhanedir
+fi
+if [ ! -d $nightdir ]
+then
+	echo "$nightdir does not exist."
+	exit
+fi
+if [ -d $uhanedir ]
+then
+	echo "$uhanedir exists, please delete it."
+	exit
+fi
+files=`ls $nightdir/ | xargs -n1 basename`
+mkdir -p $uhanedir
+for file in $files
+do
+	echo -n "."
+	arfile=`$archivedir/arlocate $file`
+	ln -s $arfile $uhanedir/$file
+done
+echo
+exit
+

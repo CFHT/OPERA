@@ -1,0 +1,55 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: operadiff
+# Version: 1.0
+# Description: do diffs between folders and the master source
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Oct/2014
+# Contact: kanoa@cfht.hawaii.edu
+# 
+# Copyright (C) 2014  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operadiff
+#/// \brief do diffs between folders and the master source
+#/// \arg token
+#/// \ingroup scripts
+#
+#########################################################################################
+if [[ ! -e $1 || ! -e $2 ]]
+then
+	echo "usage: $(basename $0) <source dir> <changed source dir>"
+	exit
+fi
+# subdirs to check
+dirs="config doc harness harness/graces harness/espadons include include/core-espadons include/analysis-espadons include/libraries include/tools scripts scripts/espadons scripts/graces sofa src src/analysis-espadons src/core-espadons src/libraries src/tools"
+#files that frequently change and can be ignored
+ignore="TIMESTAMP\|config.status\|config\|aclocal.m4\|libtool\|config.log\|Makefile.in\|\\.o\|\\.lo\|\\.la"
+#stuff to keep an eye on
+important="^Files\|^diff\|^Only"
+#changes in the top level directory
+diff --brief $1 $2 | grep $important | grep -v $ignore | grep -v "Makefile\ "
+#changes in subdirectories
+for dir in $dirs; do
+   echo "Checking subdirectory $dir..."
+   diff --brief $1/$dir $2/$dir | grep $important | grep -v $ignore | grep -v "Makefile\ "
+done
+exit

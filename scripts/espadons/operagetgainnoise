@@ -1,0 +1,76 @@
+#!/bin/bash
+#########################################################################################
+#
+# Script name: operagetgainnoise
+# Version: 1.0
+# Description: get gain or noise of an amp from the calibration file
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operagetgainnoise
+#/// \brief get gain or noise of an amp from the calibration file
+#/// \arg filename amp gain|noise|gainerror
+#/// \ingroup scripts
+#
+#########################################################################################
+# 
+# <amp> <gain> <noise> <gainerror> <bias>
+#
+bindir=$opera/bin/
+if (( $# != 3 ))
+then
+	echo "usage: $(basename $0) <filename> <amp>(0|1) gain|noise|gainerror|bias"
+	exit
+fi
+amp=$2
+which=$3
+${bindir}/catz <$1 | while read line
+do
+	if [[ "$line[0]" != "#" ]]
+	then
+		if [[ "`${bindir}/operagetword 1 $line`" == "$amp" ]]
+		then
+			case $which in
+			gain)
+				echo "`${bindir}/operagetword 2 $line`";
+				;;
+			noise)
+				echo "`${bindir}/operagetword 3 $line`";
+				;;
+			gainerror)
+				echo "`${bindir}/operagetword 4 $line`";
+				;;
+			bias)
+				echo "`${bindir}/operagetword 5 $line`";
+				;;
+			*)
+				echo "$(basename $0): Error: Invalid input $3 must be one of gain|noise|gainerror|bias";
+				exit 1
+				;;
+			esac
+			exit 0
+		fi
+	fi
+done
+exit 0

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<!-- saved from url=(0057)./Installation -->
+<html lang="en" dir="ltr" class="client-js"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Installation - espectro</title>
+
+<meta name="generator" content="MediaWiki 1.19.5">
+<link rel="shortcut icon" href="http://200.131.64.73/favicon.ico">
+<link rel="search" type="application/opensearchdescription+xml" href="http://200.131.64.73/wiki/espectro/opensearch_desc.php" title="espectro (en)">
+<link rel="EditURI" type="application/rsd+xml" href="http://200.131.64.73/wiki/espectro/api.php?action=rsd">
+<link rel="alternate" type="application/atom+xml" title="espectro Atom feed" href="http://200.131.64.73/wiki/espectro/index.php?title=Special:RecentChanges&amp;feed=atom">
+<link rel="stylesheet" href="./espectro_files/load.php">
+<style type="text/css" media="all">.js-messagebox{margin:1em 5%;padding:0.5em 2.5%;border:1px solid #ccc;background-color:#fcfcfc;font-size:0.8em}.js-messagebox .js-messagebox-group{margin:1px;padding:0.5em 2.5%;border-bottom:1px solid #ddd}.js-messagebox .js-messagebox-group:last-child{border-bottom:thin none transparent}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:8b08bdc91c52a9ffba396dccfb5b473c */
+
+
+.mw-collapsible-toggle{float:right} li .mw-collapsible-toggle{float:none} .mw-collapsible-toggle-li{list-style:none}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:4250852ed2349a0d4d0fc6509a3e7d4c */
+</style><meta name="ResourceLoaderDynamicStyles" content="">
+<style>a:lang(ar),a:lang(ckb),a:lang(fa),a:lang(kk-arab),a:lang(mzn),a:lang(ps),a:lang(ur){text-decoration:none}a.new,#quickbar a.new{color:#ba0000}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:c88e2bcd56513749bec09a7e29cb3ffa */
+</style>
+
+<script src="./espectro_files/load(1).php"></script><script src="./espectro_files/load(2).php"></script>
+<script>if(window.mw){
+mw.config.set({"wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"Installation","wgTitle":"Installation","wgCurRevisionId":2005,"wgArticleId":228,"wgIsArticle":true,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":[],"wgBreakFrames":false,"wgPageContentLanguage":"en","wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgRelevantPageName":"Installation","wgRestrictionEdit":[],"wgRestrictionMove":[],"wgWikiEditorEnabledModules":{"toolbar":true,"dialogs":true,"hidesig":true,"templateEditor":false,"templates":false,"preview":true,"previewDialog":false,"publish":true,"toc":false}});
+}</script><script>if(window.mw){
+mw.loader.implement("user.options",function($){mw.user.options.set({"ccmeonemails":0,"cols":80,"date":"default","diffonly":0,"disablemail":0,"disablesuggest":0,"editfont":"default","editondblclick":0,"editsection":1,"editsectiononrightclick":0,"enotifminoredits":0,"enotifrevealaddr":0,"enotifusertalkpages":1,"enotifwatchlistpages":0,"extendwatchlist":0,"externaldiff":0,"externaleditor":0,"fancysig":0,"forceeditsummary":0,"gender":"unknown","hideminor":0,"hidepatrolled":0,"highlightbroken":1,"imagesize":2,"justify":0,"math":1,"minordefault":0,"newpageshidepatrolled":0,"nocache":0,"noconvertlink":0,"norollbackdiff":0,"numberheadings":0,"previewonfirst":0,"previewontop":1,"quickbar":5,"rcdays":7,"rclimit":50,"rememberpassword":0,"rows":25,"searchlimit":20,"showhiddencats":0,"showjumplinks":1,"shownumberswatching":1,"showtoc":1,"showtoolbar":1,"skin":"vector","stubthreshold":0,"thumbsize":2,"underline":2,"uselivepreview":0,"usenewrc":0,"watchcreations":0,"watchdefault":0,"watchdeletion":0,
+"watchlistdays":3,"watchlisthideanons":0,"watchlisthidebots":0,"watchlisthideliu":0,"watchlisthideminor":0,"watchlisthideown":0,"watchlisthidepatrolled":0,"watchmoves":0,"wllimit":250,"usebetatoolbar":1,"usebetatoolbar-cgd":1,"wikieditor-preview":1,"wikieditor-publish":1,"variant":"en","language":"en","searchNs0":true,"searchNs1":false,"searchNs2":false,"searchNs3":false,"searchNs4":false,"searchNs5":false,"searchNs6":false,"searchNs7":false,"searchNs8":false,"searchNs9":false,"searchNs10":false,"searchNs11":false,"searchNs12":false,"searchNs13":false,"searchNs14":false,"searchNs15":false});;},{},{});mw.loader.implement("user.tokens",function($){mw.user.tokens.set({"editToken":"+\\","watchToken":false});;},{},{});
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-js:7:505b325ececdfc1317a6cea46e739f26 */
+}</script>
+<script>if(window.mw){
+mw.loader.load(["mediawiki.page.startup","mediawiki.legacy.wikibits","mediawiki.legacy.ajax"]);
+}</script><script type="text/javascript" src="./espectro_files/load(3).php"></script>
+<!--[if lt IE 7]><style type="text/css">body{behavior:url("/wiki/espectro/skins/vector/csshover.min.htc")}</style><![endif]--><style type="text/css">
+:root #content > #right > .dose > .dosesingle,
+:root #content > #center > .dose > .dosesingle
+{ display: none !important; }</style></head>
+<body class="mediawiki ltr sitedir-ltr ns-0 ns-subject page-Installation skin-vector action-view">
+		<div id="mw-page-base" class="noprint"></div>
+		<div id="mw-head-base" class="noprint"></div>
+		<!-- content -->
+		<div id="content" class="mw-body">
+			<a id="top"></a>
+			<div id="mw-js-message" style="display:none;" class="js-messagebox"></div>
+						<!-- firstHeading -->
+			<h1 id="firstHeading" class="firstHeading">
+				<span dir="auto">Installation</span>
+			</h1>
+			<!-- /firstHeading -->
+			<!-- bodyContent -->
+			<div id="bodyContent">
+								<!-- tagline -->
+				<div id="siteSub">From espectro</div>
+				<!-- /tagline -->
+								<!-- subtitle -->
+				<div id="contentSub"></div>
+				<!-- /subtitle -->
+																<!-- jumpto -->
+				<div id="jump-to-nav" class="mw-jump">
+					Jump to: <a href="./Installation#mw-head">navigation</a>,
+					<a href="./Installation#p-search">search</a>
+				</div>
+				<!-- /jumpto -->
+								<!-- bodycontent -->
+				<div id="mw-content-text" lang="en" dir="ltr" class="mw-content-ltr"><table id="toc" class="toc"><tbody><tr><td><div id="toctitle"><h2>Contents</h2><span class="toctoggle">&nbsp;[<a href="./Installation#" class="internal" id="togglelink">hide</a>]&nbsp;</span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="./Installation#Installation_Instructions"><span class="tocnumber">1</span> <span class="toctext">Installation Instructions</span></a></li>
+<li class="toclevel-1 tocsection-2"><a href="./Installation#Optional_Steps"><span class="tocnumber">2</span> <span class="toctext">Optional Steps</span></a>
+<ul>
+<li class="toclevel-2 tocsection-3"><a href="./Installation#Installing_OPERA_in_a_different_directory"><span class="tocnumber">2.1</span> <span class="toctext">Installing OPERA in a different directory</span></a></li>
+<li class="toclevel-2 tocsection-4"><a href="./Installation#Setting_environment_variables_in_your_profile"><span class="tocnumber">2.2</span> <span class="toctext">Setting environment variables in your profile</span></a></li>
+<li class="toclevel-2 tocsection-5"><a href="./Installation#Enabling_optional_components"><span class="tocnumber">2.3</span> <span class="toctext">Enabling optional components</span></a></li>
+<li class="toclevel-2 tocsection-6"><a href="./Installation#Cleaning"><span class="tocnumber">2.4</span> <span class="toctext">Cleaning</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-7"><a href="./Installation#Installation_Troubleshooting"><span class="tocnumber">3</span> <span class="toctext">Installation Troubleshooting</span></a>
+<ul>
+<li class="toclevel-2 tocsection-8"><a href="./Installation#Running_Autotools"><span class="tocnumber">3.1</span> <span class="toctext">Running Autotools</span></a></li>
+<li class="toclevel-2 tocsection-9"><a href="./Installation#Troubleshooting_configure"><span class="tocnumber">3.2</span> <span class="toctext">Troubleshooting configure</span></a></li>
+<li class="toclevel-2 tocsection-10"><a href="./Installation#ltmain.sh_Error"><span class="tocnumber">3.3</span> <span class="toctext">ltmain.sh Error</span></a></li>
+<li class="toclevel-2 tocsection-11"><a href="./Installation#operaBias_Error"><span class="tocnumber">3.4</span> <span class="toctext">operaBias Error</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-12"><a href="./Installation#Testing_Installation"><span class="tocnumber">4</span> <span class="toctext">Testing Installation</span></a></li>
+</ul>
+</td></tr></tbody></table>
+<h2> <span class="mw-headline" id="Installation_Instructions"> Installation Instructions </span></h2>
+<p>Below are the instructions on how to install OPERA. Make sure you have installed the necessary <a href="./Dependencies" title="Dependencies">dependencies</a> before attempting to install OPERA. DO NOT CONFIGURE AND BUILD AS USER ROOT.
+</p>
+<ol><li> Download the latest version of <a rel="nofollow" class="external text" href="http://sourceforge.net/projects/opera-pipeline/">OPERA</a> (zip or tar.gz).
+</li><li> Remove an existing copy if you have one: <pre>cd ~
+rm -rf opera-1.0/</pre>
+</li><li> Unpack this file in your home directory. For the zip: <pre>unzip opera-1.0.zip</pre> For the tar.gz: <pre>tar -xzvf opera-1.0.tar.gz</pre>
+</li><li> Open a terminal and access the directory: <pre>cd $HOME/opera-1.0/</pre>
+</li><li> Run the configuration file: <pre>./configure --prefix=$HOME/opera-1.0/</pre>
+<ul><li> If this command fails, you may need to run Autotools first (see Running Autotools below).
+</li></ul>
+</li><li> Build and install: <pre>make
+make install</pre>
+<ul><li> To rebuild in a directory that already has OPERA installed, you should clear out the existing built files first (see Cleaning below).
+</li></ul>
+</li><li> Run setup script to update environment variables: <pre>. ./setup.sh</pre>
+<ul><li> Running <code>. ./setup.sh</code> may fail if using tcsh. Try bash instead.
+</li><li> You may need to re-run <code>. ./setup.sh</code> upon each login unless you set the variables in your profile.
+</li><li> If this worked, you should now be able to run OPERA.
+</li></ul>
+</li><li> Release: Once you are done debugging your modules, you can significantly reduce the module size by stripping debug info: <pre>make install-strip</pre>
+</li></ol>
+<h2> <span class="mw-headline" id="Optional_Steps"> Optional Steps </span></h2>
+<h3> <span class="mw-headline" id="Installing_OPERA_in_a_different_directory"> Installing OPERA in a different directory </span></h3>
+<p>To build and install OPERA in a different directory, simply replace <code>$HOME/opera-1.0/</code> in the prefix with the actual directory OPERA is in.
+</p><p>NOTE: If you change the prefix to /usr/local/, most likely you do not have write permissions to that directory. To install OPERA, you must then use:
+</p>
+<pre> sudo make install </pre>
+<h3> <span class="mw-headline" id="Setting_environment_variables_in_your_profile"> Setting environment variables in your profile </span></h3>
+<p>To get changes to the environment variables to stay between login sessions, you can add them to your <code>.profile</code>, e.g.:
+</p>
+<pre>echo "export opera=$HOME/opera-1.0/" &gt;&gt; ~/.profile
+echo "export PATH=$HOME/opera-1.0/bin/:$PATH" &gt;&gt; ~/.profile
+</pre>
+<h3> <span class="mw-headline" id="Enabling_optional_components"> Enabling optional components </span></h3>
+<p>Optional components can be enabled by appending switches to the configure command.
+</p>
+<ul><li> To use libpng: <code>--enable-LIBPNG=true</code>
+</li><li> To use WCSlib: <code>--enable-LIBWCS=true</code>
+</li></ul>
+<p>Example:
+</p>
+<pre>./configure --prefix=$HOME/opera-1.0/ --enable-LIBPNG=true</pre>
+<h3> <span class="mw-headline" id="Cleaning"> Cleaning </span></h3>
+<p>If you have previously compiled the software in this folder without removing that copy first, it is suggested to remove any previously installed binaries and clean out the existing intermediate files before installing a new version:
+</p>
+<pre>make uninstall
+make clean
+make distclean
+</pre>
+<p>After running <code>make distclean</code>, you will need to run configure again.
+</p><p>You can also manually remove all binaries previously installed:
+</p>
+<pre>rm ~/opera-1.0/bin/*
+rm ~/opera-1.0/lib/*
+</pre>
+<h2> <span class="mw-headline" id="Installation_Troubleshooting"> Installation Troubleshooting </span></h2>
+<h3> <span class="mw-headline" id="Running_Autotools"> Running Autotools </span></h3>
+<p>OPERA builds with shared libraries, which is taken care of by Autotools. Preparing this can usually be done with a single command:
+</p>
+<pre>autoreconf -vfi</pre>
+<p>Here, v = verbose output, f = force remake, i = install missing files.
+</p><p>However, if you have an older version of Autotools, the above command may not run, so you can run the Autotools one-by-one:
+</p>
+<pre>libtoolize (or glibtoolize on Mac)
+aclocal
+autoconf
+automake --add-missing
+</pre>
+<p>The above process can also be done by running the included script:
+</p>
+<pre>autoconf/bootstrap.sh</pre>
+<h3> <span class="mw-headline" id="Troubleshooting_configure"> Troubleshooting configure </span></h3>
+<p>NOTE: dynamic link libraries are used. If you get this error:
+</p>
+<pre>Error: 'required file `./ltmain.sh' not found'</pre>
+<p>please see <code>ltmain.sh Error</code> below.
+</p><p>If you wish to use static libraries instead, append: <code>--disable-shared</code> to the configure command.
+NOTE: xubuntu, ubuntu users must use static libraries
+</p><p>NOTE: Debian users must:
+</p>
+<pre>aclocal
+autoconf
+./configure
+</pre>
+<h3> <span class="mw-headline" id="ltmain.sh_Error"> ltmain.sh Error </span></h3>
+<pre>8.3.9.1 Error: 'required file `./ltmain.sh' not found'</pre>
+<p>Libtool comes with a tool called libtoolize that will install libtool's supporting files into a package. Running this command will install ltmain.sh. You should execute it before aclocal and automake.
+</p><p>People upgrading old packages to newer autotools are likely to face this issue because older Automake versions used to call libtoolize. Therefore old build scripts do not call libtoolize.
+</p><p>Since Automake 1.6, it has been decided that running libtoolize was none of Automake's business. Instead, that functionality has been moved into the autoreconf command (see Using autoreconf in The Autoconf Manual). If you do not want to remember what to run and when, just learn the autoreconf command. Hopefully, replacing existing bootstrap.sh or autogen.sh scripts by a call to autoreconf should also free you from any similar incompatible change in the future.
+</p>
+<h3> <span class="mw-headline" id="operaBias_Error"> operaBias Error </span></h3>
+<p>There is a reported issue during installation on Ubuntu 16.04 (Xenial) machines:
+</p>
+<pre>Makefile:813: recipe for target 'operaBias.o' failed
+make[1]: *** [operaBias.o] Error 1
+make[1]: Leaving directory '/home/$User/opera-1.0/src/core-espadons'
+Makefile:397: recipe for target 'install-recursive' failed
+make: *** [install-recursive] Error 1
+</pre>
+<p>As a work-around, you can remove the operaBias module from the build, as it is not necessary for reductions. To do this, make the following modifications to the file <code>opera-1.0/core-espadons/Makefile.am</code>:
+</p>
+<ul><li> Under <code>binaries to produce</code>, remove <code>operaBias</code>.
+</li><li> Remove the line <code>operaBias_SOURCES = operaBias.cpp</code>.
+</li></ul>
+<p>After making changes to <code>Makefile.am</code>, you should run Autotools.
+</p>
+<h2> <span class="mw-headline" id="Testing_Installation">  Testing Installation </span></h2>
+<p>To quickly test if OPERA was properly installed in your computer run the following commands:
+</p>
+<pre>$ cd /home/$USER/opera-1.0/config/
+$ /home/$USER/opera-1.0/bin/operaQueryImageInfo -r ./ -e "NAXIS1 NAXIS2" -p
+</pre>
+<p>The command above makes use of an OPERA module called <b>operaQueryImageInfo</b>, which prints out the values of the header keywords "NAXIS1" and "NAXIS2" for all FITS files in the directory "./". In this particular example it should print the keyword values of some FITS images saved in the "config" directory, which are basically some ESPaDOnS/GRACES bad pixel masks and flat responses. This example should print out the following results:
+</p>
+<pre>FILENAME	NAXIS1	NAXIS2
+badpix_eev.fits.fz	2080	4640
+badpix_eev.fits.gz	2080	4640
+badpix_olapa-a.fits.fz	2080	4640
+badpix_olapa-a.fits.gz	2080	4640
+badpix_olapa-ab.fits.fz	2080	4640
+badpix_olapa-ab.fits.gz	2080	4640
+flat_resp_olapa.fits.gz	300	2
+graces_StarOnly_flatresp.fits.gz	300	2
+graces_StarPlusSky_flatresp.fits.gz	300	2
+</pre>
+<p>Note that the example above only tests one module.  However, if you got this one running it is likely that all other modules were also compiled properly and you should be able to start using OPERA to reduce your data.
+</p><p>You can also try simply running:
+</p>
+<pre>opera</pre>
+<p>This should produce version information, such as:
+</p>
+<pre>03/21/17 17:20:40 [username@machinename]  OPERA pipeline opera-1.0.1225 build date Wed Feb 17 10:15:01 HST 2016 configured for CFHT</pre>
+<p>This can be used to verify that the setup.sh properly added paths.
+</p>
+<!-- 
+NewPP limit report
+Preprocessor node count: 238/1000000
+Post‐expand include size: 0/2097152 bytes
+Template argument size: 0/2097152 bytes
+Expensive parser function count: 0/100
+-->
+
+<!-- Saved in parser cache with key lnawiki-espectro:pcache:idhash:228-0!*!0!!en!*!* and timestamp 20170413210830 -->
+</div>				<!-- /bodycontent -->
+								<!-- printfooter -->
+				<div class="printfooter">
+				Retrieved from "<a href="http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;oldid=2005">http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;oldid=2005</a>"				</div>
+				<!-- /printfooter -->
+												<!-- catlinks -->
+				<div id="catlinks" class="catlinks catlinks-allhidden"></div>				<!-- /catlinks -->
+												<div class="visualClear"></div>
+				<!-- debughtml -->
+								<!-- /debughtml -->
+			</div>
+			<!-- /bodyContent -->
+		</div>
+		<!-- /content -->
+		<!-- header -->
+		<div id="mw-head" class="noprint">
+			
+<!-- 0 -->
+<div id="p-personal" class="">
+	<h5>Personal tools</h5>
+	<ul>
+		<li id="pt-login"><a href="http://200.131.64.73/wiki/espectro/index.php?title=Special:UserLogin&amp;returnto=Installation" title="You are encouraged to log in; however, it is not mandatory [alt-shift-o]" accesskey="o">Log in</a></li>
+	</ul>
+</div>
+
+<!-- /0 -->
+			<div id="left-navigation">
+				
+<!-- 0 -->
+<div id="p-namespaces" class="vectorTabs">
+	<h5>Namespaces</h5>
+	<ul>
+					<li id="ca-nstab-main" class="selected"><span><a href="./Installation" title="View the content page [alt-shift-c]" accesskey="c">Page</a></span></li>
+					<li id="ca-talk" class="new"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Talk:Installation&amp;action=edit&amp;redlink=1" title="Discussion about the content page [alt-shift-t]" accesskey="t">Discussion</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-variants" class="vectorMenu emptyPortlet">
+	<h4>
+		</h4>
+	<h5><span>Variants</span><a href="./Installation#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+			</div>
+			<div id="right-navigation">
+				
+<!-- 0 -->
+<div id="p-views" class="vectorTabs">
+	<h5>Views</h5>
+	<ul>
+					<li id="ca-view" class="selected"><span><a href="./Installation">Read</a></span></li>
+					<li id="ca-viewsource"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;action=edit" title="This page is protected.
+You can view its source [alt-shift-e]" accesskey="e">View source</a></span></li>
+					<li id="ca-history" class="collapsible"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;action=history" title="Past revisions of this page [alt-shift-h]" accesskey="h">View history</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-cactions" class="vectorMenu emptyPortlet">
+	<h5><span>Actions</span><a href="./Installation#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+
+<!-- 2 -->
+<div id="p-search">
+	<h5><label for="searchInput">Search</label></h5>
+	<form action="http://200.131.64.73/wiki/espectro/index.php" id="searchform">
+				<div>
+			<input type="search" name="search" title="Search espectro [alt-shift-f]" accesskey="f" id="searchInput">			<input type="submit" name="go" value="Go" title="Go to a page with this exact name if exists" id="searchGoButton" class="searchButton">			<input type="submit" name="fulltext" value="Search" title="Search the pages for this text" id="mw-searchButton" class="searchButton">					<input type="hidden" name="title" value="Special:Search">
+		</div>
+	</form>
+</div>
+
+<!-- /2 -->
+			</div>
+		</div>
+		<!-- /header -->
+		<!-- panel -->
+			<div id="mw-panel" class="noprint">
+				<!-- logo -->
+					<div id="p-logo"><a style="background-image: url(http://200.131.64.73/wiki/images/logo8.gif);" href="./Main_page" title="Visit the main page"></a></div>
+				<!-- /logo -->
+				
+<!-- navigation -->
+<div class="portal" id="p-navigation">
+	<h5>Navigation</h5>
+	<div class="body">
+		<ul>
+			<li id="n-mainpage-description"><a href="./Main_page" title="Visit the main page [alt-shift-z]" accesskey="z">Main page</a></li>
+			<li id="n-portal"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Community_portal" title="About the project, what you can do, where to find things">Community portal</a></li>
+			<li id="n-currentevents"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Current_events" title="Find background information on current events">Current events</a></li>
+			<li id="n-recentchanges"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:RecentChanges" title="A list of recent changes in the wiki [alt-shift-r]" accesskey="r">Recent changes</a></li>
+			<li id="n-randompage"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:Random" title="Load a random page [alt-shift-x]" accesskey="x">Random page</a></li>
+			<li id="n-help"><a href="http://200.131.64.73/wiki/espectro/index.php/Help:Contents" title="The place to find out">Help</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /navigation -->
+
+<!-- SEARCH -->
+
+<!-- /SEARCH -->
+
+<!-- TOOLBOX -->
+<div class="portal" id="p-tb">
+	<h5>Toolbox</h5>
+	<div class="body">
+		<ul>
+			<li id="t-whatlinkshere"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:WhatLinksHere/Installation" title="A list of all wiki pages that link here [alt-shift-j]" accesskey="j">What links here</a></li>
+			<li id="t-recentchangeslinked"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:RecentChangesLinked/Installation" title="Recent changes in pages linked from this page [alt-shift-k]" accesskey="k">Related changes</a></li>
+			<li id="t-specialpages"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:SpecialPages" title="A list of all special pages [alt-shift-q]" accesskey="q">Special pages</a></li>
+			<li><a href="http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;printable=yes" rel="alternate">Printable version</a></li>
+			<li id="t-permalink"><a href="http://200.131.64.73/wiki/espectro/index.php?title=Installation&amp;oldid=2005" title="Permanent link to this revision of the page">Permanent link</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /TOOLBOX -->
+
+<!-- LANGUAGES -->
+
+<!-- /LANGUAGES -->
+			</div>
+		<!-- /panel -->
+		<!-- footer -->
+		<div id="footer">
+							<ul id="footer-info">
+											<li id="footer-info-lastmod"> This page was last modified on 3 April 2017, at 19:45.</li>
+											<li id="footer-info-viewcount">This page has been accessed 56 times.</li>
+									</ul>
+							<ul id="footer-places">
+											<li id="footer-places-privacy"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Privacy_policy" title="Espectro:Privacy policy">Privacy policy</a></li>
+											<li id="footer-places-about"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:About" title="Espectro:About">About espectro</a></li>
+											<li id="footer-places-disclaimer"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:General_disclaimer" title="Espectro:General disclaimer">Disclaimers</a></li>
+									</ul>
+										<ul id="footer-icons" class="noprint">
+					<li id="footer-poweredbyico">
+						<a href="http://www.mediawiki.org/"><img src="./espectro_files/poweredby_mediawiki_88x31.png" alt="Powered by MediaWiki" width="88" height="31"></a>
+					</li>
+				</ul>
+						<div style="clear:both"></div>
+		</div>
+		<!-- /footer -->
+		<script src="./espectro_files/load(4).php"></script>
+<script>if(window.mw){
+mw.loader.load(["mediawiki.user","mediawiki.page.ready"], null, true);
+}</script><script src="./espectro_files/load(5).php" type="text/javascript"></script>
+<!-- Served in 0.153 secs. -->
+	
+
+</body></html>

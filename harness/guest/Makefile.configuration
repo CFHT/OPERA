@@ -1,0 +1,115 @@
+#########################################################################################
+#
+# Makefile name: Makefile.configuration
+# Version: 1.0
+# Description: sample configuration rules
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_configuration
+#/// \brief OPERA Configuration Definitions
+#/// \brief - all observatory-specific configuration definitions go here
+#/// \brief Configuration definitions are items like filepaths and the like
+#/// \brief which change depending on the location where the pipeline is run.
+#/// \see makefile.parameters for instrument-specific definitions.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#///
+#///	Section 1 directory paths and whoami
+#///
+#########################################################################################
+version		:= 1.0
+me			:= opera-$(version)
+versionstr 	:= "Guest version $(version) - build date `date`"
+observatory	:= Guest
+
+#########################################################################################
+#
+# General paths
+#
+#########################################################################################
+# Note: important it be done this way...
+prefix-dir	:= $HOME/opera-1.0/
+homedir		:= $(HOME)/
+operahomedir:= $(homedir)$(me)/
+homebase	:= $$(basename $(HOME))
+homeroot	:= $$(dirname $(HOME))
+# make this assign to empty if you want the path to determine the location of the modules for execution
+# it is safer to use a wired directory...
+bindir		:= $(operahomedir)/bin/
+libdir		:= $(operahomedir)/lib/
+makedir		:= $(operahomedir)/harness/
+devhomedir	:= $(homeroot)/$(DEVELOPER)/$(me)/
+
+ifndef OSTYPE
+	OSTYPE	:= $(shell uname -s | awk '{print tolower($$0)}')
+endif
+
+ifeq ($(OSTYPE),darwin)
+# stuff here...
+endif
+
+ifeq ($(OSTYPE),linux)
+# stuff here...
+endif
+
+#########################################################################################
+#
+# Paths
+#
+#########################################################################################
+ifeq ($(OSTYPE),darwin)
+	mastersrcdir	:= $(homedir)/opera/
+	queuedir		:= /data/espadons/
+	outdir			:= $(homedir)/opera/
+else
+	queuedir		:= /data/niele/espadons/
+	outdir			:= /data/uhane5/opera/
+endif
+
+DATADIR			:= $(queuedir)/$(NIGHT)/
+ROOTDIR			:= $(homedir)
+NIGHT			:= $$(basename $(DATADIR))
+spectradir		:= $(outdir)/spectra/$$(basename $(DATADIR))/
+configdir		:= $(operahomedir)/config/
+calibrationdir	:= $(outdir)/calibrations/$$(basename $(DATADIR))/
+tmpdir			:= /tmp/$$(basename $(DATADIR))/
+logdir			:= $(outdir)/logs/$$(basename $(DATADIR))/
+visualsdir		:= $(outdir)/visuals/$$(basename $(DATADIR))/
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

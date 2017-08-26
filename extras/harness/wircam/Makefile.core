@@ -1,0 +1,1157 @@
+#########################################################################################
+#
+# Makefile name: Makefile.core.wircam
+# Version: 1.0
+# Description: core reduction targets for wircam
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile__core_wircam
+#/// \brief This makefile contains core reduction targets.
+#/// \ingroup harness
+#
+#########################################################################################
+
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# These are the targets available from the command line
+#
+#########################################################################################
+
+all:
+	@echo "$(pref) Please specify a crunid or runid and a target." ; \
+
+ifeq ($(PASS),1)
+reduce: cleanstart directoriescreated
+	@start=$$SECONDS; \
+	if [[ -e $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ]] ; then \
+		echo "$(epref) `cat $(IIWI_LOCK_DIR)/Lock_$(CRUNID)`" ; \
+	else \
+		echo "$(CRUNID) locked by `whoami`" >$(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		echo "$(pref) $(version)" ; \
+		echo "$(pref) ~~~ Starting single pass for $(CRUNID) $(RUNID) OBJECTS=$(OBJECTS)" ; \
+		username=`whoami` ; \
+		rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+		$(bindir)/wirenvdb "insert into run (semester,startdatetime,rundatetime,crunid,username,status,commandline,comment,errors,iiwi_version) values ('$(SEMESTER)',convert(datetime,'$$rundate'),convert(datetime,'$$rundate'),'$(CRUNID)','$$username','Pass1 BEGIN','$(COMMANDLINE)','$(COMMENT)',0,$(IIWI_MAJOR))" ; \
+		echo "$(pref) Starting reduction..." ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=1 --jobs --no-print-directory pass1 2>$(IIWI_LOG_DIR)/error.log | tee $(IIWI_LOG_DIR)/process.log; \
+		rm -f $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		bdate=`date "+%Y/%m/%d %X%p"` ; \
+		errorCount=`$(bindir)/wirenvdb "select count(*) from error where runid='$(RUNID)' and crunid='$(CRUNID)' and severity='ERROR'"` ; \
+		if (( errorCount > 0 )) ; then \
+			$(bindir)/wirenvdb "update run set status = 'Pass 1 FAIL', enddatetime = convert(datetime, '$$bdate'), errors = $$errorCount where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(epref) $$errorCount errors encountered in $(CRUNID) $(RUNID), finalization not done."  ; \
+		else \
+			$(bindir)/wirenvdb "update run set status = 'Pass 1 COMPLETE', enddatetime = convert(datetime, '$$bdate'), comment = 'Time=$(deltat)' where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(pref) No errors encountered in $(CRUNID) $(RUNID)."  ; \
+		fi ; \
+	fi
+endif
+
+ifeq ($(PASS),2)
+reduce: cleanstart directoriescreated
+	@start=$$SECONDS; \
+	if [[ -e $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ]] ; then \
+		echo "$(epref) `cat $(IIWI_LOCK_DIR)/Lock_$(CRUNID)`" ; \
+	else \
+		echo "$(CRUNID) locked by `whoami`" >$(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		echo "$(pref) $(version)" ; \
+		echo "$(pref) ~~~ Starting pass 2 for $(CRUNID) $(RUNID) OBJECTS=$(OBJECTS)" ; \
+		$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --skipbadamps; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) Sanity check failed $(CRUNID)."; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$(RUNID)','Calibrations not available.')" ; \
+			exit 1 ; \
+		fi ; \
+		username=`whoami` ; \
+		rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+		$(bindir)/wirenvdb "update run set status = 'Mask2 BEGIN' where startdatetime = convert(datetime,'$$rundate')" ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=2 --jobs --no-print-directory mask2ndpass 2>$(IIWI_LOG_DIR)/error.log | tee $(IIWI_LOG_DIR)/process.log; \
+		$(bindir)/wirenvdb "update run set status = 'Pass2 BEGIN' where startdatetime = convert(datetime,'$$rundate')" ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=p2.fits PASS=2 --jobs --no-print-directory pass2 2>>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log; \
+		$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --products $(OBJECTS) ; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) Sanity check failed $(CRUNID)."; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$(RUNID)','Sanity check failed pass1')" ; \
+		fi ; \
+		bdate=`date "+%Y/%m/%d %X%p"` ; \
+		rm -f $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		errorCount=`$(bindir)/wirenvdb "select count(*) from error where runid='$(RUNID)' and crunid='$(CRUNID)' and severity='ERROR'"` ; \
+		if (( errorCount > 0 )) ; then \
+			$(bindir)/wirenvdb "update run set status = 'Pass2 FAIL', enddatetime = convert(datetime, '$$bdate'), errors = $$errorCount where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(epref) $$errorCount errors encountered in $(CRUNID) $(RUNID), finalization not done." ; \
+		else \
+			$(bindir)/wirenvdb "update run set status = 'Pass2 COMPLETE', enddatetime = convert(datetime, '$$bdate'), comment = 'Time=$(deltat)' where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(pref) No errors encountered in $(CRUNID) $(RUNID)."  ; \
+		fi ; \
+	fi
+endif
+
+ifndef PASS
+reduce: cleanstart directoriescreated
+	@start=$$SECONDS; \
+	if [[ -e $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ]] ; then \
+		echo "$(epref) `cat $(IIWI_LOCK_DIR)/Lock_$(CRUNID)`" ; \
+	else \
+		echo "$(CRUNID) locked by `whoami`" >$(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		echo "$(pref) $(version)" ; \
+		echo "$(pref) ~~~ Starting 2 pass reduction for $(CRUNID) $(RUNID) OBJECTS=$(OBJECTS)" ; \
+		$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --skipbadamps; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) Sanity check failed $(CRUNID)."; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$(RUNID)','Calibrations not available.')" ; \
+			exit 1 ; \
+		fi ; \
+		username=`whoami` ; \
+		rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+		$(bindir)/wirenvdb "insert into run (semester,startdatetime,rundatetime,crunid,username,status,commandline,comment,errors,iiwi_version) values ('$(SEMESTER)',convert(datetime,'$$rundate'),convert(datetime,'$$rundate'),'$(CRUNID)','$$username','Pass1 BEGIN','$(COMMANDLINE)','$(COMMENT)',0,$(IIWI_MAJOR))" ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=1 --jobs --no-print-directory pass1 2>$(IIWI_LOG_DIR)/error.log | tee $(IIWI_LOG_DIR)/process.log; \
+		$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --products $(OBJECTS) ; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) Sanity check failed $(CRUNID)."; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$(RUNID)','Sanity check failed pass2')" ; \
+		fi ; \
+		bdate=`date "+%Y/%m/%d %X%p"` ; \
+		errorCount=`$(bindir)/wirenvdb "select count(*) from error where runid='$(RUNID)' and crunid='$(CRUNID)' and severity='ERROR'"` ; \
+		if (( errorCount > 0 )) ; then \
+			$(bindir)/wirenvdb "update run set status = 'Pass1 FAIL', enddatetime = convert(datetime, '$$bdate'), errors = $$errorCount where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(epref) $$errorCount errors encountered $(CRUNID) $(RUNID)" ; \
+		else \
+			$(bindir)/wirenvdb "update run set status = 'Pass1 COMPLETE', enddatetime = convert(datetime, '$$bdate'), comment = 'Time=$(deltat)' where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$epref) No errors encountered $(CRUNID) $(RUNID)" ; \
+		fi ; \
+		$(bindir)/wirenvdb "update run set status = 'Mask2 BEGIN' where startdatetime = convert(datetime,'$$rundate')" ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=2 --jobs --no-print-directory mask2ndpass 2>>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log; \
+		$(bindir)/wirenvdb "update run set status = 'Pass2 BEGIN' where startdatetime = convert(datetime,'$$rundate')" ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) RUNDATETIME=$(RUNDATETIME) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=p2.fits PASS=2 --jobs --no-print-directory pass2 2>>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log; \
+		$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --products $(OBJECTS) ; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) Sanity check failed $(CRUNID)."; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$(RUNID)','Sanity check failed pass2')" ; \
+		fi ; \
+		bdate=`date "+%Y/%m/%d %X%p"` ; \
+		rm -f $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+		errorCount=`$(bindir)/wirenvdb "select count(*) from error where runid='$(RUNID)' and crunid='$(CRUNID)' and severity='ERROR'"` ; \
+		if (( errorCount > 0 )) ; then \
+			$(bindir)/wirenvdb "update run set status = 'Pass2 FAIL', enddatetime = convert(datetime, '$$bdate'), errors = $$errorCount where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(epref) $$errorCount errors encountered $(CRUNID) $(RUNID), finalization not done." ; \
+		else \
+			$(bindir)/wirenvdb "update run set status = 'Pass2 COMPLETE', enddatetime = convert(datetime, '$$bdate'), comment = 'Time=$(deltat)' where startdatetime = convert(datetime,'$${rundate}')" ; \
+			echo "$(pref) No errors encountered in $(CRUNID) $(RUNID)."  ; \
+		fi ; \
+		echo "$(pref) ~~~ Total reduction time for $(CRUNID) $(RUNID) $(deltat)" ; \
+	fi
+endif
+
+pass1: directoriescreated
+	@start=$$SECONDS; \
+	echo "$(pref) Start of pass 1 for $(CRUNID) $(RUNID)..." ; \
+	$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=1 --jobs --no-print-directory pars; \
+	echo "$(pref) ~~~ Total pass 1 time for $(CRUNID) $(RUNID)  $(deltat)" 
+
+pass2:
+	@start=$$SECONDS; \
+	echo "$(pref) Start of pass 2 for $(CRUNID) $(RUNID)..." ; \
+	$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) FLAGS="$(FLAGS)" PASS=2 --jobs --no-print-directory pars; \
+	echo "$(pref) ~~~ Total pass 2 time for $(CRUNID) $(RUNID) $(deltat)"
+
+detrend: cleanstart
+	@echo "$(pref) Start of detrend for $(CRUNID) $(OBJECTS)..." ; \
+	if [[ "$(OBJECTS)" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) SLICE=$(SLICE) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) OBJECTS="$(OBJECTS)" ECHO=$(ECHO) DISK=$(DISK) DEST=$(DEST) pars --jobs --no-print-directory ; \
+	else \
+		uncals=`echo $(OBJECTS) | sed -e 's:o.fits:s-uncalibrated.fits:g'` ; \
+		$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) SLICE=$(SLICE) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) DISK=$(DISK) BG=-bg $$uncals --jobs --no-print-directory ; \
+	fi
+
+detrend1:
+	@start=$$SECONDS; \
+	echo "$(pref) Start of detrend for $(CRUNID) $(RUNID)..." ; \
+	$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) --jobs --no-print-directory pars; \
+	echo "$(pref) Detrend time for $(CRUNID) $(RUNID) $(deltat)"
+
+mask: .FORCE
+	@if [[ "$(OBJECTS)" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filelist=`echo $(OBJECTS) | sed -e 's:\@::'`; \
+		masks="`cat $${filelist} | tr '\n' ' ' | sed -e 's:o.fits:m.fits:g'`" ; \
+	fi ; \
+	$(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" DEST=$(DEST) PASS=1 OBJECTS="" $${masks} --no-print-directory
+
+########################################################################################
+#
+#	Finalization and Approval
+#
+#########################################################################################
+
+finalize: 
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.util ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) $* --jobs=$(jobs) --no-print-directory finalize
+
+archivelogs:
+
+stop:
+	@killall make
+
+#########################################################################################
+#
+# This section contains the reduction steps
+#
+#########################################################################################
+
+#########################################################################################
+# find the o.fits in the archive
+# 
+
+%o.fits: .FORCE
+	@IIWI2_STEP="Archive retrieval $*o.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}$(SLICE)o.fits" ; \
+	log_name="$${base_name}$(SLICE).log" ; \
+	if (( ! $$(lockfile $(IIWI_BYPRODUCTS_DIR)/$${object_name}) )) ; then \
+		name_raw=`$(archivebindir)arlocate $$object_name` ; \
+		if [[ "$$name_raw" == "not.on.disk" ]] ; then \
+			echo "$(epref) $$object_name is not on any archive disk, 32 bit float conversion aborted..." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$(RUNID)','$$object_name is not on any archive disk.')" ; \
+			exit 1; \
+		fi ; \
+		ln -sf $${name_raw} $(IIWI_BYPRODUCTS_DIR)/$${object_name} ; \
+		ln -sf $${name_raw} $(IIWI_WEB_DIR)/$${object_name} ; \
+		fitsverify -q -e $(IIWI_BYPRODUCTS_DIR)/$${object_name} >& /dev/null; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) archive retrieval: fitsverify of $(IIWI_BYPRODUCTS_DIR)$${object_name} ($$name_raw) failed, file could not be retrieved from archive." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${object_name}', '$${log_name}','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+		fi ; \
+	fi 
+
+#########################################################################################
+# Find a natural sequence
+# The natural sequence is small enough that it is stored directly in command mapped byproducts
+# directory. Note that references in the detrendlist are made to the common mapped
+# byproducts directory. The natural sequence is prepended with a directory name.
+# The Natural Sequence is derived from the exposure database, it is a straightforward
+# select of all odometers of the same filter, object, runid, crunid, taken within 10 minutes
+# of one another.
+#
+%.ns: %o.fits  .FORCE
+	@IIWI2_STEP="Natural sequence $*.ns" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name="$$(basename $*)" ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	natural_sequence_name="$${base_name}.ns" ; \
+	if (( ! $$(lockfile $(IIWI_BYPRODUCTS_DIR)/$${natural_sequence_name}) )) ; then \
+		echo "$(pref) Creating natural sequence for $${object_name}..." ; \
+		res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+		theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+		maxtime=`$(bindir)wirgetProcessingParameter maxtime $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		if [[ "$$maxtime" == "" ]] ; then \
+			$(bindir)/iiwi_dbtable_processing $*o.fits ; \
+			maxtime=`$(bindir)wirgetProcessingParameter maxtime $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		fi ; \
+		maxskycount=`$(bindir)wirgetProcessingParameter maxskycount $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		date=`$(bindir)/wirenvdb "select convert(varchar,mydatetime) from exposure where odometer = $${base_name}" | sed -e 's:{::' -e 's:}::'` ; \
+		odos=`$(bindir)/wirenvdb "select distinct odometer from exposure where filter = '$$filter' and etype='OBJECT' and abs(datediff(minute,mydatetime,'$$date')) < $$maxtime and datediff(day,mydatetime,'$$date') = 0 and runid='$${runid}' and crunid='$(CRUNID)' and _use > 0 order by odometer"` ; \
+		mygrade=`$(bindir)/wirph2db "select eval from op..xexp where _obsid = $${base_name}"` ; \
+		if [[ "$$mygrade" == "" || "$mygrade" == "0" ]] ; then\
+			mygrade=5 ; \
+			echo "$(wpref) Grade of $${base_name} could not be determined, using $$mygrade." ; \
+		else \
+			echo "$(pref) Grade of $${base_name} is $$mygrade." ; \
+		fi ; \
+		rm -f $(IIWI_BYPRODUCTS_DIR)$${natural_sequence_name} ; \
+		for odo in $$odos ; do \
+			thegrade=`$(bindir)/wirph2db "select eval from op..xexp where _obsid = $${odo}"` ; \
+			echo "$(pref) Grade of $${odo} in the natural sequence of $${base_name} is $$thegrade." ; \
+			echo "`$(bindir)/wirenvdb \"select distinct filename,convert(varchar,mydatetime,111),convert(varchar,mydatetime,108),ra,dec,dpi,dpn,d_ra,d_dec,target_type from exposure where odometer = $$odo\" | sed -e 's:{::' -e 's:}::' -e 's:/: :g' | awk '{printf(\"$(IIWI_BYPRODUCTS_DIR)%s %s-%s-%sT%s %s %s %s %s %s %s %s\n\", $$1, $$2, $$3, $$4, $$5, $$6, $$7, $$8, $$9, $$10, $$11, $$12)}'` $$thegrade" >>$(IIWI_BYPRODUCTS_DIR)$${natural_sequence_name} ; \
+		done ; \
+		count=`cat $(IIWI_BYPRODUCTS_DIR)$${natural_sequence_name} | wc -l` ; \
+		mindp=`$(bindir)wirgetProcessingParameter mindp $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		if (( count < mindp )) ; then \
+			echo "$(wpref) No valid natural sequence for $${object_name}; need $$mindp, got $$count." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','No valid natural sequence for $${object_name}; need $$mindp, got $$count.')" ; \
+		else \
+			echo "$(pref) Natural Sequence of $${count} images generation time for $$object_name $(deltat)."; \
+		fi ; \
+	else \
+		echo "$(pref) $${natural_sequence_name} already exists." ; \
+	fi 
+
+#########################################################################################
+#
+# Find a skylist. It is derived from the natural sequence. 
+#
+# Note the wait for the odometers from the archive Natural Sequences overlap, so it is possible
+# that another natural sequence is already retrieving an odometer. So it is necessary to wait
+# for that process to complete.
+# DT May 17 2013 wired the default sky to all zero image, was:
+# 		defaultsky=`$(bindir)/wirenvdb "select filename from calibration where crunid='$(CRUNID)' and filter='$${filter}' and type='DEFSKY' and version=$(VERSION) and _use>0"`
+#########################################################################################
+
+%.skylist: %.ns .FORCE
+	@IIWI2_STEP="Skylist creation $*.skylist" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	skylist_name="$${base_name}.skylist" ; \
+	natural_sequence_name="$${base_name}.ns" ; \
+	detrendlist_name="$${base_name}.detrendlist" ; \
+	name_raw=$(IIWI_BYPRODUCTS_DIR)/$*o.fits ; \
+	if (( ! $$(lockfile $(IIWI_BYPRODUCTS_DIR)/$${skylist_name}) )) ; then \
+		echo "$(pref) Starting $${skylist_name} creation for the natural sequence $${natural_sequence_name}."; \
+		res=(`$(bindir)/wirenvdb "select distinct runid,filter,object,target_type,ra,dec from exposure where odometer = $${base_name}"`) ; \
+		runid=$${res[0]} ; filter=$${res[1]} ; theobject=$${res[2]} ; targettype=$${res[3]} ; ra=$${res[4]} ; dec=$${res[5]} ; \
+		observing_strategy=`$(bindir)wirgetProcessingParameter observing_strategy $${filter} $${theobject} $${runid} $${object_name}` ; \
+		adate=`$(bindir)/wirenvdb "select distinct convert(varchar,mydatetime,102),convert(varchar,mydatetime,108) from exposure where odometer = $$base_name " | sed -e 's:{::' -e 's:}::' -e 's:\.: :g' | awk '{printf("%s-%s-%sT%s\n", $$1, $$2, $$3, $$4)}'` ; \
+		rejectcurrenttime=`$(bindir)wirgetProcessingParameter rejcurr $${filter} $${theobject} $${runid} $${object_name} | awk '{printf("%d",$$1)}'` ; \
+		rejectcurrentdp=`$(bindir)wirgetProcessingParameter rejcurr $${filter} $${theobject} $${runid} $${object_name} | awk '{printf("%d",$$1)}'` ; \
+		dpradius=`$(bindir)wirgetProcessingParameter dpradius $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		mindp=`$(bindir)wirgetProcessingParameter mindp $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		maxskycount=`$(bindir)wirgetProcessingParameter maxskycount $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		maxtime=`$(bindir)wirgetProcessingParameter maxtime $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		equalsampleperdp=`$(bindir)wirgetProcessingParameter equalsampleperdp $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		defaultsky=$(IIWI_CONFIG_DIR)/defaultsky.fits ; \
+		mygrade=`$(bindir)/wirph2db "select eval from op..xexp where _obsid = $${base_name}"` ; \
+		if [[ "$$mygrade" == "" || "$mygrade" == "0" ]] ; then\
+			mygrade=5 ; \
+			echo "$(wpref) Grade of $${base_name} could not be determined, using $$mygrade." ; \
+		else \
+			echo "$(pref) Grade of $${base_name} is $$mygrade." ; \
+		fi ; \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$$name_raw\n$${adate}\n$${ra}\n$${dec}\n$(IIWI_BYPRODUCTS_DIR)/$${natural_sequence_name}\n$(IIWI_BYPRODUCTS_DIR)/$${skylist_name}\n$$defaultsky\n$${mygrade}\" | $(bindir)/iiwi_skypicker param_observingstrategy=$$observing_strategy param_rejectcurrentim=$$rejectcurrenttime param_rejectcurrentdp=$$rejectcurrentdp param_dpradius=$$dpradius param_mindp=$$mindp param_maxskyodom=$$maxskycount param_maxtime=$$maxtime param_equalsampleperdp=$$equalsampleperdp param_objectname=\"$${theobject}\" param_targettype=\"$${targettype}\" --readin $(FLAGS)" ; \
+		echo -e "$${name_raw}\n$${adate}\n$${ra}\n$${dec}\n$(IIWI_BYPRODUCTS_DIR)/$${natural_sequence_name}\n$(IIWI_BYPRODUCTS_DIR)/$${skylist_name}\n$$defaultsky\n$${mygrade}" | $(bindir)/iiwi_skypicker param_observingstrategy=$$observing_strategy param_rejectcurrentim=$$rejectcurrenttime param_rejectcurrentdp=$$rejectcurrentdp param_dpradius=$$dpradius param_mindp=$$mindp param_maxskyodom=$$maxskycount param_maxtime=$$maxtime param_equalsampleperdp=$$equalsampleperdp "param_objectname=\"$${theobject}\"" param_targettype=\"$${targettype}\" --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+		if [[ -e $(IIWI_BYPRODUCTS_DIR)/$${skylist_name} ]] ; then \
+			skycount=`cat $(IIWI_BYPRODUCTS_DIR)/$${skylist_name} | wc -l ` ; \
+			if (( skycount < mindp )) ; then \
+				echo "$(wpref) Too few skies available for $${object_name}; found $${skycount}, need $${mindp}." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','Too few skies available; found $${skycount}, need $${mindp}.')" ; \
+			else \
+				echo "$(pref) Adequate skies available for $${object_name}; found $${skycount}, need $${mindp}." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+			fi ; \
+			detrends="`cat $(IIWI_BYPRODUCTS_DIR)/$${skylist_name} | sed -e 's:o.fits:s-uncalibrated.fits:g'`" ; \
+			echo $$detrends | tr ' ' '\n' >$(IIWI_TMP_DIR)/$${base_name}.detrendlist ; \
+			echo "$(pref) Skylist $${skylist_name} and detrendlist $${base_name}.detrendlist generation time (including retrieval of objects from archive) for $$object_name $(deltat)."; \
+		else \
+			echo "$(wpref) No skylist could be found for $${object_name} -- this should not happen because we have default skies: $$defaultsky." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','No skylist could be found for $${object_name} -- this should not happen because we have default skies: $$defaultsky.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) $${skylist_name} already exists." ; \
+	fi 
+	
+#########################################################################################
+# Detrending
+# 
+# INPUT
+#  name_raw		A raw cube name (not the slice) with full path to the archive
+#  name_dark		The master dark to be used to subtract the dark current with full path
+#  name_flat		The master flat field with full path
+#  name_badpix		The bad pixel mask with full path
+#  name_detrended	The name of the detrended fits cube with full path
+# 				Format: ODOMETERs-uncalibrated.fits
+#  path_temporaryshort	The path for very temporary files of no use beyond this call to iiwi_detrend
+#  path_byproducts	The path for files to be used beyond this call but not distributed to PIs
+#  param_iiwiversion	A string representing the current version of iiwi, example 2.0 or 2.5.2
+#  param_procdate	A string representing the HST date/time when the iiwi Makefile was started which cascaded into this
+# 			instance of iiwi_detrend
+#  param_linearize	Determines whether non-linearity correction is to be applied or not.
+# 				Format: Either set or not set (1 or 0)
+#  param_subrefpix	Determine whether subtraction using the reference pixels is applied or not.
+# 				Format: Either set or not set (1 or 0)
+#  param_needweight	Determines whether a weight map is going to be generated or not.
+# 				Format: Either set or not set (1 or 0)
+#  param_gwinxtalk	The method of guide window crosstalk removal.
+# 				Format: A string (case insensitive). Either:
+# 				SUBNEIGHBORSMEDIAN,MASK,NONE
+#  param_maskingthreshold Sets the masking threshold (in sigmas) above median background for source masking in estimating the sky background.
+# 				Format: float.
+#
+# The detrended image is kept in the LOCAL_BYPRODUCTS directory for speed and is 
+# referenced by a link to the common byproducts directory to cover the case when 
+# natural sequences overlap and are being processed on different machines.
+#
+
+#########################################################################################
+# This is the basic detrend step calling iiwi_detrend IDL routine
+# default skies require the o.fits dependency -- don't remove it!
+
+%s-uncalibrated.fits: %o.fits .FORCE
+	@IIWI2_STEP="Detrending $*s-uncalibrated.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o$(SLICE).fits" ; \
+	log_name="$${base_name}$(SLICE).log" ; \
+	name_raw=$(IIWI_BYPRODUCTS_DIR)/$${base_name}o$(SLICE).fits ; \
+	if (( ! $$(lockfile $(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits) )) ; then \
+		res=(`$(bindir)/wirenvdb "select distinct runid,filter,object,etime from exposure where odometer = $${base_name}"`) ; \
+		runid=$${res[0]} ; filter=$${res[1]} ; theobject=$${res[2]} ; etime=$${res[3]} ; \
+		echo "${pref} Creating uncalibrated image $*s-uncalibrated.fits for $$runid $$theobject filter $$filter etime $$etime seconds." ; \
+		$(bindir)/wirwait $(VERBOSE) $${name_raw} ; \
+		if (( $$? == 0 )) ; then \
+			name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and crunid='$(CRUNID)' and _use > 0"` ; \
+			if [[ "$${name_badpix}" == "" ]] ; then \
+				name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and _use > 0" | tail -1` ; \
+			fi ; \
+			echo "$(pref) Using bad pixel mask $$name_badpix for $$object_name"; \
+			name_weight=`$(bindir)/wirenvdb "select distinct filename from calibration where type='WEIGHT_MAP' and crunid='$(CRUNID)' and filter='$$filter'" | tail -1 | sed -e 's:twilight::'` ; \
+			echo "$(pref) Using weight map $$name_weight for $$object_name"; \
+			$(GetMasterDark) ; \
+			echo "$(pref) Using dark $$name_dark for $$object_name"; \
+			$(GetMasterFlat) ; \
+			echo "$(pref) Using flat $$name_flat for $$object_name"; \
+			maskingthreshold=`$(bindir)wirgetProcessingParameter maskingthreshold $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			linearize=`$(bindir)wirgetProcessingParameter linearize $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			subrefpix=`$(bindir)wirgetProcessingParameter subrefpix $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			needweight=`$(bindir)wirgetProcessingParameter needweight $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			gwinxtalk=`$(bindir)wirgetProcessingParameter gwinxtalk $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			mygrade=`$(bindir)/wirph2db "select eval from op..xexp where _obsid = $${base_name}"` ; \
+			if [[ "$$mygrade" == "" || "$$mygrade" == "0" ]] ; then\
+				mygrade=5 ; \
+				echo "$(wpref) Grade of $${base_name} could not be determined, using $$mygrade." ; \
+			else \
+				echo "$(pref) Grade of $${base_name} is $$mygrade." ; \
+			fi ; \
+			echo "$(pref) Starting detrend of $$object_name $(CRUNID) $(RUNID)."; \
+			$(bindir)/wirtrace $(TRACE) "echo -e \"$${name_raw}\n$(IIWI_CALS_TWIFLATS_DIR)$${name_flat}\n$(IIWI_CALS_DARKS_DIR)$${name_dark}\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}\n$(IIWI_REDUCTION_DIR)/$${base_name}w.fits\n$(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_VERSION)\n$(PROCDATE)\n$${linearize}\n$${subrefpix}\n$${needweight}\n$${gwinxtalk}\n$${maskingthreshold}\n$${mygrade}\" | $(bindir)/iiwi_detrend --readin $(FLAGS)" ; \
+			echo -e "$${name_raw}\n$(IIWI_CALS_TWIFLATS_DIR)$${name_flat}\n$(IIWI_CALS_DARKS_DIR)$${name_dark}\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}\n$(IIWI_REDUCTION_DIR)/$${base_name}w.fits\n$(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_VERSION)\n$(PROCDATE)\n$${linearize}\n$${subrefpix}\n$${needweight}\n$${gwinxtalk}\n$${maskingthreshold}\n$${mygrade}" | $(bindir)/iiwi_detrend --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${base_name}$(SLICE).log 2>>$(IIWI_LOG_DIR)/$${base_name}$(SLICE).log; \
+			if [[ -e $(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits ]] ; then \
+				fitsverify -q -e $(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits ; \
+				if (( $$? != 0 )) ; then \
+					echo "$(epref) fitsverify of $${base_name}s$(SLICE)-uncalibrated.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+					$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}s$(SLICE)-uncalibrated.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+					rm -f $(IIWI_REDUCTION_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits ; \
+				else \
+					echo "$(pref) Detrend $${base_name}s$(SLICE)-uncalibrated.fits created." ; \
+				fi ; \
+			else \
+				rm -f $(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits  ; \
+				echo "$(epref) Detrend of $$object_name failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Detrend of $$object_name failed.')" ; \
+			fi ; \
+			if [[ -s $(IIWI_REDUCTION_DIR)/$*w.fits ]] ; then \
+				fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}w.fits ; \
+				if (( $$? != 0 )) ; then \
+					echo "$(epref) fitsverify of $${base_name}w.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+					$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}w.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+					rm -f $(IIWI_REDUCTION_DIR)/$${base_name}w.fits ; \
+				else \
+					dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(WFITS)"` ; \
+					if [[ "$$dbentry" == "" ]] ; then \
+						res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+						semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+						adate=`date "+%Y/%m/%d %X%p"` ; \
+						rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+						target_ext=$(WFITS); \
+						echo "$(pref) Creating processedimage database entry for odometer $${base_name}w.fits $$object $$filter $(RUNID)."; \
+						$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}w.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+					else \
+						echo "$(pref) Updating processedimage database for $${base_name}w.fits $$object $$filter $$RUNID."; \
+						adate=`date "+%Y/%m/%d %X%p"` ; \
+						$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(WFITS)" ; \
+					fi ; \
+				fi ; \
+			else \
+				echo "$(epref) $${base_name}w.fits creation failed, the file does not exist." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Creation of $${base_name}w.fits failed.')" ; \
+			fi ; \
+			echo "$(pref) Detrend time for $$object_name $(deltat)."; \
+		else \
+			echo "$(wpref) A dependency for detrending: $${name_raw} was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			rm -f $(IIWI_BYPRODUCTS_DIR)/$${base_name}s$(SLICE)-uncalibrated.fits  ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','A dependency ($${name_raw} or $${base_name}s$(SLICE)-uncalibrated.fits) was not available.')" ; \
+		fi ; \
+		rm -f $(IIWI_TMP_DIR)/$*-*.satpix.fits ; \
+	else \
+		echo "$(pref) $${base_name}s$(SLICE)-uncalibrated.fits already exists." ; \
+	fi 
+
+#########################################################################################
+#function iiwi_sky, 
+# list_detrend		A list of detrended images to use for sky construction purposes (the s.fits)
+#			in a 32-bit format.
+#
+# list_mask		A list of the associated masks (one for each image in list_detrend). Are used
+#			to reject pixels or entire arrays from sky computations/construction. using
+#			masks is optional. If the keyword is not set then no mask is applied.
+#
+# name_sky		The output sky image name, not a list but a single image name. The format is
+#			32-bit.
+#
+# param_observingstrategy	A string, either DP, NDP, WDP, ST or STDP that applies to all the images in
+#				list_detrend.
+#
+# param_procdate	A string representing the HST date/time when the iiwi Makefile was started which cascaded into this
+#			instance of iiwi_sky
+#				Format:
+#					As in iiwi_gethstdatestring.pro, i.e. unix command: date +%Y-%m-%dHST%T
+#				Example:
+#					2009-03-03HST15:23:26
+#
+# param_maxmemory	The maximum amount of RAM that the script is allowed to use. All images passed in
+#			list_detrend are read in memory (all extensions at once). So the following equation
+#			is used to estimate how much memory is needed for iiwi_sky (in MB). If the result of the
+#			equation is higher than the param_maxmemory then exit with error:
+#			required_memory = (nslice_im1 + nslice_im2 + ... + nslice_imn ) * 32
+#
+# param_useallskyslices	Include all slices of every cube in doing final sky construction. Used to be the default method
+#			but was changed on Sep 17 2006 to use a single slice per cube and save reading & processing time.
+#			In iiwi 2.0, the default should be 1.
+# Find sky - a tricky case because it has dependencies on all the s-uncalibrated.fits in the skylist
+# Notice that a recursive iiwi2 call to make of a detrend of all the detrendlist is done before proceeding
+# The sky.fits is stored in the LOCAL_BYPRODUCTS directory and linked to the 
+# common BYPRODUCTS directory.
+# Note that the wait for mask must be there whether or not the shortlist is empty because other processes
+# may be making the mask.
+
+%y.fits: %m.fits %.skylist .FORCE
+	@IIWI2_STEP="Sky subtraction $*y.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	if (( ! $$(lockfile $(IIWI_REDUCTION_DIR)/$${base_name}y.fits) )) ; then \
+		res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+		theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+		observingstrategy=`$(bindir)wirgetProcessingParameter observing_strategy $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		if [[ "$$observingstrategy" == "" ]] ; then \
+			echo "${wpref} Processing parameter observingstrategy unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming DP..." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','Processing parameter observingstrategy unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming DP.')" ; \
+			observingstrategy="DP" ; \
+		fi ; \
+		rm -f $(IIWI_TMP_DIR)/$${base_name}.shortlist ; \
+		skies="`cat $(IIWI_BYPRODUCTS_DIR)/$${base_name}.skylist | tr '\n' ' '`" ; \
+		masks="" ; \
+		((count=0)) ; \
+		for sky in $$skies ; do \
+			if [[ $$(basename $$sky) != defaultsky* ]] ; then \
+				if [[ $$(basename $$sky) != $${base_name} ]] ; then \
+					echo $$(basename $$sky) >>$(IIWI_TMP_DIR)/$${base_name}.shortlist ; \
+					((count++)) ; \
+				fi ; \
+				masks=`$(bindir)/wirappend $(IIWI_REDUCTION_DIR)/$$(basename $$sky o.fits)m.fits "$$masks"` ; \
+			fi ; \
+		done ; \
+		if (( count > 0 )) ; then \
+			echo "$(pref) Detrending/creating masks for $${count} images in $${base_name}.skylist"; \
+			$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" OBJECTS=@$(IIWI_TMP_DIR)/$${base_name}.shortlist RUNDATETIME='$(RUNDATETIME)' DEST=m.fits PASS=1 mask --no-print-directory ; \
+		fi ; \
+		res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+		theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+		observingstrategy=`$(bindir)wirgetProcessingParameter observing_strategy $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		useallslices=`$(bindir)wirgetProcessingParameter useallslices $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		((maxmemory=10000)); \
+		cat $(IIWI_TMP_DIR)/$${base_name}.detrendlist | sed -e 's:s-uncalibrated.fits:m.fits:' -e 's:$(IIWI_BYPRODUCTS_DIR):$(IIWI_REDUCTION_DIR):' >$(IIWI_TMP_DIR)/$*.masklist ; \
+		detrends=`cat $(IIWI_TMP_DIR)/$${base_name}.detrendlist | tr '\n' ' '` ; \
+		echo "$(pref) Waiting for masklist and detrendlist to continue $${base_name}y.fits creation."; \
+		$(bindir)/wirwait $(VERBOSE) $$masks $$detrends ; \
+		echo "$(pref) Detrend/mask of skylist done, starting $${base_name}y.fits creation"; \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_TMP_DIR)/$*.detrendlist\n$(IIWI_TMP_DIR)/$*.masklist\n$(IIWI_REDUCTION_DIR)/$*y.fits\n$${observingstrategy}\n$(PROCDATE)\n$${maxmemory}\n$${useallslices}\" | $(bindir)/iiwi_sky --readin $(FLAGS)" ; \
+		echo -e "$(IIWI_TMP_DIR)/$*.detrendlist\n$(IIWI_TMP_DIR)/$*.masklist\n$(IIWI_REDUCTION_DIR)/$*y.fits\n$${observingstrategy}\n$(PROCDATE)\n$${maxmemory}\n$${useallslices}" | $(bindir)/iiwi_sky --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+		if [[ -e $(IIWI_REDUCTION_DIR)/$*y.fits ]] ; then \
+			fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}y.fits ; \
+			if (( $$? != 0 )) ; then \
+				echo "$(epref) fitsverify of $${base_name}y.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}y.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+			else \
+				dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(YFITS)"` ; \
+				if [[ "$$dbentry" == "" ]] ; then \
+					res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+					semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+					target_ext=$(YFITS); \
+					echo "$(pref) Creating processedimage database entry for odometer $${base_name}y.fits $$object $$filter $(RUNID)."; \
+					$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}y.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+				else \
+					echo "$(pref) Updating processedimage database for $${base_name}y.fits $$object $$filter $$RUNID."; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(YFITS)" ; \
+				fi ; \
+				echo "$(pref) $${base_name}y.fits creation time $(deltat)."; \
+			fi ; \
+		else \
+			echo "$(epref) Creation of $${base_name}y.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			rm -f $(IIWI_REDUCTION_DIR)/$${base_name}y.fits  ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Creation of $${base_name}y.fits failed.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) $${base_name}y.fits already exists." ; \
+	fi 
+
+#########################################################################################
+#function iiwi_mask1stpass
+#	name_detrended=name_detrended, $
+#	name_weight=name_weight, $
+#	name_mask=name_mask, $
+#	name_badpix=name_badpix, $
+#	param_maskingmethod=param_maskingmethod, $
+#	param_maskingthreshold=param_maskingthreshold, $
+#	param_maskbyslice=param_maskbyslice, $
+#	path_temporaryshort=path_temporaryshort, $
+#	path_byproducts=path_byproducts, $
+#	param_iiwiversion=param_iiwiversion, $
+#	param_procdate=param_procdate, $
+#	readin=readin, $
+#	verbose=verbose, $
+#	debug=debug
+#INPUT
+# name_detrended	The name of the detrended fits cube with full path (or list of)
+#				Format:
+#					ODOMETERs-uncalibrated.fits
+#				Example:
+#					987987s-uncalibrated.fits
+# name_weight		The name of the weight map produced during iiwi_detrend (or list of)
+#
+# name_mask		The name of the mask fits cube with full path (or list of)
+#				Format:
+#					ODOMETERm.fits
+#				Example: 987987m.fits
+#
+# param_maskingmethod	The masking method to flag sources on an image
+#				Format:
+#					A string in upper case
+#				Possible choices:
+#					MASK_SIGMACLIPPING
+#					MASK_SEXOBJECT
+#					MASK_NONE
+# param_maskingthreshold Sets the masking threshold (in sigmas) above median background for source masking in estimating the sky background.
+#			 Used only if the param_maskingmethod=MASK_SIGMACLIPPING
+#				Format:
+#					A float.
+#				Example:
+#					5.0 (the default)
+# param_maskbyslice	Sets whether or not a mask is generated on a per slice basis or on a per cube basis.
+#			If this parameter is set then each slice of a cube will be used to generate a mask for itself.
+#			If not set, then the slices of the cube will be summed together before making a mask such that all of the resulting 
+#			mask slices will be identical.
+#				Format:
+#					Either set or not set (1 or 0)
+#				Examples:
+#					0 means that 
+#
+# path_temporaryshort	The path for very temporary files of no use beyond this call to iiwi_detrend
+# path_byproducts	The path for files to be used beyond this call but not distributed to PIs
+# param_iiwiversion	A string representing the current version of iiwi, example 2.0 or 2.5.2
+# param_procdate	A string representing the HST date/time when the iiwi Makefile was started which cascaded into this
+#			instance of iiwi_mask1stpass
+#				Format:
+#					As in iiwi_gethstdatestring.pro, i.e. unix command: date +%Y-%m-%dHST%T
+#				Example:
+#					2009-03-03HST15:23:26
+
+%m.fits: %s-uncalibrated.fits
+	@IIWI2_STEP="Mask 1st pass creation $*m.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	if (( ! $$(lockfile $(IIWI_REDUCTION_DIR)/$*m.fits) )) ; then \
+		echo "$(pref) Starting $${base_name}m.fits creation"; \
+		res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+		theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+		maskmethod=`$(bindir)wirgetProcessingParameter maskmethod $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and crunid='$(CRUNID)' and _use > 0"` ; \
+		if [[ "$${name_badpix}" == "" ]] ; then \
+			name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and _use > 0" | tail -1` ; \
+		fi ; \
+		echo "$(pref) Using bad pixel mask $$name_badpix for $$object_name"; \
+		if [[ "$$maskmethod" == "" ]] ; then \
+			echo "${wpref} Processing parameter maskmethod unavailable for $${filter} "$${theobject}" $${runid} $$object_name, assuming MASK_SEXOBJECT..." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','Processing parameter maskmethod unavailable for $${filter} "$${theobject}" $${runid} $$object_name, assuming MASK_SEXOBJECT...')" ; \
+			maskmethod="MASK_SEXOBJECT" ; \
+		fi ; \
+		maskingthreshold=`$(bindir)wirgetProcessingParameter maskingthreshold $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		if [[ "$$maskingthreshold" == "" ]] ; then \
+			echo "${wpref} Processing parameter maskingthreshold unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming default of 5.0..." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','Processing parameter maskingthreshold unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming default of 5.0.')" ; \
+			maskingthreshold="5.0" ; \
+		fi ; \
+		useallslices=`$(bindir)wirgetProcessingParameter useallslices $${filter} $${theobject} $${runid} $${object_name}` ; \
+		if [[ "$$useallslices" == "" ]] ; then \
+			echo "${wpref} Processing parameter useallslices unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming default of 1..." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','Processing parameter useallslices unavailable for $${filter} $${theobject} $${runid} $$object_name, assuming default of 1.')" ; \
+			useallslices=1 ; \
+		fi ; \
+		if [[ ! -e $(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits ]] ; then \
+			echo "${wpref} Error $*s-uncalibrated.fits is missing and is required for mask 1st pass."  | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Error $*s-uncalibrated.fits is missing and is required for mask 1st pass.')" ; \
+			exit ; \
+		fi ; \
+		$(bindir)/wirwait $(VERBOSE) $(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits $(IIWI_REDUCTION_DIR)/$*w.fits ; \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*w.fits\n$(IIWI_REDUCTION_DIR)/$*m.fits\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}\n$${maskmethod}\n$${maskingthreshold}\n$${useallslices}\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)/\n$(IIWI_CONFIG_DIR)/\n$(IIWI_VERSION)\n$(PROCDATE)\" | $(bindir)/iiwi_mask1stpass --readin $(FLAGS)" ; \
+		echo -e "$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*w.fits\n$(IIWI_REDUCTION_DIR)/$*m.fits\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}\n$${maskmethod}\n$${maskingthreshold}\n$${useallslices}\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)/\n$(IIWI_CONFIG_DIR)/\n$(IIWI_VERSION)\n$(PROCDATE)" | $(bindir)/iiwi_mask1stpass --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+		if [[ -e $(IIWI_REDUCTION_DIR)/$*m.fits ]] ; then \
+			fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}m.fits ; \
+			if (( $$? != 0 )) ; then \
+				echo "$(epref) fitsverify of $${base_name}m.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}m.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+				rm -f $(IIWI_REDUCTION_DIR)/$${base_name}m.fits ; \
+			else \
+				dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(MFITS)"` ; \
+				if [[ "$$dbentry" == "" ]] ; then \
+					res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+					semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+					target_ext=$(MFITS); \
+					echo "$(pref) Creating processedimage database entry for odometer $${base_name}m.fits $$object $$filter $(RUNID)."; \
+					$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}m.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+				else \
+					echo "$(pref) Updating processedimage database for $${base_name}m.fits $$object $$filter $$RUNID."; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(MFITS)" ; \
+				fi ; \
+				echo "$(pref) mask creation time for $$object_name $(deltat)." ; \
+			fi ; \
+		else \
+			echo "$(epref) $${base_name}m.fits creation failed, the file does not exist." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Creation of $${base_name}m.fits failed.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) $${base_name}m.fits already exists." ; \
+	fi
+
+
+#########################################################################################
+#function iiwi_skysub
+#	list_detrend=list_detrend= $*s-uncalibrated.fits  -- input
+#	list_preproc=list_preproc= $*p-uncalibrated.fits -- output
+#	list_sky=list_sky= $*y.fits   -- input
+#	param_xtalk=param_xtalk, -- optional input
+#	param_scaletoexptime=param_scaletoexptime,  -- optional input, used for NDP
+#	matrix_skylvl=matrix_skylvl,  -- optional input -- NOT IMPLEMENTED
+#	param_save16bit=param_save16bit,  must be set to 1
+#	list_medamp32=list_medamp32,  -- optional input should not be needed if no crosstalk correction is done -- NOT IMPLEMENTED
+#
+# Subtract sky -- Pass 1
+# The uncalibrated image is kept in the LOCAL_BYPRODUCTS directory for speed and is 
+# referenced by a link to the common byproducts directory to cover the case when 
+# natural sequences overlap and are being processed on different machines.
+#
+############# NOTE WELL ##############
+#
+# p-uncalibrated and p.fits are stored as BITPIX 16 because tools such as 
+# scat, sextractor DOES NOT WORK on BITPIX32 !!!!!
+#
+
+%p-uncalibrated.fits: %y.fits
+	@IIWI2_STEP="Sky subtraction $*p-uncalibrated.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	if (( ! $$(lockfile $(IIWI_BYPRODUCTS_DIR)/$${base_name}p-uncalibrated.fits) )) ; then \
+		$(bindir)/wirwait $(VERBOSE) $(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits $(IIWI_REDUCTION_DIR)/$*y.fits ; \
+		if (( $$? == 0 )) ; then \
+			echo "$(pref) Starting Pass 1 Sky subtraction for $$object_name."; \
+			res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+			theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+			param_xtalk=`$(bindir)wirgetProcessingParameter crosstalk $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			param_scaletoexptime=`$(bindir)wirgetProcessingParameter scaleexptime $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+			name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and crunid='$(CRUNID)' and _use > 0"` ; \
+			if [[ "$${name_badpix}" == "" ]] ; then \
+				name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and _use > 0" | tail -1` ; \
+			fi ; \
+			echo "$(pref) Using bad pixel mask $$name_badpix for $$object_name"; \
+			$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_BYPRODUCTS_DIR)/$*p-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*y.fits\n$$param_xtalk\n$$param_scaletoexptime\n$(IIWI_TMP_DIR)\n$(IIWI_CONFIG_DIR)\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}\" | $(bindir)/iiwi_skysub --param_save16bit --readin $(FLAGS)" ; \
+			echo -e "$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_BYPRODUCTS_DIR)/$*p-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*y.fits\n$$param_xtalk\n$$param_scaletoexptime\n$(IIWI_TMP_DIR)\n$(IIWI_CONFIG_DIR)\n$(IIWI_CALS_BADPIX_DIR)$${name_badpix}" | $(bindir)/iiwi_skysub --param_save16bit --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+			if [[ -e $(IIWI_BYPRODUCTS_DIR)/$${base_name}p-uncalibrated.fits ]] ; then \
+				echo "$(pref) Pass 1 Sky subtraction time for $$object_name $(deltat)."; \
+			else \
+				echo "$(epref) Sky subtraction of $$object_name failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				rm -f $(IIWI_BYPRODUCTS_DIR)/$${base_name}p-uncalibrated.fits  ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Pass 1 Sky subtraction of $$object_name failed.')" ; \
+			fi ; \
+		else \
+			echo "$(wpref) A dependency ($*s-uncalibrated.fits or $*y.fits) of $${base_name}p-uncalibrated.fits was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			rm -f $(IIWI_BYPRODUCTS_DIR)/$${base_name}p-uncalibrated.fits  ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','WARNING','$(CRUNID)','$${runid}','A dependency ($*s-uncalibrated.fits or $*y.fits) of $${base_name}p-uncalibrated.fits was not available.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) $${base_name}p-uncalibrated.fits already exists." ; \
+	fi 
+
+#########################################################################################
+#
+# pro iiwi_mask2ndpass.pro
+#
+# pro iiwi_mask2ndpass, $
+# 	 listpfits=list_pfits, $		-- input a list of p.fits files on same OBJECT
+# 	 stackname=stackname, $			-- output the stack name
+# 	 stackmethod=stackmethod, $		-- MEDIAN or AVERAGE - defaults to AVERAGE
+# 	 path_temporaryshort=path_temporaryshort, $
+# 	 path_config=path_config, $
+# 	 runswarponly=runswarponly, $
+# 	 noswarp=noswarp,$
+# 	 runstacksexonly=runstacksexonly, $
+# 	 pixelscale=pixelscale, $
+# 	 centercoord=centercoord, $
+# 	 nobackgroundsub=nobackgroundsub, $
+# 	 back_size=back_size, $
+# 	 inputstack=inputstack, $
+# 	 verbose=verbose, $
+# 	 readin=readin, $
+# 	 debug=debug
+#########################################################################################
+%.stack.fits: .FORCE
+	@IIWI2_STEP="Mask 2nd pass $*.stack.fits" ; \
+	start=$$SECONDS; \
+	sources="$(SOURCES)" ; \
+	if [[ "$${sources}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filename=`echo $${sources} | sed -e 's:\@::'`; \
+		sources=`cat $${filename} | tr '\n' ' '`; \
+	fi ; \
+	echo "$(pref) Making 2nd pass mask for $(OBJECT) $(FILTER)."; \
+	pfiles="" ; \
+	count=`$(bindir)/wircount $$sources` ; \
+	for source in $$sources ; do \
+		arfile=`$(archivebindir)arlocate $$source` ; \
+		if [[ $$arfile != not.on.disk ]] ; then \
+			pfiles=`$(bindir)/wirappend $$arfile "$$pfiles"` ; \
+		fi ; \
+	done ; \
+	log_name="error.log"; \
+	if [[ "$$pfiles" == "" ]] ; then \
+		echo "$(wpref) Mask 2nd pass: No p files in archive for $(OBJECT) $(FILTER) out of $$count."; \
+	else \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$${pfiles}\n$(IIWI_REDUCTION_DIR)/$*\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)/\n\" | $(bindir)/iiwi_mask2ndpass --readin $(FLAGS)" ; \
+		echo -e "$${pfiles}\n$(IIWI_REDUCTION_DIR)/$*\n$(IIWI_TMP_DIR)/\n$(IIWI_BYPRODUCTS_DIR)" | $(bindir)/iiwi_mask2ndpass --readin $(FLAGS) ; \
+		if [[ -e $(IIWI_REDUCTION_DIR)/$* ]] ; then \
+			fitsverify -q -e $(IIWI_REDUCTION_DIR)/$* ; \
+			if (( $$? != 0 )) ; then \
+				echo "$(epref) fitsverify of $* failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$*', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+			else \
+				echo "$(pref) Mask 2nd pass creation for $* time $(deltat)."; \
+				$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','$(FILTER)','MASK2PASS',0,'$*',$(VERSION),1)" ; \
+			fi ; \
+		else \
+			echo "$(epref) Mask 2nd pass creation for $* failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$*', '$$log_name','ERROR','$(CRUNID)','$${runid}','Mask 2nd pass creation for $* failed')" ; \
+		fi ; \
+	fi
+
+mask2ndpass: .FORCE
+ifdef CRUNID
+	@start=$$SECONDS; \
+	filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	for filter in $$filters ; do \
+		uniqobjects=`wirenvdb "select distinct upper(object) from processedimage where crunid='$(CRUNID)' and filter='$$filter'" | sed -e 's:-.*::' -e s':_.*::' -e 's:p[0-9]*::' -e 's:+.*::' -e 's:(.*::' | sort | uniq` ; \
+		echo "$(pref) Unique objects for filter $$filter: `echo $$uniqobjects | tr '\n' ' '`" ; \
+		for object in $$uniqobjects ;  do \
+				$(bindir)/wirenvdb "select distinct filename from processedimage where target_ext = $(PFITS) and upper(object) like '$$object%'" >$(IIWI_TMP_DIR)stack_$${filter}_$${forged_date}.lst ; \
+				$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile ROOTDIR=$(ROOTDIR) ECHO=$(ECHO) RECHO=$(RECHO) NOCHIP4CORR=$(NOCHIP4CORR) TRACE=$(TRACE) FLAGS="$(FLAGS)" VERSION='$(VERSION)' SOURCES="@$(IIWI_TMP_DIR)/stack_$(CRUNID)_$${filter}_$(VERSION).lst" CRUNID=$(CRUNID) FILTER=$$filter OBJECT="$$object" mask_$(CRUNID)_$${filter}_$${object}_$(VERSION).stack.fits --jobs --no-print-directory; \
+		done ; \
+	done ; \
+	echo "$(pref) 2nd pass mask creation time $(deltat)."
+else
+	@echo "$(pref) Please specify a CRUNID for 2nd pass mask."
+endif
+
+#########################################################################################
+# pro iiwi_astrometry -- Pass 1
+#	name_cube_uncalibrated=$*p-uncalibrated.fits
+#	name_cube_calibrated=name_cube_calibrated, $
+#	overwritecube=overwritecube, $
+#	path_temporaryshort=path_temporaryshort, $
+#	path_config=path_config, $
+#	matchedcat=matchedcat, $
+#	matchedstruc=matchedstruc, $
+#	detect_thresh=detect_thresh, $
+#	detect_minarea=detect_minarea, $
+#	analysis_thresh=analysis_thresh, $
+#	quietsex=quietsex
+#########################################################################################
+# pro iiwi_photometry, $  -- Pass 1
+#	name_cube_uncalibrated=name_cube_uncalibrated, $
+#	name_cube_calibrated=name_cube_calibrated, $
+#	overwritecube=overwritecube, $
+#	;name_weight=name_weight, $
+#	path_temporaryshort=path_temporaryshort, $
+#	path_config=path_config, $
+#	matchedcat=matchedcat, $
+#	matchedstruc=matchedstruc, $
+#	param_linearize=param_linearize
+#########################################################################################
+#function iiwi_skysub -- Pass 2
+#	name_detrended=$*s.fits -- input
+#	name_skysubtracted=$*p.fits -- output
+#	name_finalsky=$*y.fits -- input
+#########################################################################################
+# Create p.fits
+# The calibrated image is kept in the LOCAL_REDUCTION directory for speed and is
+# referenced by a link to the common REDUCTION directory.
+
+ifeq ($(PASS),2)
+%p2.fits:  .FORCE
+	@IIWI2_STEP="Photometry pass 2 $*p2.fits" ; \
+	start=$$SECONDS; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	export TMC_PATH=/data/polena/catalogs/2mass.wcs; \
+	rm -f $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+	touch $(IIWI_REDUCTION_DIR)/$${base_name}p.fits; \
+	echo "$(pref) Starting Pass 2 Sky subtraction for $$object_name, waiting for dependencies..."; \
+	$(bindir)/wirwait $(VERBOSE) $(IIWI_REDUCTION_DIR)/$${base_name}s.fits $(IIWI_REDUCTION_DIR)/$${base_name}y.fits ; \
+	if (( $$? == 0 )) ; then \
+		echo "$(pref) Starting Pass 2 Sky subtraction for $$object_name."; \
+		res=(`$(bindir)wirenvdb "select distinct object,filter,runid from exposure where odometer = $${base_name}"`) ; \
+		theobject=$${res[0]} ; filter=$${res[1]} ; runid=$${res[2]} ; \
+		param_xtalk=`$(bindir)wirgetProcessingParameter crosstalk $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		param_scaletoexptime=`$(bindir)wirgetProcessingParameter scaleexptime $${filter} "$${theobject}" $${runid} $${object_name}` ; \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_REDUCTION_DIR)/$${base_name}s.fits\n$(IIWI_REDUCTION_DIR)/$${base_name}p.fits\n$(IIWI_REDUCTION_DIR)/$${base_name}y.fits\n$$param_xtalk\n$$param_scaletoexptime\" | $(bindir)/iiwi_skysub --param_save16bit --readin $(FLAGS)" ; \
+		echo -e "$(IIWI_REDUCTION_DIR)/$${base_name}s.fits\n$(IIWI_REDUCTION_DIR)/$${base_name}p.fits\n$(IIWI_REDUCTION_DIR)/$${base_name}y.fits\n$$param_xtalk\n$$param_scaletoexptime" | $(bindir)/iiwi_skysub --param_save16bit --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+		if [[ -e $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ]] ; then \
+			ln -sf $(IIWI_REDUCTION_DIR)/$${base_name}p.fits $(IIWI_WEB_DIR)/processed/$${base_name}p.fits ; \
+			fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+			if (( $$? != 0 )) ; then \
+				echo "$(epref) fitsverify of $${base_name}p.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}p.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+			else \
+				echo "$(pref) Pass 2 Sky subtraction time for $$object_name $(deltat)."; \
+				adate=`date "+%Y/%m/%d %X%p"` ; \
+				$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(PFITS)" ; \
+			fi ; \
+		else \
+			echo "$(epref) Pass 2 Sky subtraction of $$object_name failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			rm -f $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','Pass 2 Sky subtraction of $$object_name failed.')" ; \
+		fi ; \
+	else \
+		echo "$(wpref) A dependency ($${base_name}s.fits or $${base_name}y.fits) of $${base_name}p.fits was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+		rm -f $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+		$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$${runid}','A dependency ($${base_name}s.fits or $${base_name}y.fits) of $${base_name}p.fits was not available.')" ; \
+	fi
+else
+%p.fits: %p-uncalibrated.fits
+	@IIWI2_STEP="Photometry pass $*p.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	if (( ! $$(lockfile $(IIWI_REDUCTION_DIR)/$${base_name}p.fits) )) ; then \
+		export TMC_PATH=/data/polena/catalogs/2mass.wcs; \
+		$(bindir)/wirwait $(VERBOSE) $(IIWI_BYPRODUCTS_DIR)/$*p-uncalibrated.fits $(IIWI_REDUCTION_DIR)/$${base_name}y.fits ; \
+		if (( $$? == 0 )) ; then \
+			echo "$(pref) Starting Pass 1 Astrometry for $$object_name."; \
+			$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_BYPRODUCTS_DIR)/$*p-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*p.fits\n0\n$(IIWI_TMP_DIR)/\n$(IIWI_CONFIG_DIR)\n$(IIWI_REDUCTION_DIR)/$${base_name}.matchedcat\" | $(bindir)/iiwi_astrometry --readin $(FLAGS)" ; \
+			echo -e "$(IIWI_BYPRODUCTS_DIR)/$*p-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*p.fits\n0\n$(IIWI_TMP_DIR)/\n$(IIWI_CONFIG_DIR)\n$(IIWI_REDUCTION_DIR)/$${base_name}.matchedcat" | $(bindir)/iiwi_astrometry --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+			echo "$(pref) Pass 1 Astrometry time for $$object_name $(deltat)."; \
+			echo "$(pref) Starting Pass 1 Photometry for $$object_name."; \
+			filter=`$(bindir)wirenvdb "select distinct filter from exposure where odometer=$$base_name"` ; \
+			zp=(`wirenvdb "select zp,zp_err,zp_wonlc,zp_ext1,zp_ext2,zp_ext3,zp_ext4 from zeropoint where crunid = '$(CRUNID)' and filter = upper('$${filter}')" | awk '{printf("%4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f",$$1,$$2,$$3,$$4,$$5,$$6,$$7)}'`) ; \
+			if [[ "$${zp[0]}" == "" ]] ; then \
+				zp=(`wirenvdb "select zp,zp_err,zp_wonlc,zp_ext1,zp_ext2,zp_ext3,zp_ext4 from zeropoint where filter = upper('$${filter}')" | tail -1 | awk '{printf("%4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f",$$1,$$2,$$3,$$4,$$5,$$6,$$7)}'`) ; \
+			fi ; \
+			zp_base=$${zp[0]} ; zp_err=$${zp[1]} ; zp_wonlc=$${zp[2]} ; zp_ext1=$${zp[3]} ; zp_ext2=$${zp[4]} ; zp_ext3=$${zp[5]} ; zp_ext4=$${zp[6]} ; \
+			$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_REDUCTION_DIR)/$*p.fits\n$(IIWI_REDUCTION_DIR)/$*p.fits\n1\n$(IIWI_TMP_DIR)\n$(IIWI_CONFIG_DIR)\n$(IIWI_REDUCTION_DIR)/$${base_name}.matchedcat\n1\n$$zp_base\n$$zp_err\n$$zp_wonlc\n$$zp_ext1\n$$zp_ext2\n$$zp_ext3\n$$zp_ext4\" | $(bindir)/iiwi_photometry --readin $(FLAGS)" ; \
+			echo -e "$(IIWI_REDUCTION_DIR)/$*p.fits\n$(IIWI_REDUCTION_DIR)/$*p.fits\n1\n$(IIWI_TMP_DIR)\n$(IIWI_CONFIG_DIR)\n$(IIWI_REDUCTION_DIR)/$${base_name}.matchedcat\n1\n$$zp_base\n$$zp_err\n$$zp_wonlc\n$$zp_ext1\n$$zp_ext2\n$$zp_ext3\n$$zp_ext4" | $(bindir)/iiwi_photometry --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+			if [[ -e $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ]] ; then \
+				if [[ "$(NOCHIP4CORR)" == "1" ]] ; then \
+					echo "$(pref) No chip 4 correction was applied." ; \
+				else \
+					$(bindir)/wirtrace $(TRACE) "$(bindir)/corr_WCchip4offset --work_rt=$(IIWI_REDUCTION_DIR) --pfits=$(IIWI_REDUCTION_DIR)/$${base_name}p.fits --mfits=$(IIWI_REDUCTION_DIR)/$${base_name}p.fits --outfits=$(IIWI_BYPRODUCTS_DIR)/$${base_name}c4.fits  --overwrite" ; \
+					$(bindir)/corr_WCchip4offset --work_rt=$(IIWI_REDUCTION_DIR) --pfits=$(IIWI_REDUCTION_DIR)/$${base_name}p.fits --mfits=$(IIWI_REDUCTION_DIR)/$${base_name}m.fits --outfits=$(IIWI_BYPRODUCTS_DIR)/$${base_name}c4.fits --overwrite  1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+				fi ; \
+				ln -sf $(IIWI_REDUCTION_DIR)/$${base_name}p.fits $(IIWI_WEB_DIR)/processed/$${base_name}p.fits ; \
+				fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+				if (( $$? != 0 )) ; then \
+					echo "$(epref) fitsverify of $${base_name}p.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+					$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}p.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+				fi ; \
+				dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(PFITS)"` ; \
+				if [[ "$$dbentry" == "" ]] ; then \
+					res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+					semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+					echo "$(pref) Creating processedimage database entry for odometer $${base_name}p.fits $$object $$filter $(RUNID)."; \
+					target_ext=$(PFITS); \
+					$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}p.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+				else \
+					echo "$(pref) Pass 1 Updating processedimage database for $${base_name}p.fits $$object $$filter $$RUNID."; \
+					adate=`date "+%Y/%m/%d %X%p"` ; \
+					$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(PFITS)" ; \
+				fi ; \
+				echo "$(pref) Pass 1 Photometry time for $$object_name $(deltat)."; \
+			else \
+				echo "$(epref) Pass 1 Photometry of $$object_name failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				rm -f $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$(RUNID)','Pass 1 Photometry of $$object_name failed.')" ; \
+			fi ; \
+		else \
+			echo "$(wpref) A dependency ($*p-uncalibrated.fits or $${base_name}y.fits) of $${base_name}p.fits was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			rm -f $(IIWI_REDUCTION_DIR)/$${base_name}p.fits ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$(RUNID)','A dependency ($*p-uncalibrated.fits or $${base_name}y.fits) of $${base_name}p.fits was not available.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) Pass 1: $${base_name}p.fits already exists." ; \
+		dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(PFITS)"` ; \
+		if [[ "$$dbentry" == "" ]] ; then \
+			res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+			semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+			target_ext=$(PFITS); \
+			echo "$(pref) Creating processedimage database entry for odometer $${base_name}p.fits $$object $$filter $(RUNID)."; \
+			$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}p.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+		else \
+			echo "$(pref) Pass 1 Updating processedimage database for $${base_name}p.fits $$object $$filter $$RUNID."; \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			$(bindir)/wirenvdb "update processedimage set mydatetime = convert(datetime,'$$adate'), _use = 1 where odometer = $${base_name} and target_ext = $(PFITS)" ; \
+		fi ; \
+	fi 
+endif
+
+#########################################################################################
+# pro iiwi_applyastrophot2detrend
+# 	name_skysubtracted_calibrated=$*p.fits
+# 	name_detrended_uncalibrated=$*s-uncalibrated.fits
+# 	name_detrended_calibrated=$*s.fits
+# Create s.fits
+# The calibrated image is kept in the LOCAL_REDUCTION directory for speed and is
+# referenced by a link to the common REDUCTION directory.
+
+%s.fits: %p.fits
+	@IIWI2_STEP="Apply astrometry photometry to detrend $*s.fits" ; \
+	start=$$SECONDS; \
+	$(LockFile) ; \
+	base_name=$$(basename $*) ; \
+	object_name="$${base_name}o.fits" ; \
+	log_name="$${base_name}.log" ; \
+	if (( ! $$(lockfile $(IIWI_REDUCTION_DIR)/$${base_name}s.fits) )) ; then \
+		export TMC_PATH=/data/polena/catalogs/2mass.wcs; \
+		$(bindir)/wirwait $(VERBOSE) $(IIWI_REDUCTION_DIR)/$*p.fits $(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits ; \
+		if (( $$? == 0 )) ; then \
+			echo "$(pref) Starting to Apply Astrometry and Photometry $$object_name."; \
+			$(bindir)/wirtrace $(TRACE) "echo -e \"$(IIWI_REDUCTION_DIR)/$*p.fits\n$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*s.fits\n0\" | $(bindir)/iiwi_applyastrophot2detrend --readin $(FLAGS)" ; \
+			echo -e "$(IIWI_REDUCTION_DIR)/$*p.fits\n$(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits\n$(IIWI_REDUCTION_DIR)/$*s.fits\n0" | $(bindir)/iiwi_applyastrophot2detrend --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+			if [[ -e $(IIWI_REDUCTION_DIR)/$${base_name}s.fits ]] ; then \
+				ln -sf $(IIWI_REDUCTION_DIR)/$${base_name}s.fits $(IIWI_WEB_DIR)/processed/$${base_name}s.fits ; \
+				fitsverify -q -e $(IIWI_REDUCTION_DIR)/$${base_name}s.fits ; \
+				if (( $$? != 0 )) ; then \
+					echo "$(epref) fitsverify of $${base_name}s.fits failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+					$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$${base_name}s.fits', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+				else \
+					echo "$(pref) Applied Astrometry and Photometry: $$object_name $(deltat)."; \
+					dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(SFITS)"` ; \
+					if [[ "$$dbentry" == "" ]] ; then \
+						res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+						semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+						adate=`date "+%Y/%m/%d %X%p"` ; \
+						rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+						echo "$(pref) Creating processedimage database entry for odometer $${base_name}s.fits $$object $$filter $(RUNID)."; \
+						target_ext=$(SFITS); \
+						$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}s.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+					else \
+						echo "$(pref) Updating processedimage database for $${base_name}s.fits $$object $$filter $(RUNID)."; \
+						$(bindir)/wirenvdb "update processedimage set filename = '$${base_name}s.fits' where odometer = $${base_name} and target_ext = $(SFITS)" ; \
+					fi ; \
+				fi ; \
+			else \
+				echo "$(epref) Astrometry and Photometry of $$object_name failed." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+				rm -f $(IIWI_REDUCTION_DIR)/$${base_name}s.fits ; \
+				$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$(RUNID)','Astrometry and Photometry of $$object_name failed.')" ; \
+			fi ; \
+		else \
+			if [[ ! -s $(IIWI_REDUCTION_DIR)/$*p.fits ]] ; then \
+				echo "$(wpref) A dependency ($*p.fits) of $${base_name}s.fits was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			fi ; \
+			if [[ ! -s $(IIWI_BYPRODUCTS_DIR)/$*s-uncalibrated.fits ]] ; then \
+				echo "$(wpref) A dependency ($*s-uncalibrated.fits) of $${base_name}s.fits was not available." | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			fi ; \
+			rm -f $(IIWI_REDUCTION_DIR)/$${base_name}s.fits ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$object_name', '$$log_name','ERROR','$(CRUNID)','$(RUNID)','A dependency ($*p.fits or $*s-uncalibrated.fits) of $${base_name}s.fits was not available.')" ; \
+		fi ; \
+	else \
+		echo "$(pref) $${base_name}s.fits already exists." ; \
+		dbentry=`$(bindir)/wirenvdb "select filename from processedimage where odometer=$$base_name and target_ext = $(SFITS)"` ; \
+		if [[ "$$dbentry" == "" ]] ; then \
+			res=(`$(bindir)wirenvdb "select distinct semester,object,plaintext_object,target_ext from exposure where odometer=$$base_name"`) ;\
+			semester=$${res[0]} ; object=$${res[1]} ; plaintext_object=$${res[2]} ; target_ext=$${res[3]} ; \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+			target_ext=$(SFITS); \
+			echo "$(pref) Creating processedimage database entry for odometer $${base_name}s.fits $$object $$filter $(RUNID)."; \
+			$(bindir)/wirenvdb "insert into processedimage (semester,odometer,filename,startdatetime,mydatetime,rundatetime,object,plaintext_object,piname,runid,crunid,filter,target_ext,_use) values ('$$semester',$${base_name},'$${base_name}s.fits',convert(datetime,'$$rundate'),convert(datetime,'$$adate'),convert(datetime,'$$rundate'),'$$object','$$plaintext_object','$$pi','$(RUNID)','$(CRUNID)','$$filter',$$target_ext,1)" ; \
+		else \
+			echo "$(pref) Updating processedimage database for $${base_name}s.fits $$object $$filter $(RUNID)."; \
+			$(bindir)/wirenvdb "update processedimage set filename = '$${base_name}s.fits' where odometer = $${base_name} and target_ext = $(SFITS)" ; \
+		fi ; \
+	fi 
+
+#########################################################################################
+#
+# This section is generic stuff
+#
+#########################################################################################
+
+#########################################################################################
+#
+# This section is generic stuff
+#
+#########################################################################################
+
+help:	
+	@echo "$(version) Makefile"
+
+version:
+	@echo $(version)
+	
+directoriescreated:
+	@whereIstarted=`pwd` ; \
+	for dd in reductions byproducts tmp logs ; do \
+		if [[ ! -d $(IIWI_ROOT_DIR)/$${dd}/$(CRUNID)/ ]] ; then \
+			cd $(IIWI_ROOT_DIR)/$${dd}/ ; \
+			mkdir -m 777 $(CRUNID)/ ; \
+		fi ; \
+		if [[ ! -d $(IIWI_ROOT_DIR)/$${dd}/$(CRUNID)/$(RUNID)/ && "$(RUNID)" != "" ]] ; then \
+			cd $(IIWI_ROOT_DIR)/$${dd}/$(CRUNID)/ ; \
+			mkdir -m 777 $(RUNID)/ ; \
+		fi ; \
+		cd $${whereIstarted} ; \
+	done
+	
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

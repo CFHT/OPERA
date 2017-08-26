@@ -1,0 +1,28 @@
+To: |EMAIL|
+From: qsoteam@cfht.hawaii.edu
+Subject: OPERA Data Report for |RUNID| |DATE|
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+Dear Dr. |PI|,
+
+On |DATE|, the QSO Team took data for your program(s). The data have
+been reduced and are now available through the URL given to you earlier.
+Please check the data carefully, and notify qsoteam@cfht.hawaii.edu if
+there is any problem with the quality of the data (other than loss of S/N
+to weather or bad seeing), the date/time of the observation (if you
+requested specific timing or monitoring). If the QSO Team has made a
+mistake, we will correct it as much as possible, if we are notified as
+soon as possible.
+
+If you receive this email, it means that you may use the tool cfhtget
+now to retrieve your data. If you use wget, you will have to wait a couple
+more hours before wget determines which files are available.
+
+Your data hhas been reduced by the opera-1.0 open source pipeline.
+Documentation on opera may be found at:
+
+http://sourceforege.net/projects/opera-pipeline/files/
+
+Regards,
+The OPERA QSO Team

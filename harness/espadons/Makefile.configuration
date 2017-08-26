@@ -1,0 +1,411 @@
+#########################################################################################
+#
+# Makefile name: Makefile.configuration
+# Version: 1.0
+# Description: configuration rules for espadons
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_configuration_espadons
+#/// \brief OPERA Configuration Definitions
+#/// \brief - all observatory-specific configuration definitions go here
+#/// \brief Configuration definitions are items like filepaths and the like
+#/// \brief which change depending on the location where the pipeline is run.
+#/// \see makefile.parameters for instrument-specific definitions.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#///
+#///	Section 1 directory paths and whoami
+#///
+#########################################################################################
+version						:= 1.0
+me							:= opera-$(version)
+versionstr					:= "`cat <$(prefix)/TIMESTAMP`"
+
+equatorial_mount			:= 1
+altazimuth_mount			:= 2
+aluminum_coating			:= 1
+silver_coating				:= 2
+
+#########################################################################################
+# Telescope and Observatory
+#########################################################################################
+observatory					:= CFHT
+MaunaKeaRA					:= 10.36478
+MaunaKeaDec					:= 19.8267
+observatory_coords			:= "19:49:36 -155:28:18"
+observatory_elevation		:= 4207
+telescope_latitude			:= 19.8266666
+telescope_longitude			:= -155.4716666
+telescope_CollectingArea	:= 8.414677
+telescope_Aperture			:= 3.6
+telescope_FocalRatio		:= 8.0
+telescope_mount				:= $(equatorial_mount)
+telescope_coating			:= $(aluminum_coating)
+
+LIBRE_ESPRIT_COMPATIBILITY	:= 1
+GENERATE_CSV				:= 0
+ 
+#########################################################################################
+#
+# General paths
+#
+#########################################################################################
+bindir		:= $(prefix)/bin/
+libdir		:= $(prefix)/lib/
+makedir		:= $(prefix)/harness/
+configdir	:= $(prefix)/config/
+
+ifndef OSTYPE
+	OSTYPE	:= $(shell uname -s | awk '{print tolower($$0)}')
+endif
+
+#########################################################################################
+#
+# Determine the maximum number of threads to use. If mymaxthreads is 1 then
+# lightweight threads are not used.
+#
+#########################################################################################
+mymaxthreads	:= 4
+
+ifeq ($(OSTYPE),darwin)
+maxthreads		:= $(shell echo "`sysctl -n hw.ncpu` $(mymaxthreads)" | awk '{printf("%d", $$1<$$2?$$1:$$2)}')
+endif
+
+ifeq ($(OSTYPE),linux)
+maxthreads		:= $(shell echo "`awk '/^processor/ {++n} END {print n+1}' /proc/cpuinfo` $(mymaxthreads)"| awk '{printf("%d", $$1<$$2?$$1:$$2)}')
+endif
+
+#########################################################################################
+#
+# CFHT-specific paths
+# USE_SYBASE is for CFHT only, it adds Q Coordinator comments to the final products
+#
+#########################################################################################
+ifeq ($(observatory),CFHT)
+
+ifeq ($(OSTYPE),darwin)
+	mastersrcdir	:= $(prefix)/opera/
+	queuedir		:= /data/espadons/
+	outdir			:= $$(dirname $(prefix))/opera/
+	USE_SYBASE		:= 0
+else
+	mastersrcdir	:= /cfht/src/medusa/espadons/$(me)/
+	queuedir		:= /data/niele/espadons/
+	setuproot		:= $(queuedir)opera/
+ifeq ($(observatory),CFHT)
+	USE_SYBASE		:= 0
+else
+	USE_SYBASE		:= 0
+endif
+ifeq ($(TYPE),setup)
+	outdir			:= $(setuproot)
+else
+ifdef upenadir
+	outdir			:= $(upenadir)
+else
+	outdir			:= /data/uhane5/opera/
+endif
+endif
+endif
+
+DATADIR			:= $(queuedir)$(NIGHT)/
+ROOTDIR			:= $(prefix)
+NIGHT			:= $$(basename $(DATADIR))
+spectradir		:= $(outdir)/spectra/$(NIGHT)/
+calibrationdir	:= $(outdir)/calibrations/$(NIGHT)/
+byproductsdir	:= $(outdir)/byproducts/$(NIGHT)/
+processeddir	:= $(outdir)/processed/
+approveddir		:= $(outdir)/approved/
+tmpdir			:= /tmp/$(NIGHT)/
+logdir			:= $(outdir)/logs/$(NIGHT)/
+visualsdir		:= $(outdir)/visuals/$(NIGHT)/
+analysesdir		:= $(outdir)/analyses/$(NIGHT)/
+archivebindir	:= /h/archive/sw/tools/
+
+#########################################################################################
+#
+# CFHT-specific reduction machine definitions. Modify these entries to implement
+# various machine use configurations.
+#
+#########################################################################################
+
+# The remote shell is what opera uses to launch a build on a server. Change this
+# to whatever will work in your environment. It is also possible to use rsh, etc.
+remoteshell			:= ssh -1 
+
+# this runs just on the local machine, launching 1 process.
+# CALLOADAVERGES (for calibrations) is best set to 1 always, so that the modes, speeds
+# are evenly distributed.
+MACHINES			:= $${HOSTNAME}
+LOADAVERAGES		:= 4
+CALLOADAVERAGES		:= 1
+
+# this runs just on the local machine, launching 4 simultaneous processes.
+#MACHINES			:= $${HOSTNAME}
+#LOADAVERAGES		:= 4
+#CALLOADAVERAGES	:= 1
+
+# this runs on a machine called "remoteserver", launching 12 simultaneous processes
+# use this to launch from your desktop and do the heavy work on a server.
+#MACHINES			:= remoteserver
+#LOADAVERAGES		:= 12
+#CALLOADAVERAGES	:= 1
+
+# this shows how to run on multiple machines, give a name and loadaverage for each,
+# here we use 3 machines.
+#MACHINES			:=  r2d1 r2d2 r2d3
+#LOADAVERAGES		:=  3     3    3
+#CALLOADAVERAGES	:=  1     1    1
+
+#########################################################################################
+# when we deploy out of the sandbox, which machines should we install on
+#########################################################################################
+INSTALLS			:= hukilau konane halea polena
+
+#########################################################################################
+# whatami
+#########################################################################################
+MACHINE				:= $${HOSTNAME}
+
+#########################################################################################
+#
+# CFHT-specific instrument characteristics
+#
+#########################################################################################
+
+#########################################################################################
+# operaReductionSet
+#########################################################################################
+DETECTORS			:= EEV1 OLAPA
+INTMODES			:= sp1 sp2
+POLMODES			:= pol
+MODES				:= sp1 sp2 pol
+SPEEDS				:= Slow Fast Normal XSlow
+EEV1_AMPLIFIERS		:= a
+OLAPA_AMPLIFIERS	:= ab
+AMPLIFIERS			:= a ab
+OSETS				:= a b c
+SPLITKEY			:= INSTMODE
+POL					:= 4
+
+#########################################################################################
+# Note that the espadons configuration is highly dependent on image filenames
+# being odometers, of the following form:
+#########################################################################################
+# Images:
+# OBJECT      [0-9]*o.$(FITS)$(inextension)
+# FLAT        [0-9]*f.$(FITS)$(inextension)
+# BIAS        [0-9]*b.$(FITS)$(inextension)
+# THORIUM     [0-9]*c.$(FITS)$(inextension)
+# FABPER      [0-9]*a.$(FITS)$(inextension)
+#########################################################################################
+# Output products:
+# INTENSITY   [0-9]*i.$(FITS)$(extension) 
+# POLAR       [0-9]*p.$(FITS)$(extension)  
+# CALS        [0-9]*m.$(FITS)$(extension)  
+# SNR         [0-9]*.sn$(gzip) 
+#########################################################################################
+
+OBJECTFILEPATTERN		:= [0-9]*o.$(FITS)$(inextension)
+OBJECTFILEPATTERNB		:= [0-9]*o.$(FITS)
+FLATFILEPATTERN			:= [0-9]*f.$(FITS)$(inextension)
+BIASFILEPATTERN			:= [0-9]*b.$(FITS)$(inextension)
+THORIUMFILEPATTERN		:= [0-9]*c.$(FITS)$(inextension)
+FABPERFILEPATTERN		:= [0-9]*a.$(FITS)$(inextension)
+CALFILEPATTERN			:= [0-9]*[abcf].$(FITS)$(inextension)
+ALLFILEPATTERN			:= [0-9]*[oabcf].$(FITS)$(inextension)
+ALLFILEPATTERNB			:= [0-9]*[oabcf].$(FITS)
+
+INTENSITYFILEPATTERN	:= [0-9]*i.$(FITS)$(extension)
+POLARIMETRYFILEPATTERN	:= [0-9]*p.$(FITS)$(extension)
+CALSFILEPATTERN			:= [0-9]*m.$(FITS)
+SNRFILEPATTERN			:= [0-9]*.sn$(gzip)
+
+OBJECTROOTPATTERN		:= o.$(FITS)$(inextension)
+OBJECTROOTPATTERNB		:= o.$(FITS)
+INTENSITYROOTPATTERN	:= i.$(FITS)$(extension)
+PRODUCTROOTPATTERN		:= m.$(FITS)
+SNRROOTPATTERN			:= .sn$(gzip)
+
+ifeq ($(LIBRE_ESPRIT_COMPATIBILITY),1)
+ifeq ($(TYPE),setup)
+POLARIMETRYROOTPATTERN	:= p.sn$(gzip)
+else
+POLARIMETRYROOTPATTERN	:= p.$(FITS)$(extension)
+endif
+else
+POLARIMETRYROOTPATTERN	:= .pol$(gzip)
+endif
+
+#########################################################################################
+# These are the basic reductionlists, which may, depending on intervening
+# mode changes be split into a, b, c sets
+#########################################################################################
+REDUCTIONSETS		:=	\
+					EEV1_sp1_Slow EEV1_sp1_Normal EEV1_sp1_Fast \
+					EEV1_sp2_Slow EEV1_sp2_Normal EEV1_sp2_Fast \
+					EEV1_pol_Slow EEV1_pol_Normal EEV1_pol_Fast \
+					OLAPA-a_sp1_Slow OLAPA-a_sp1_Normal OLAPA-a_sp1_Fast \
+					OLAPA-a_sp2_Slow OLAPA-a_sp2_Normal OLAPA-a_sp2_Fast \
+					OLAPA-a_pol_Slow OLAPA-a_pol_Normal OLAPA-a_pol_Fast \
+					OLAPA-ab_sp1_Slow OLAPA-ab_sp1_Normal OLAPA-ab_sp1_Fast \
+					OLAPA-ab_sp2_Slow OLAPA-ab_sp2_Normal OLAPA-ab_sp2_Fast \
+					OLAPA-ab_pol_Slow OLAPA-ab_pol_Normal OLAPA-ab_pol_Fast
+
+#########################################################################################
+# defaults.... these will be overridden
+#########################################################################################
+DETECTOR 	:= 
+MODE 		:= 
+SPEED 		:= 
+AMPLIFIER	:= 
+OSET		:=
+
+#########################################################################################
+# change this to fully qualify all of the characteristics that differentiate
+# calibration and reduction data sets
+#########################################################################################
+QUALIFIERNAMES		:= DETECTORS MODES SPEEDS AMPLIFIERS
+QUALIFIERS			:= $(DETECTOR)$(AMPLIFIER)_$(MODE)$(OSET)_$(SPEED)
+QUALIFIERLIST		:= $(DETECTOR)$(AMPLIFIER) $(MODE)$(OSET) $(SPEED)
+QUALIFIERNAMELIST	:= DETECTOR MODE SPEED AMPLIFIER
+
+#########################################################################################
+# definitions for qualifiers: 
+#########################################################################################
+# the keys to look for
+DETECTOR_HEADERKEY	:= DETECTOR
+MODE_HEADERKEY		:= INSTMODE
+SPEED_HEADERKEY		:= EREADSPD
+AMPLIFIER_HEADERKEY	:= AMPLIST
+# the values of the keyword in the FITS header
+DETECTOR_EEV1_HEADERVALUE	:= 'EEV1    '
+DETECTOR_OLAPA_HEADERVALUE	:= 'OLAPA   '
+# the values of the keyword in the FITS header
+AMPLIFIER_a_HEADERVALUE		:= 'a       '
+AMPLIFIER_ab_HEADERVALUE	:= 'a,b     '
+# the values of the keyword in the FITS header
+MODE_pol_HEADERVALUE		:= 'Polarimetry, R=65,000'
+MODE_sp1_HEADERVALUE		:= 'Spectroscopy, star+sky, R=65,000'
+MODE_sp2_HEADERVALUE		:= 'Spectroscopy, star only, R=80,000'
+# the values of the keyword in the FITS header
+# Note the % wildcard...
+SPEED_Fast_HEADERVALUE		:= 'Fast:%'
+SPEED_Normal_HEADERVALUE	:= 'Normal:%'
+SPEED_Slow_HEADERVALUE		:= 'Slow:%'
+SPEED_XSlow_HEADERVALUE		:= 'xSlow:%'
+#
+OPERAGETMODE		:= operagetmode $(MODE_HEADERKEY)
+
+#########################################################################################
+#
+# definitions for obstype:
+#
+#########################################################################################
+OBSTYPE_HEADERKEY		:=	OBSTYPE
+ETYPES					:=	OBJECT BIAS FLAT ALIGN COMPARISON
+OBJECT_HEADERVALUE		:= 'OBJECT  '
+BIAS_HEADERVALUE		:= 'BIAS    '
+FLAT_HEADERVALUE		:= 'FLAT    '
+ALIGN_HEADERVALUE		:= 'ALIGN   '
+COMPARISON_HEADERVALUE	:= 'COMPARISON'
+#########################################################################################
+# end operaReductionSet
+#########################################################################################
+
+#########################################################################################
+# operaGain - support either 1 or 2 amplifiers
+#########################################################################################
+# 1 amp:
+#########################################################################################
+1AMP_DATASEC_HEADERKEY		:= DATASEC
+#########################################################################################
+# 2 amps:
+#########################################################################################
+2AMP_1_DATASEC_HEADERKEY	:= DSECA
+2AMP_2_DATASEC_HEADERKEY	:= DSECB
+#########################################################################################
+# end operaGain
+#########################################################################################
+
+#########################################################################################
+#
+# CFHT-specific Calibration data
+#
+#########################################################################################
+EEV1_badpix			:= $(configdir)badpix_eev
+EEV1a_badpix		:= $(configdir)badpix_eev
+EEV1_wref			:= $(configdir)wcal_ref.dat
+EEV1_arc			:= $(configdir)thar.arc
+EEV1_masktel		:= $(configdir)tel
+EEV1_fresp			:= $(configdir)flat_resp.s
+EEV1_sky			:= $(configdir)sky
+EEV1_ref_pol		:= $(configdir)th_pol.ref
+EEV1_ref_sp1		:= $(configdir)th_sp1.ref
+EEV1_ref_sp2		:= $(configdir)th_sp2.ref
+
+OLAPAa_badpix		:= $(configdir)badpix_olapa-a
+OLAPAa_wref			:= $(configdir)wcal_ref.dat
+OLAPAa_arc			:= $(configdir)thar.arc
+OLAPAa_masktel		:= $(configdir)tel
+OLAPAa_fresp		:= $(configdir)flat_resp_olapa-a.s
+OLAPAa_sky			:= $(configdir)sky
+OLAPAa_ref_pol		:= $(configdir)th_pol.ref
+OLAPAa_ref_sp1		:= $(configdir)th_sp1.ref
+OLAPAa_ref_sp2		:= $(configdir)th_sp2.ref
+
+OLAPAab_badpix		:= $(configdir)badpix_olapa-ab
+OLAPAab_wref		:= $(configdir)wcal_ref.dat
+OLAPAab_arc			:= $(configdir)thar.arc
+OLAPAab_masktel 	:= $(configdir)tel
+OLAPAab_fresp		:= $(configdir)flat_resp__olapa-ab.s
+OLAPAab_sky			:= $(configdir)sky
+OLAPAab_ref_pol 	:= $(configdir)th_pol.ref
+OLAPAab_ref_sp1 	:= $(configdir)th_sp1.ref
+OLAPAab_ref_sp2 	:= $(configdir)th_sp2.ref
+
+badpixelmap			:= $($(DETECTOR)$(AMPLIFIER)_badpix)
+badpixelmask		:= $($(DETECTOR)$(AMPLIFIER)_badpix).$(FITS)$(extension)
+logfile				:= $(logdir)operacal.log
+errfile				:= $(logdir)operaerr.log
+
+endif	# observatory == CFHT
+
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

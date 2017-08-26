@@ -1,0 +1,51 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: operagetdaterange
+# Version: 1.0
+# Description: get a date and time range that covers an entire night
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package operagetdaterange
+#/// \brief convert nightdir to daterange
+#/// \arg nightdir
+#/// \ingroup scripts
+#
+#########################################################################################
+bindir=$opera/bin/
+
+if (( $# != 1 ))
+then
+	echo "usage: operagetdaterange <night>"
+	exit
+fi
+year=20`echo $1 | cut -c1-2`
+month=`echo $1 | cut -c8-10`
+if [[ $month == "Jan" ]] ; then (( year++ )); fi
+day=`echo $1 | cut -c11-12`
+start=`date -d"$month $day $year" +%Y/%m/%d`
+end=`date -d"$month $day $year + 1 day" +%Y/%m/%d`
+echo "$start:06:00:00-$end:18:00:00"
+exit

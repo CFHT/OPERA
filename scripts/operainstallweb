@@ -1,0 +1,176 @@
+#!/bin/bash
+#########################################################################################
+#
+# Script name: installweb
+# Version: 1.0
+# Description: Create a distribution.
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Sep/2012
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+# install ${version} build on the opera machine web directory,
+# /data/world/doug/ (for internal CFHT use) and publish to sourceforge
+#
+################################################################################################################
+version="opera-1.0"
+if [[ "$1" == "-h" || "$1" == "--help" ]]
+then
+	echo "usage: $(basename $0) [-h|--help] [--nodoc] [--local] [--noemail]"
+	echo "	run from directory above opera-1.0"
+	exit 0
+fi
+cd $HOME/${version}
+echo "############################################################################################"
+echo "#    cleaning up..."
+echo "############################################################################################"
+make -C $HOME/${version}/ distclean
+rm -f $HOME/${version}/*.fits
+rm -f $HOME/${version}/bin/*
+rm -f $HOME/${version}/lib/*
+rm -f $HOME/${version}/src/libraries/*.a $HOME/${version}/src/libraries/*.la 
+rm -f $HOME/${version}/config/masterfluxcalibration_*
+rm -f $HOME/${version}/src/tools/.ds9opera.tcl
+if [[ "$1" == "--nodoc" ]]
+then 
+	shift
+else
+	echo "############################################################################################"
+	echo "#    creating doxygen documentation"
+	echo "############################################################################################"
+	make -C $HOME/${version}/doc/ install
+fi
+make -C $HOME/${version}/doc/ clean
+echo "############################################################################################"
+echo "#    Zipping up the distribution"
+echo "############################################################################################"
+subversion=`cat <TIMESTAMP | awk '{print $1}' | awk 'BEGIN { FS="." } ; { print $3 }' | awk '{printf("%.3d",$1+1)}'`
+echo "${version}.${subversion} build date `date`" >TIMESTAMP
+cd ~
+date=`date +"%b%d-%Y"`
+zipname=${version}-$date.zip
+gzipname=${version}-$date.tar.gz
+rm -f $zipname
+rm -f $gzipname
+echo "zip -9 -r $zipname ${version}"
+zip -r $zipname -x@${version}/exclude.lst ${version}
+echo "tar cvzf ${version}.tar.gz ${version} --exclude=@${version}/exclude.lst"
+tar cvzf ${gzipname} ${version}
+rm -f ${version}-xcodeproj.zip
+rm -f ${version}-xcodeproj.tar.gz
+echo "zip -9 -r ${version}-xcodeproj.zip ${version}.xcodeproj"
+zip -r ${version}-xcodeproj.zip ${version}.xcodeproj
+echo "tar cvzf ${version}-xcodeproj.tar.gz ${version}.xcodeproj"
+tar cvzf ${version}-xcodeproj.tar.gz ${version}.xcodeproj
+echo "############################################################################################"
+echo "#    copying the local  $zipname $gzipname distributions"
+echo "############################################################################################"
+chmod 644 $zipname
+chmod 644 ${version}-xcodeproj.zip
+chmod 644 $gzipname
+chmod 644 ${version}-xcodeproj.tar.gz
+echo "rsync $zipname akua.cfht.hawaii.edu:/data/world/doug/"
+rsync $zipname akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+echo "rsync $gzipname akua.cfht.hawaii.edu:/data/world/doug/"
+rsync $gzipname akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+#echo "rsync $HOME/${version}/INSTALL_OPERA-1.0.sh akua.cfht.hawaii.edu:/data/world/doug/"
+#rsync $HOME/${version}/INSTALL_OPERA-1.0.sh akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+#echo "rsync $HOME/${version}/DEPENDENCIES akua.cfht.hawaii.edu:/data/world/doug/"
+#rsync $HOME/${version}/DEPENDENCIES akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+#echo "rsync $HOME/${version}/INSTALLATION akua.cfht.hawaii.edu:/data/world/doug/"
+#rsync $HOME/${version}/INSTALLATION akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+#echo "rsync $HOME/${version}/README akua.cfht.hawaii.edu:/data/world/doug/"
+#rsync $HOME/${version}/README akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+echo "rsync ${version}-xcodeproj.zip akua.cfht.hawaii.edu:/data/world/doug/"
+rsync ${version}-xcodeproj.zip akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+echo "rsync ${version}-xcodeproj.tar.gz akua.cfht.hawaii.edu:/data/world/doug/"
+rsync ${version}-xcodeproj.tar.gz akua.cfht.hawaii.edu:/data/world/doug/ || echo -n
+ssh akua.cfht.hawaii.edu rm -f /data/world/doug/${version}.zip
+ssh akua.cfht.hawaii.edu rm -f /data/world/doug/${version}.tar.gz
+echo "ssh akua.cfht.hawaii.edu ln -s /data/world/doug/$zipname /data/world/doug/${version}.zip"
+ssh akua.cfht.hawaii.edu ln -s /data/world/doug/$zipname /data/world/doug/${version}.zip 
+echo "ssh akua.cfht.hawaii.edu ln -s /data/world/doug/$gzipname /data/world/doug/${version}.tar.gz"
+ssh akua.cfht.hawaii.edu ln -s /data/world/doug/$gzipname /data/world/doug/${version}.tar.gz 
+#echo "ssh akua.cfht.hawaii.edu rm -f /data/world/doug/INSTALL_OPERA-1.0"
+#ssh akua.cfht.hawaii.edu rm -f /data/world/doug/INSTALL_OPERA-1.0
+#echo "ssh akua.cfht.hawaii.edu ln -s /data/world/doug/INSTALL_OPERA-1.0.sh /data/world/doug/INSTALL_OPERA-1.0"
+#ssh akua.cfht.hawaii.edu ln -s /data/world/doug/INSTALL_OPERA-1.0.sh /data/world/doug/INSTALL_OPERA-1.0
+#echo "############################################################################################"
+#echo "#    copying opera web docs"
+#echo "############################################################################################"
+#rm -f /Library/WebServer/Documents/Opera/*.zip
+#cp -f $zipname /Library/WebServer/Documents/Opera/
+#cd /Library/WebServer/Documents/Opera/
+#rm -f drop
+#ln -s $zipname drop
+#cd -
+#if [ "$1" == "--local" ]
+#then
+#	exit 0
+#fi
+echo "############################################################################################"
+echo "#    copying the sourceforge $zipname $gzipname distribution"
+echo "############################################################################################"
+echo "scp -P 22 $zipname douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/"
+#scp -P 22 $HOME/${version}/INSTALL_OPERA-1.0.sh douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+#scp -P 22 $HOME/${version}/DEPENDENCIES douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+#scp -P 22 $HOME/${version}/INSTALLATION douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+#scp -P 22 $HOME/${version}/README douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+scp -P 22 $HOME/${version}/NEWS douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/ || echo -n
+#scp -P 22 ${version}-xcodeproj.zip douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+#scp -P 22 ${version}-xcodeproj.tar.gz douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+scp -P 22 $zipname douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+scp -P 22 $gzipname douglasteeple,opera-pipeline@frs.sourceforge.net:/home/frs/project/o/op/opera-pipeline/${version}/ || echo -n
+if [ "$1" != "--noemail" ]
+then
+	recipients="opera@cfht.hawaii.edu"
+	echo "############################################################################################"
+	echo "#    sending email to: $recipients"
+	echo "############################################################################################"
+	cc=""
+	echo "Sending metadata report email to $recipients."
+	echo "To: $recipients" >/tmp/opera.eml
+	echo "From: opera@cfht.hawaii.edu" >>/tmp/opera.eml
+	echo "Cc: $cc" >>/tmp/opera.eml
+	echo "Subject: OPERA Build of `date` distributed..." >>/tmp/opera.eml
+	echo "Content-Type: text/html" >>/tmp/opera.eml
+	echo "Content-Transfer-Encoding: 7bit" >>/tmp/opera.eml
+	echo >>/tmp/opera.eml
+	echo >>/tmp/opera.eml
+	echo "<HTML><BODY>" >>/tmp/opera.eml
+	echo "<P>Please pick up the latest build: `cat $HOME/${version}/TIMESTAMP`</P>" >>/tmp/opera.eml
+	echo "<PRE>" >>/tmp/opera.eml
+	cat <$HOME/${version}/NEWS >>/tmp/opera.eml
+	echo "</PRE>" >>/tmp/opera.eml
+	echo "</BODY></HTML>" >>/tmp/opera.eml
+	echo  >>/tmp/opera.eml 
+	echo  >>/tmp/opera.eml 
+	scp /tmp/opera.eml akua.cfht.hawaii.edu:/data/world/doug/opera.eml
+	ssh akua.cfht.hawaii.edu /usr/sbin/sendmail -i -t "</data/world/doug/opera.eml"
+	rm -f /tmp/opera.eml
+	ssh akua.cfht.hawaii.edu rm -f /data/world/doug/opera.eml
+	echo "Sent distribution email to $recipients"
+fi
+echo "############################################################################################"
+echo "# $zipname ${subversion} distributed `date`"
+echo "############################################################################################"
+exit

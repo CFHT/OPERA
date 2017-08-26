@@ -1,0 +1,1366 @@
+#! /bin/bash
+#########################################################################################
+#
+#  iiwi2 launch script
+#
+#  Teeple Mar 2009
+#
+# exec 5<> /dev/tcp/www.google.com/80
+# printf "GET / HTTP/1.0\n\n" >&5
+# cat <&5
+# exec 5>&-#  
+#########################################################################################
+
+export COLUMNS=200
+export SESSIONHOST=`ls -l /h/wircam/.director/sessionhost | sed -e 's/.*-> //' | sed -e 's/\..*//'`
+machine=`hostname | sed -e 's/.cfht.hawaii.edu//'`
+
+iiwi=iiwi21
+homedir="$HOME/iiwi-2.1/"
+bindir="${homedir}/bin/"
+iiwidir="/data/iiwi/"
+webdir="${iiwidir}/web/"
+wircamdir="/data/${SESSIONHOST}/wircam/"
+reductiondir="${iiwidir}/reductions/"
+byproductsdir="${iiwidir}/byproducts/"
+logdir="${iiwidir}/logs/"
+confdir="${iiwidir}/conf/"
+tabledir="${iiwidir}/tables/"
+wircambindir="/h/wircam/.director/bin/"
+archivebindir="/h/archive/sw/tools/"
+makefile=Makefile
+
+targets=""
+distid=""
+nights=""
+objects=""
+RA=""
+DEC=""
+nexp="NEXP=1"
+etime="ETIME=6"
+filter=""
+zenith=1
+slice=""
+FLAGS=""
+qrunid=""
+crunid=""
+crunids=""
+runid=""
+runids=""
+pref=""
+dir=""
+verbose=0
+table=""
+comment=""
+dotwilightflats=0
+doautoflats=0
+dodomeflats=0
+dodarks=0
+dometadata=0
+doloadmetrics=0
+spawn=0
+dogo=0
+dodetrend1=0
+dolist=0
+archive=0
+needobjects=0
+passno=1		# zero means both passes....
+pass="PASS=1"	# the new default...
+version=100
+execcals=0
+chip4correction="NOCHIP4CORR=0"
+web=""
+trace=""
+DEST=""
+FLAGS=""
+#########################################################################################
+#
+# These are used to identify which kind of image we want when querying the processdimage
+# databse and we don't want to use filename like '%p.fits'
+#
+#########################################################################################
+
+PFITS=1
+SFITS=2
+MFITS=3
+YFITS=4
+WFITS=5
+
+if [[ "$DIRECTOR_LEVEL" != "" ]]
+then
+	pref="status: "
+	wpref="warning: "
+	epref="error: "
+else
+	pref="`date +'%D %H:%M:%S'` [${machine}] "
+	wpref="`date +'%D %H:%M:%S'` [${machine}] *** Warning: "
+	epref="`date +'%D %H:%M:%S'` [${machine}] *** Error: "
+fi
+
+function usage() {
+	echo "${pref}     ${iiwi} version"
+	echo "${pref}****** Calibration Images"
+	echo "${pref}     ${iiwi} domeflats              (only on exchange day - requires lights out)"
+	echo "${pref}     ${iiwi} update                 (recalculates current set of good twilight flats)"
+	echo "${pref}****** Master Calibrations"
+	echo "${pref}     ${iiwi} <crunid> calibrations  (master darks, master twilight flats,zeropoints, defaults skies)"
+	echo "${pref}     ${iiwi} <crunid> zeropoints    (calculate zeropoints for camera run)"
+	echo "${pref}     ${iiwi} <crunid> defaulskies   (create default sky image from standard stars)"
+	echo "${pref}     ${iiwi} <crunid> masters       (create master darks, master twilight flats)"
+	echo "${pref}     ${iiwi} <crunid> badpixelmask  (create badpixelmask)"
+	echo "${pref}****** Reduction"
+	echo "${pref}     ${iiwi} [PASS=1|2] [VERBOSE=1] [TRACE=1] [crunid>] [runid>] reduce"
+	echo "${pref}     ${iiwi} [<crunid>] [<runid>] report"
+	echo "${pref}     ${iiwi} [<crunid>] <runid> finalize (after reduction, prior to distribution)"
+	echo "${pref}     ${iiwi} <runid> cleandist      (after finalization and metadata, clean out the runid)"
+	echo "${pref}     ${iiwi} [<crunid>] [<runid>] status"
+	echo "${pref}     ${iiwi} [<crunid>] [<runid>] movie=<movie name> (make a movie of images, e.g. use DEST=o.fits"
+	echo "${pref}     ${iiwi} NIGHT=<night> movie=<movie name>   (make a movie of images, e.g. use DEST=o.fits"
+	echo "${pref}     ${iiwi} runids url[s]          (returns the urls of metadata for runid(s))"
+	echo "${pref}****** Observer commands"
+	echo "${pref}     ${iiwi} flats [nexp=<n>] [etime=<n>] [filter=<filter>] [-nozenith] (take a twilight flats series)"
+	echo "${pref}     ${iiwi} autoflats              (check sky background using guider)"
+	echo "${pref}     ${iiwi} stats                  (show twilight flats statistics)"
+   return 0
+}
+
+#########################################################################################
+#
+# normal command line processing from here
+#
+#########################################################################################
+for arg in "$@"
+do
+   case "${arg}" in
+	@*) 
+		objects=${arg};
+	;;
+	*help) 
+		usage;
+		exit 0;
+	;;
+	*version) 
+		make -C ${homedir} --no-print-directory version;
+		exit 0;
+	;;
+	*trace|TRACE=1) 
+		trace="TRACE=1";
+	;;
+	*debug|DEBUG=1) 
+		FLAGS="${FLAGS} --debug";
+		DEBUG=${arg#DEBUG=};
+	;;
+	*verbose|VERBOSE=1) 
+	    verbose=1
+		FLAGS="${FLAGS} --verbose";
+	;;
+	version=*) 
+		version=${arg#version=};
+	;;
+	-web) 
+		pref="<font color=green>"
+		wpref="<font color=yellow>"
+		epref="<font color=red>"
+		web="WEB=1";
+	;;
+	NOCHIP4CORR=*) 
+		chip4correction=$arg;
+	;;
+	installcals) 
+		make -C ${homedir} -f ${homedir}Makefile.cal CRUNID=$crunid --no-print-directory ${arg};
+		exit 0;
+	;;
+	install*) 
+		make -C ${homedir} -f ${homedir}Makefile.util CRUNID=$crunid --no-print-directory ${arg};
+		exit 0;
+	;;
+	stop) 
+		targets="${targets} ${arg}";
+	;;
+	*execute) 
+		targets="${targets} execute";
+		#execcals=1;
+		needobjects=1
+	;;
+	*nocals)
+		 execcals=0;
+	;;
+	--cals)
+		 execcals=1;
+	;;
+	zeropoint*) 
+		targets="${targets} ${arg}";
+		makefile=Makefile.cal;
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	detrend) 
+		targets="${targets} ${arg}";
+		needobjects=1
+	;;
+	defaultskies) 
+		targets="${targets} ${arg}";
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	detrend1) 
+		targets="${targets} ${arg}";
+		dodetrend1=1
+	;;
+	pass1) 
+		pass="PASS=1";
+		((passno=1));
+		needobjects=1
+	;;
+	pass2) 
+		pass="PASS=2";
+		((passno=2));
+		needobjects=1
+	;;
+	PASS=[12])
+		pass=${arg};
+		((passno=${arg#PASS=}));
+	;;
+	mask2ndpass)
+		targets="${targets} ${arg}";
+	;;
+	-archive) 
+		archive=1;
+	;;
+	calibrat*) 
+		targets="${targets} calibrations";
+		makefile=Makefile.cal;
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	masters) 
+		targets="${targets} ${arg}";
+		makefile=Makefile.cal;
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	mastertwilightflats) 
+		targets="${targets} ${arg}";
+		makefile=Makefile.cal;
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	masterdomeflats) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	masterdarks) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	badpixelmask) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		runids="`echo ${crunid} | sed -e 's:\(...\)...:\1:'`Q87";
+	;;
+	domeflats) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dodomeflats=1;
+	;;
+	autoflats) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		doautoflats=1;
+	;;
+	processedtwilightflats) 
+		makefile=Makefile.cal;
+		targets=${arg};
+	;;
+	plottwilightflats | update) 
+		makefile=Makefile.cal;
+		targets="plottwilightflats";
+	;;
+	replottwilightflats) 
+		targets="${targets} REPROCESS=1 plottwilightflats";
+		makefile=Makefile.cal;
+	;;
+	processeddarks) 
+		makefile=Makefile.cal;
+		targets=${arg};
+	;;
+	twilightflats) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dotwilightflats=1;
+	;;
+	flats) 
+		makefile=Makefile.cal;
+		targets="twilightflats";
+		dotwilightflats=1;
+	;;
+	flatlist) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dolist=1;
+	;;
+	darklist) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dolist=1;
+	;;
+	focuslist) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dolist=1;
+	;;
+	stats) 
+		makefile=Makefile.cal;
+		if [[ "$web" != "" ]]
+		then
+			targets="statshtml" ;
+		else
+			targets="focuslist darklist filterlist runidlist flatlist twilightflatlist" ;
+		fi;
+		dolist=1;
+	;;
+	wazzup) 
+		makefile=Makefile.cal;
+		targets="${arg}";
+#		if [[ "${filter}" == "" ]]
+#		then
+#			if [[ "$DIRECTOR_LEVEL" != "" ]]
+#			then
+#				filter=`clicap filter | awk '{print $2}'`
+#				if [[ "$filter" == "FakeBlank" ]]
+#				then
+#					filter=""
+#				fi
+#			fi
+#		fi
+		dolist=1;
+	;;
+	select*) 
+		wirenvdb "${arg}";
+		exit
+	;;
+	update*) 
+		wirenvdb "${arg}";
+		exit
+	;;
+	set*) 
+		wirenvdb "${arg}";
+		exit
+	;;
+	date=*) 
+		date="${arg#date=}";
+	;;
+	DATE=*) 
+		date="${arg#DATE=}";
+	;;
+	webstats)
+		makefile=Makefile.cal;
+		targets="${targets} statshtml" ;
+		dolist=1;
+	;;
+	darks) 
+		makefile=Makefile.cal;
+		targets=${arg};
+		dodarks=1;
+	;;
+	thumnails) 
+		targets="${targets} ${arg}";
+	;;
+	*nozenith)
+		zenith=0;
+	;;
+	*errlog) 
+		makefile=Makefile.util;
+		targets="${targets} errlog";
+	;;
+	*log) 
+		makefile=Makefile.util;
+		targets="${targets} log";
+	;;
+	go) 
+		dogo=1;
+		targets="${targets} reduce";
+		makefile=Makefile;
+		needobjects=1
+	;;
+	verify) 
+		targets="verify";
+		makefile=Makefile.util;
+	;;
+	report) 
+		targets="report";
+		makefile=Makefile.util;
+	;;
+	nightreport) 
+		targets="nightreport";
+		makefile=Makefile.util;
+	;;
+	sanity*) 
+		targets="sanitycheck";
+		makefile=Makefile.util;
+	;;
+	quicksanity*) 
+		targets="quicksanitycheck";
+		makefile=Makefile.util;
+	;;
+	*show*) 
+		if [[ "$crunid" != "" ]]
+		then
+			runids=`${bindir}/wirenvdb "select distinct runid from exposure where crunid='$crunid'" | tr '\n' ' '`;
+			runid="$runids"
+		fi
+		if [[ "$runid" != "" ]]
+		then
+			for r in $runids
+			do
+				if [[ -d /data/iiwi/processed/$r/ ]]
+				then
+					printf "%5s finalized images " `ls /data/iiwi/processed/$r/ | wc -l`
+					ls -ltr --time-style=+%c /data/iiwi/processed/ | grep $r | awk '{printf("%12s -- %s %s %2s %s %s\n", $11,  $6, $7, $8, $9, $10)}' | sed -e 's:/::';
+				fi
+			done
+		else
+			ls -ltr --time-style=+%c /data/iiwi/processed/ | awk '{printf("%12s -- %s %s %2s %s %s\n", $11,  $6, $7, $8, $9, $10)}' | sed -e 's:/::';
+		fi ;
+		exit;
+	  ;;
+	list) 
+		if [[ "$crunid" == "" && "$runid" != "" ]]
+		then
+			${bindir}/wirenvdb "select crunid, runid, filename from exposure where runid='$runid'";
+		fi
+		if [[ "$crunid" != "" && "$runid" == "" ]]
+		then
+			${bindir}/wirenvdb "select crunid, runid, filename from exposure where crunid='$crunid'";
+		fi
+		if [[ "$crunid" != "" && "$runid" != "" ]]
+		then
+			${bindir}/wirenvdb "select crunid, runid, filename from exposure where crunid='$crunid' and runid='$runid'";
+		fi
+		exit
+	  ;;
+	info) 
+		if [[ "$crunid" == "" && "$runid" != "" ]]
+		then
+			cruns=`${bindir}/wirenvdb "select distinct crunid from exposure where runid='$runid'" | tr '\n' ' '`;
+			for crun in $cruns
+			do
+				count=`${bindir}/wirenvdb "select count(*) from exposure where runid='$runid' and crunid='$crun'"`;
+				printf "${pref} %8d images were taken for $runid in $crun\n" $count
+			done
+		fi
+		if [[ "$crunid" != "" && "$runid" == "" ]]
+		then
+			runs=`${bindir}/wirenvdb "select distinct runid from exposure where crunid='$crunid'" | tr '\n' ' '`;
+			for run in $runs
+			do
+				count=`${bindir}/wirenvdb "select count(*) from exposure where runid='$run' and crunid='$crunid'"`;
+				printf "${pref} %8d images were taken for $run in $crunid\n" $count
+			done
+			count=`${bindir}/wirenvdb "select count(*) from exposure where crunid='$crunid'"`;
+			printf "${pref} %8d images were taken in total   in $crunid\n" $count
+		fi
+		if [[ "$crunid" != "" && "$runid" != "" ]]
+		then
+			count=`${bindir}/wirenvdb "select count(*) from exposure where runid='$runid' and crunid='$crunid'"`;
+			printf "${pref} %8d images were taken for $runid in $crunid\n" $count
+		fi
+		exit
+	  ;;
+	*view) 
+		for object in $objects 
+		  do
+			obj=`${archivebindir}/arlocate $object`
+			if (( $? == 0 ))
+			then
+				if [[ "$slice" == "" ]]
+				then
+					slice=1
+				fi
+				jpgname="/tmp/$(basename ${obj} .fits).jpg"
+				${bindir}/wirpreview ${obj}[$slice] $jpgname
+        		display $jpgname &
+			fi
+		  done
+		  exit
+	  ;;
+	slice=*) 
+		slice="${arg#slice=}";
+	;;
+	table=*) 
+		table="${arg#table=}";
+	;;
+	clean*) 
+		targets="${targets} ${arg}";
+		makefile=Makefile.util;
+	;;
+	archivelogs) 
+		targets="${targets} ${arg}";
+	;;
+	*bg) 
+		spawn=1;
+	;;
+	*url*) 
+		${bindir}/wirmagic $runids
+		exit 0
+	  ;;
+	*status) 
+		targets="${targets} status";
+		makefile=Makefile.util;
+	;;
+	*final*) 
+		targets="finalize";
+		makefile=Makefile.util;
+	;;
+	*approve*) 
+		targets="finalize";
+		makefile=Makefile.util;
+	;;
+	*metadata) 
+		((dometadata=1))
+	;;
+	movie=*) 
+		targets="movie";
+		moviename=${arg#movie=};
+		makefile=Makefile.util;
+	;;
+	movie) 
+		targets="movie";
+		if [[ "${nights}" != "" ]]
+		then
+			moviename="${iiwidir}/web/${nights}.mpg";
+		else
+			moviename="";
+		fi;
+		makefile=Makefile.util;
+	;;
+	FLAGS=*) 
+		FLAGS="${FLAGS} ${arg#FLAGS=}";
+	;;
+	SRCDIR=*) 
+		srcdir=${arg};
+	;;
+	*reduce) 
+		targets="${targets} reduce";
+		needobjects=1
+	;;
+	*unlock) 
+		targets="${targets} unlock";
+		makefile=Makefile.util;
+	;;
+	*html) 
+		html=${arg};
+	;;
+	nexp=*)
+		nexp="NEXP=${arg#nexp=}"
+	;;
+	NEXP=*)
+		nexp="NEXP=${arg#NEXP=}"
+	;;
+	etime=*)
+		etime="ETIME=${arg#etime=}"
+	;;
+	ETIME=*)
+		etime="ETIME=${arg#ETIME=}"
+	;;
+	RA=*)
+		RA=${arg}
+	;;
+	ra=*)
+		RA="RA=${arg#ra=}"
+	;;
+	DEC=*)
+		DEC=${arg}
+	;;
+	dec=*)
+		DEC="DEC=${arg#dec=}"
+	;;
+	FILTER=*)
+		filter=${arg}
+	;;
+	filter=*)
+		filter="FILTER=${arg#filter=}"
+	;;
+	Ks|H|H2|CH4On|CH4Off|J|KCont|Y|BrG)
+		filter="FILTER=${arg}"
+	;;
+	*machines) 
+		make -C ${homedir} -f Makefile.util machines;
+		exit 0;
+	;;
+	*loadmetrics)
+		((doloadmetrics=1));
+	;;
+	OBJECT=*)
+		object=${arg#OBJECT=}
+		if [[ $object == [^%.]*% ]]
+		then
+			t="like"
+		else
+			t="="
+		fi
+		if [[ "$crunid" != "" ]]
+		then
+			count=`${bindir}/wirenvdb "select count(*) from exposure where crunid='$crunid' and etype='OBJECT' and _use > 0 and object $t '$object'"`;
+			wirenvdb "select filename from exposure where crunid='$crunid' and etype='OBJECT' and object $t '$object'" >${byproductsdir}/${crunid}.lst;
+			objects="@${byproductsdir}/${crunid}.lst";
+		else
+			count=`${bindir}/wirenvdb "select count(*) from exposure where etype='OBJECT' and object $t '$object' and _use > 0"`;
+			${bindir}/wirenvdb "select filename from exposure where etype='OBJECT' and object $t '$object' and _use > 0" >${byproductsdir}/${crunid}.lst;
+			objects="@${byproductsdir}/${crunid}.lst";
+		fi
+		if [[ "$objects" == "" ]]
+		then
+			echo "${epref} No objects found for $crunid $object."
+			exit 1
+		fi
+		;;
+		FINDOBJECT=*)
+		object=${arg#FINDOBJECT=}
+		if [[ $object == [^%.]*% ]]
+		then
+			t="like"
+		else
+			t="="
+		fi
+		if [[ "$crunid" != "" ]]
+		then
+			${bindir}/wirenvdb "select mydatetime,filename,crunid,object,filter from exposure where crunid='$crunid' and etype='OBJECT' and object $t '$object'";
+		else
+			${bindir}/wirenvdb "select mydatetime,filename,crunid,object,filter from exposure where etype='OBJECT' and object $t '$object'";
+		fi
+	;;
+	select*)
+		objects=`${bindir}/wirenvdb "${arg#select=}"`;
+	;;
+	comment=*) 
+		comment="COMMENT='${arg}'";
+	;;
+	semester=*) 
+		semester=${arg};
+	;;
+	QRUNID=*) 
+		qrunid=${arg#QRUNID=};
+	;;
+	RUNID=*) 
+		runid=${arg#RUNID=};
+		runids="$runids $runid"
+	;;
+	CRUNID=*) 
+		crunid=${arg#CRUNID=};
+		crunids="$crunids $crunid"
+	;;
+	NIGHTDIR=*) 
+		if [[ "$nights" == "" ]]
+		  then
+				nights="$(basename ${arg#NIGHTDIR=})";
+		  else
+				nights="$nights $(basename ${arg#NIGHTDIR=})";
+		fi
+	;;
+	nexp=*) 
+		nexp="${arg}";
+	;;
+	ECHO=*) 
+		ECHO="${arg}";
+	;;
+	DEST=*) 
+		DEST="${arg}";
+	;;
+	RECHO=*) 
+		RECHO="${arg}";
+	;;
+	distid=*) 
+		distid=${arg#*=};
+		runid="`echo ${distid} | sed =e 's/-.*//' | tr [:lower:] [:upper:]`";
+		runids=$runid
+		needobjects=1
+	;;
+	OBJECTS=*) 
+		objects="${arg#OBJECTS=}";
+	;;
+	[0-9][0-9][ABab][QECFHTDSqbcfhtds][0-9][0-9]-[0-9]) 
+		distid=${arg};
+		runid="`echo ${arg} | sed -e 's/-.*//' | tr [:lower:] [:upper:]`";
+		runids=$runid
+		needobjects=1
+	;;
+	[0-9]*o.fits) 
+		objects="${objects} ${arg}";
+	;;
+	[0-9]*o-slice[0-9]*.fits) 
+		objects="${objects} ${arg}";
+	;;
+	[0-9]*-slice[0-9]*.fits) 
+		exit;
+	;;
+	[0-9]*o.fits,) 
+		os=`echo ${arg} | sed -e 's/,/ /g'`;
+		objects="${objects} $os";
+	;;
+	[0-9]*o.fits-[0-9]*o.fits) 
+		objects="${objects} ${arg}";
+	;;
+	[0-9]*o.fits-[0-9]*o.fits,) 
+		os=`echo ${arg} | sed -e 's/,/ /g'`;
+		objects="${objects} $os";
+	;;
+	[0-9][0-9][AB][QBEOCFHTDPS][0-9][0-9]) 
+		runid="$arg";
+		runids="$runids $runid"
+	;;
+	[0-9][0-9][AB][w][0-9][0-9]) 
+		crunid="$arg";
+		crunids="$crunids $crunid"
+	;;
+	[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]) 
+		nights="$nights $arg";
+	;;
+	[0-9][0-9][AB][QE][0-9][0-9]-*) 
+		nights="$nights `ls -rt ${wircamdir} | grep '[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]' | grep $arg | tr '\n' ' '`";
+	;;
+	NIGHT=[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]) 
+		if [[ "$nights" == "" ]]
+		then
+			nights="${arg#NIGHT=}";
+		else
+			nights="$nights ${arg#NIGHT=}";
+		fi
+		night=${arg#NIGHT=};
+	;;
+	*) 
+		echo "Invalid argument: $arg";
+		usage;
+		exit 1;
+	;;
+   esac 
+done
+
+
+#########################################################################################
+#
+# Dome flats processing
+#
+#########################################################################################
+if (( dodomeflats ))
+then
+	today=`date +"%b %e %Y"`
+	qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	echo "${pref}***************************************************************"
+	echo "${pref}*                                                             *"
+	echo "${pref}*            WIRCam iiwi-2.1 Taking Dome Flats                *"
+	echo "${pref}*                                                             *"
+	echo "${pref}*               ALL dome lights must be OFF                   *"   
+	echo "${pref}*                                                             *"
+	echo "${pref}* This script will call for telescope focus changes           *"
+	echo "${pref}* as the filters change.                                      *"
+	echo "${pref}*                                                             *"
+	echo "${pref}* Ignore any warning messages as failure to change focus,     *"
+	echo "${pref}* as this does not have any effect on the correct operation   *"
+	echo "${pref}* of this script.                                             *"
+	echo "${pref}*                                                             *"
+	echo "${pref}***************************************************************"
+	echo "${pref}Starting domeflats for $crunid $qrunid."
+	ssPut /e/state/wircam/cameraRun $crunid
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} --no-print-directory ${ECHO} VERSION=$version CRUNID=$crunid QRUNID=$qrunid ${targets} --jobs --no-print-directory
+	echo "${pref}***************************************************************"
+	echo "${pref}*                                                             *"
+	echo "${pref}*         WIRCam finished Dome Flats successfully             *"
+	echo "${pref}*                                                             *"
+	echo "${pref}***************************************************************"
+	clicmd @wircam_done -noreduce
+	exit 0
+fi
+#########################################################################################
+#
+# list processing
+#
+#########################################################################################
+if (( dolist ))
+then
+	nightdir=`pwd`	
+	today=`date +"%b %e %Y"`
+	if [[ "$crunid" == "" ]]
+	then
+		qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+		crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	fi
+	semester=`echo $crunid | sed -e 's/\(...\).../\1/'`
+	if [[ "${filter}" != "" ]]
+	then
+		make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} NIGHTDIR=${nightdir} ${web} --no-print-directory ${ECHO} DATE=${date} CRUNID=$crunid QRUNID=$qrunid RUNID=${semester}Q87 VERSION=$version ${targets} FILTER=${filter} ${FLAGS} --no-print-directory
+	else
+		make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} NIGHTDIR=${nightdir} ${web} --no-print-directory ${ECHO} DATE=${date} CRUNID=$crunid QRUNID=$qrunid RUNID=${semester}Q87 VERSION=$version ${targets} ${FLAGS} --no-print-directory
+	fi
+	exit 0
+fi
+#########################################################################################
+#
+# Twilight flats processing
+#
+#########################################################################################
+if (( dotwilightflats ))
+then
+	nightdir=`pwd`	
+	today=`date +"%b %e %Y"`
+	qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} NIGHTDIR=${nightdir} --no-print-directory ${ECHO} CRUNID=$crunid QRUNID=$qrunid VERSION=$version ${RA} ${DEC} zenith=${zenith} ${nexp} ${etime} ${filter} ${targets} --jobs --no-print-directory
+	exit 0
+fi
+#########################################################################################
+#
+# Darks processing
+#
+#########################################################################################
+if (( dodarks ))
+then
+	cd ${wircamdir}${night}
+	yyyy=`date '+%Y'`
+	adate="`echo $night | sed -e 's:\([0-9][0-9]\)[AB][Q][0-9][0-9]-\([A-Z][a-z][a-z]\)\([0-9][0-9]\):\2 \3:'` $yyyy"
+	crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${adate} 12:00:00') between startdatetime and enddatetime" | tail -1`
+	tomorrow=`${bindir}/wirenvdb "select convert(varchar,dateadd(day, datediff(day,'20000101','${adate}'),'20000102'),106)" | sed -e 's:{::' -e 's:}::' | awk '{printf("%s %s %s", $2,$1,$3)}'`
+	etimes=`${bindir}/wirenvdb "select distinct convert(int,floor(etime+0.5)) from exposure where crunid='${crunid}' and (etype='OBJECT' or etype='FLAT') and dateadd(hour,-14,mydatetime) between '${adate}' and '${tomorrow}'" | tr '\n' ' '`
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} --no-print-directory ${ECHO} NIGHT=${night} VERSION=$version CRUNID=$crunid ETIMES="${etimes}" ${targets} --jobs --no-print-directory
+	exit 0
+fi
+#########################################################################################
+#
+# autoflats processing
+#
+#########################################################################################
+if (( doautoflats ))
+then
+	today=`date +"%b %e %Y"`
+	qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} --no-print-directory ${ECHO} VERSION=$version CRUNID=${crunid} ${ECHO} ${RECHO} ${trace} ${etime} FLAGS="${FLAGS}" ${targets} --jobs --no-print-directory
+	exit 0
+fi
+#########################################################################################
+#
+# detrend1 detrends a single o.fits from endgo to detrend each slice and each cube
+#
+#########################################################################################
+if (( dodetrend1 ))
+then
+	today=`date +"%b %e %Y"`
+	if [[ "$qrunid" == "" ]]
+	then
+		qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	fi
+	if [[ "$crunid" == "" ]]
+	then
+		crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where instrument='wircam' and convert(date,'${today} 12:00:00') between startdatetime and enddatetime"`
+	fi
+	for object in ${objects}
+	do
+		if [[ ${object} == [0-9]*o.fits || ${object} == [0-9]*o-slice[0-9]*.fits ]]
+		then
+			if [[ ${object} == [0-9]*o-slice[0-9]*.fits ]]
+			then
+				slicepart=`echo ${object} | sed -e 's:[0-9]*::'`
+				ob="$(basename ${object} ${slicepart})o.fits"
+				slice=`echo $(basename $slicepart .fits) | sed -e 's:o::'`
+			else
+				ob=${object}
+			fi
+			if [[ "$ob" != "" ]]
+			then
+				for target in ${targets}
+				do
+					if (( spawn ))
+					then
+						make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} ${target} DEST="s-uncalibrated.fits" SLICE=$slice NIGHT=${night} OBJECTS="$ob" QRUNID=${qrunid} CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${chip4correction} ${trace} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory | sed -e 's|status:|logonly:|' &
+					else
+						make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} ${target} DEST="s-uncalibrated.fits" SLICE=$slice NIGHT=${night} OBJECTS="$ob" QRUNID=${qrunid} CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${chip4correction} ${trace} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+					fi
+				done
+			fi
+		fi
+	done
+	exit 0
+fi
+if (( dometadata ))
+then
+	echo "${pref} Starting foreground metadata for ${runid}"
+	for runid in ${runids}
+	do
+		lrunid=`echo ${runid} | tr [:upper:] [:lower:]`
+		runon konane ${archivebindir}WC_adh -i ${lrunid}
+	done
+	exit
+fi
+if (( doloadmetrics ))
+then
+	if (( spawn ))
+	then
+		${bindir}/iiwi_loadmetrics &
+	else
+		${bindir}/iiwi_loadmetrics
+	fi
+	exit 0
+fi
+#########################################################################################
+#
+# This is the case where a runid is given which requires special handling
+# when crossing several crunids...
+#
+#########################################################################################
+if [[ $targets == *cleanzeropoints || $targets == *cleandefaultskies  ]]
+then
+	semester=`echo $crunid | sed -e 's/\(...\).../\1/'`
+	for q in Q87 Q89
+	do
+		runid=${semester}${q}
+		make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+	done
+	exit
+fi
+if [[ $targets == *cleantargets || $targets == *cleandist  ]]
+then
+	if [[ "${runid}" = "" && "${crunid}" != "" ]]
+	then
+		runids=`${bindir}/wirenvdb "select distinct runid from exposure where crunid='${crunid}' and runid not like '%E%' and _use>0" | tr '\n' ' '`
+		echo "${pref} There are `${bindir}/wircount $runids` runids in ${crunid}."
+		for runid in ${runids}
+		do
+			echo "${pref} Cleaning ${crunid} ${runid}..."
+			make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+		done
+	elif [[ "${runid}" != "" && "${crunid}" == "" ]]
+	then
+		crunids=`${bindir}/wirenvdb "select distinct crunid from exposure where runid='${runid}' and runid not like '%E%' and _use>0" | tr '\n' ' '`
+		echo "${pref} There are `${bindir}/wircount $crunids` crunids for ${runid}."
+		for crunid in ${crunids}
+		do
+			echo "${pref} Cleaning ${crunid} ${runid}..."
+			make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+		done
+	else
+		echo "${pref} Cleaning ${crunid} ${runid}..."
+		make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+	fi
+	exit
+fi
+if [[ $targets == finalize ]]
+then
+	if [[ "${runid}" = "" && "${crunid}" != "" ]]
+	then
+		runids=`${bindir}/wirenvdb "select distinct runid from exposure where crunid='${crunid}' and runid not like '%E%' and _use>0" | tr '\n' ' '`
+		echo "${pref} There are `${bindir}/wircount $runids` runids in ${crunid}."
+		for runid in ${runids}
+		do
+			echo "${pref} Finalizing ${crunid} ${runid}..."
+			make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+		done
+	else
+		echo "${pref} Finalizing ${crunid} ${runid}..."
+		make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+	fi
+	exit
+fi
+if [[ $targets == *sanitycheck ]]
+then
+	if [[ "${runid}" != "" && "${crunid}" == "" ]]
+	then
+		crunids=`${bindir}/wirenvdb "select distinct crunid from exposure where runid='${runid}'" | tr '\n' ' '`
+		crunid="$crunids"
+	fi
+	crunidcount=`${bindir}/wircount $crunids`
+	if [[ "${crunid}" != "" ]]
+	then
+		for target in ${targets}
+		do
+			if [[ "${runids}" == "" ]]
+			then
+				runids="FAKE"	# always do one...
+			fi
+			for runid in ${runids}
+			do
+				if [[ "${runid}" == "FAKE" ]]
+				then
+					runid=""
+				fi
+				for crunid in ${crunids}
+				do
+					echo "${pref} Checking ${crunid} ${runid}..."
+					make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" NIGHT=${nights} CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+				done
+			done
+		done
+	fi
+	exit
+fi
+if [[ $targets == report || $targets == nightreport ]]
+then
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} OBJECTS="" NIGHT=${nights} CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+	exit
+fi
+if [[ $targets == movie ]]
+then
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${targets} DEST=${DEST} NIGHT=${nights} FLAGS=${FLAGS} ${srcdir} MOVIENAME=${moviename} OBJECTS="${objects}" CRUNID=${crunid} RUNID=${runid} ${ECHO} ${RECHO} ${trace} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+	exit $?
+fi
+#########################################################################################
+#
+# When specific odometers are given
+#
+#########################################################################################
+if [[ "$objects" != "" ]]
+then
+	if [[ ${objects} == @[a-zA-Z0-9_\-/]* ]]
+	then
+		os=${objects}
+	else
+		os=""
+		for object in $objects
+		do
+			if [[ $object == [0-9]*o.fits-[0-9]*o.fits ]]
+			then
+				odo1=`echo $object | sed -e 's/o\.fits-.*//'`
+				odo2=`echo $object | sed -e 's/[0-9]*o\.fits-//' -e 's/o.fits//'`
+			else
+				if [[ $object == [0-9]*o.fits ]]
+				then
+					odo1=`echo $object | sed -e 's/o\.fits//'`
+					odo2=$odo1
+				fi
+			fi
+			while (( odo1 <= odo2 ))
+			do
+				ob=`${bindir}wirenvdb "select distinct filename from exposure where filename='${odo1}o.fits' and _use > 0"`
+				filter=`${bindir}wirenvdb "select distinct filter from exposure where filename='${odo1}o.fits' and _use > 0"`
+				if [[ "$ob" != "" && "$filter" != "FakeBlank" ]]
+				then
+					if [[ "$crunid" == "" ]] 
+					then
+						crunid=`${bindir}wirenvdb "select distinct crunid from exposure where filename='${odo1}o.fits' and _use > 0"`
+					fi
+					pfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo1} and target_ext = $PFITS"`
+					sfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo1} and target_ext = $SFITS"`
+					mfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo1} and target_ext = $MFITS"`
+					yfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo1} and target_ext = $YFITS"`
+					wfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo1} and target_ext = $WFITS"`
+					if [[ $targets == *clean* ]]
+					then
+						os="$os $ob"
+					else
+						if [[ "$pfile" == "" || "$sfile" == "" || "$mfile" == "" || "$yfile" == "" || "$wfile" == "" ]]
+						then
+							os="$os $ob"
+							${bindir}wirenvdb "delete from processedimage where odometer=${odo1}"
+							rm -f ${reductiondir}/${crunid}/${runid}/${odo1}*
+							rm -f ${byproductsdir}/${crunid}/${runid}/${odo1}*
+							echo "${pref} One of ${odo1}[swymp].fits missing from database"
+						else
+							echo "${pref} $crunid $runid $pfile $sfile $mfile $yfile $wfile are in the processed image database."
+						fi
+					fi
+				else
+					ob=`${bindir}wirenvdb "select distinct filename from exposure where filename='${odo1}o.fits'"`
+					echo "${epref} ${odo1}o.fits not found in exposure database."
+				fi
+				((odo1++))
+			done
+		done
+	fi
+	for target in ${targets}
+	do
+		for odo in ${os}
+		do
+			crunid=`${bindir}/wirenvdb "select distinct crunid from exposure where filename = '${odo}'"`
+			runid=`${bindir}/wirenvdb "select runid from exposure where filename = '${odo}'"`
+			make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${target} ${web} DEST="s.fits" OBJECTS="${odo}" RUNID=$runid QRUNID=$qrunid CRUNID=$crunid COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+		done
+	done
+	exit 0
+fi
+#########################################################################################
+#
+# go processing - reduce the entire night data
+#
+#########################################################################################
+if [[ "$nights" == "" ]]
+then
+	night=$(basename $(pwd))
+	if [[ $night == [0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9] ]]
+	then 
+		nights=$night
+	fi
+fi
+if (( dogo ))
+then
+	if [[ "$nights" == "" ]]
+	then
+		nights=$(basename $(pwd))
+	fi
+	if [[ "${nights}" != "" ]]
+	then
+		for night in ${nights} 
+		do
+			if [[ ! -d ${wircamdir}${night} ]]
+			then
+				echo "${pref}The night directory ${night} does not exist."
+			else
+				qrunid=`echo $night | sed -e 's/-.*//'`
+				yyyy=`date '+%Y'`
+				adate="`echo $night | sed -e 's:\([0-9][0-9]\)[AB][Q][0-9][0-9]-\([A-Z][a-z][a-z]\)\([0-9][0-9]\):\2 \3:'` $yyyy"
+				crunid=`${bindir}wirenvdb "select distinct crunid from cqrunids where convert(date,'${adate}') between startdatetime and enddatetime and instrument='wircam'" | tail -1`
+				crunids=$crunid
+				semester=`echo $crunid | sed -e 's/\(...\).../\1/'`
+				while [[ -e ${reductiondir}/Lock_$crunid ]] 
+				do
+					echo "${pref} Waiting for $crunid lock, ~C to abort."
+					echo "${pref} iiwi2 $crunid unlock"
+					sleep 300
+				done
+				#
+				# Do the master darks, twilightflsts, night movie, reduction and stats
+				#
+				${bindir}iiwi_morningcals $night $crunid &
+				exit 0
+			fi
+		done
+	fi
+fi
+#########################################################################################
+#
+# This is the case where we are given a runid or distid which may cross several crunids...
+#
+#########################################################################################
+if (( $(${bindir}/wircount ${runids}) > 1 && $(${bindir}/wircount ${crunids}) > 1 ))
+then
+	echo "${epref} iiwi2 cannot handle multiple runids and crunids simultaneously."
+	exit 1
+fi
+# check the case of a runid spanning multiple crunids
+if [[ "${runid}" != "" && "${crunid}" == "" ]]
+then
+	crunids=`${bindir}/wirenvdb "select distinct crunid from exposure where runid='${runid}' and runid not like '%E%' and _use>0" | tr '\n' ' '`
+	crunid="$crunids"
+	echo "${pref} There are `${bindir}/wircount $crunids` camera runids for ${runid}."
+fi
+# the case of a crunid containing multiple runids
+if [[ "${runid}" = "" && "${crunid}" != "" && ${needobjects} == 1 ]]
+then
+	runids=`${bindir}/wirenvdb "select distinct runid from exposure where crunid='${crunid}' and runid not like '%E%' and _use>0" | tr '\n' ' '`
+	runid="$runids"
+	echo "${pref} There are `${bindir}/wircount $runids` runids in ${crunid}."
+fi
+crunidcount=`${bindir}/wircount $crunids`
+if [[ "${crunid}" != "" ]]
+then
+	for target in ${targets}
+	do
+		if [[ "${runids}" == "" ]]
+		then
+			runids="FAKE"	# always do one...
+		fi
+		for runid in ${runids}
+		do
+			if [[ "${runid}" == "FAKE" ]]
+			then
+				runid=""
+			fi
+			if [[ ${runid} != [0-9][0-9][AB]E[0-9][0-9] ]]
+			then
+			for crunid in ${crunids}
+			do
+				semester=`echo $crunid | sed -e 's/\(...\).../\1/'`
+				if (( needobjects == 0 ))
+				then
+					make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${target} OBJECTS="" CRUNID=$crunid RUNID=$runid ${ECHO} ${RECHO} DEBUG=${DEBUG} ${chip4correction} ${trace} ${pass} SEMESTER=${semester} FLAGS="${FLAGS}" --jobs --no-print-directory
+				else
+					if  (( execcals == 1 ))
+					then
+						echo "${pref} ${crunid} ${runid} $target step 1 calibrations..."
+						make -C ${homedir} -f ${homedir}/${makefile}.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleancals OBJECTS="" QRUNID=${qrunid} RUNID=${semester}Q87 CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						make -C ${homedir} -f ${homedir}/${makefile}.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleancals OBJECTS="" QRUNID=${qrunid} RUNID=${semester}Q89 CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						make -C ${homedir} -f ${homedir}/${makefile}.cal ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} calibrations OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						execcals=0
+						echo "${pref} ${crunid} ${runid} $target step 1 calibrations complete..."
+					else
+						echo "${pref} ${crunid} ${runid} $target skipping step 1 calibrations..."
+					fi
+					((i=1))
+					os="$objects"
+					if [[ $target == reduce || $target == execute || $target == detrend || $passno == 1 || $passno == 2 ]]
+					then
+						runidclause=""
+						if [[ "${runid}" != "" ]]
+						then
+							runidclause="and runid='${runid}'"
+						fi
+						make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} directoriescreated OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						if [[ $target == execute ]]
+						then
+							make -C ${homedir} -f ${homedir}/${makefile}.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleandist OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+							make -C ${homedir} -f ${homedir}/${makefile}.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleantargets OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						fi
+						make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} directoriescreated OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						rm -f ${byproductsdir}/${crunid}/${runid}/objects.lst
+						ocount=`${bindir}wirenvdb "select count(distinct filename) from exposure where etype='OBJECT' and crunid='${crunid}' ${runidclause}"`
+						${bindir}wirenvdb "select distinct filename from exposure where etype='OBJECT' and crunid='${crunid}' ${runidclause} and _use>0" >${byproductsdir}/${crunid}/${runid}/objects.tmp
+						echo "${pref} Preparing to reduce `${bindir}wirenvdb "select count(distinct filename) from exposure where etype='OBJECT' and crunid='${crunid}' ${runidclause} and _use>0"` images of ${crunid} ${runid}, gathering odometers and checking for existing products..."
+						cat ${byproductsdir}/${crunid}/${runid}/objects.tmp | while read line
+						do
+							odo=$(basename $line o.fits)
+							pfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo} and target_ext = $PFITS"`
+							sfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo} and target_ext = $SFITS"`
+							mfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo} and target_ext = $MFITS"`
+							yfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo} and target_ext = $YFITS"`
+							wfile=`${bindir}wirenvdb "select distinct filename from processedimage where odometer=${odo} and target_ext = $WFITS"`
+							haves=0
+							havep=0
+							havey=0
+							havem=0
+							havew=0
+							if [[ "$sfile" != "" ]]
+							then
+								haves=1
+							fi
+							if [[ "$pfile" != "" ]]
+							then
+								havep=1
+							fi
+							if [[ "$yfile" != "" ]]
+							then
+								havey=1
+							fi
+							if [[ "$mfile" != "" ]]
+							then
+								havem=1
+							fi
+							if [[ "$wfile" != "" ]]
+							then
+								havew=1
+							fi
+							founds=0
+							foundp=0
+							foundy=0
+							foundm=0
+							foundw=0
+							if [[ -s ${reductiondir}/${crunid}/${runid}/${odo}p.fits ]]
+							then
+								foundp=1
+							fi
+							if [[ -s ${reductiondir}/${crunid}/${runid}/${odo}s.fits ]]
+							then
+								founds=1
+							fi
+							if [[ -s ${reductiondir}/${crunid}/${runid}/${odo}w.fits ]]
+							then
+								foundw=1
+							fi
+							if [[ -s ${reductiondir}/${crunid}/${runid}/${odo}m.fits ]]
+							then
+								foundm=1
+							fi
+							if [[ -s ${reductiondir}/${crunid}/${runid}/${odo}y.fits ]]
+							then
+								foundy=1
+							fi
+							if (( !founds && !foundp && !foundw && !foundm && !foundy && !haves && !havep && !havew && !havem && !havey ))
+							then
+								#${bindir}wirenvdb "delete from processedimage where odometer=${odo}"
+								#make -C ${homedir} -f ${homedir}/Makefile.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleanodometer OBJECTS="${odo}" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+								echo $line >>${byproductsdir}/${crunid}/${runid}/objects.lst
+							elif (( founds && foundp && foundw && foundm && foundy && haves && havep && havew && havem && havey ))
+							then
+								if (( verbose ))
+								then
+									echo "${pref} $crunid $runid $pfile $sfile $mfile $yfile $wfile exist and are in processed image database."
+								fi
+							else
+								echo "${pref} One of ${odo}p.fits ${odo}s.fits ${odo}m.fits ${odo}w.fits ${odo}y.fits missing."
+								${bindir}wirenvdb "delete from processedimage where odometer=${odo}"
+								make -C ${homedir} -f ${homedir}/Makefile.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleanodometer OBJECTS="${odo}" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${trace} ${chip4correction} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+								echo $line >>${byproductsdir}/${crunid}/${runid}/objects.lst
+							fi
+						done # while read line
+						os="@${byproductsdir}/${crunid}/${runid}/objects.lst"
+						rm -f ${byproductsdir}/${crunid}/${runid}/objects.tmp
+					fi  # $target == reduce || $target == detrend || $passno == 1 || $passno == 2
+					if (( passno == 1 ))
+					then
+						dest="s.fits"
+					fi
+					if [[ $target == detrend ]]
+					then
+						dest="s-uncalibrated.fits"
+					fi
+					if (( passno == 2 ))
+					then
+						dest="p2.fits"
+					fi
+					if [[ -s ${byproductsdir}/${crunid}/${runid}/objects.lst ]]
+					then
+						if (( passno == 1 ))	# this is the 1.5 pass solution where all the detrends and masks are done first
+						then
+							echo "${pref} ${crunid} ${runid} $target checking completeness of odometers..."
+							runstart=`${bindir}/wirenvdb "select startdatetime from cqrunids where crunid='${crunid}'" | sed -e 's:}::' -e 's:{::'`
+							runend=`${bindir}/wirenvdb "select enddatetime from cqrunids where crunid='${crunid}'" | sed -e 's:{::' -e 's:}::'`
+							lrunid=`echo ${runid} | tr [:upper:] [:lower:]`
+							${archivebindir}/dbq "select name from file where RUNID='${lrunid}' and EXDATE between '${runstart}' and '${runend}' and name like '%o.fits' order by name" >${byproductsdir}/${crunid}/${runid}/archive.lst
+							acount=`cat ${byproductsdir}/${crunid}/${runid}/archive.lst | wc -l`
+							echo "${pref} $ocount objects in exposure table, $acount objects in archive table."
+							if (( acount > ocount && 0 ))
+							then
+								cat ${byproductsdir}/${crunid}/${runid}/archive.lst | while read f
+								do
+									if [[ "`grep $f ${byproductsdir}/${crunid}/${runid}/objects.lst`" == "" ]]
+									then
+										odo=$(basename $f o.fits)
+										if [[ "`${bindir}/wirenvdb \"select filename from exposure where odometer = ${odo}\"`" == "" ]]
+										then
+											echo "${wpref} $f is missing from the exposure table, adding it now..."
+											${bindir}/iiwi_dbtable_exposure `${archivebindir}/arlocate ${f}`
+										fi
+										echo "${pref} grep $f ${byproductsdir}/${crunid}/${runid}/objects.lst"
+										echo ${bindir}/iiwi21 ${f} cleanodometer
+										echo $f >>${byproductsdir}/${crunid}/${runid}/objects.lst
+									fi
+								done
+							fi
+							echo "${pref} ${crunid} ${runid} $target step 1.5 pass1..."
+							make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} pass1 DEST="m.fits" OBJECTS="${os}" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						fi
+						if [[ $target == execute ]]
+						then
+							echo "${pref} ${crunid} ${runid} $target step 2 cleantargets..."
+							make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} cleantargets OBJECTS="" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+							echo "${pref} ${crunid} ${runid} $target step 3 reduce..."
+							make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} reduce DEST="$dest" OBJECTS="${os}" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+							echo "${pref} ${crunid} ${runid} $target step 3 reduce complete..."
+							# double check...
+							echo "${pref} ${crunid} ${runid} $target step 4 re-reduce..."
+							${bindir}/${iiwi} ${crunid} ${runid} DEBUG=1 ${chip4correction} reduce
+						else
+							echo "${pref} ${crunid} ${runid} $target step 2 ..."
+							make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} ${target} DEST="$dest" OBJECTS="${os}" QRUNID=${qrunid} RUNID=${runid} CRUNID=${crunid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+						fi
+					fi # -s ${byproductsdir}/${crunid}/${runid}/objects.lst
+				fi # needobject == 0
+				((i++))
+				echo "${pref} ${crunid} ${runid} $target complete..."
+			done # crunid in $crunids
+			fi
+			if [[ $target == execute ]]
+			then
+				echo "${pref} ${crunid} ${runid} $target step 5 finalize..."
+				make -C ${homedir} -f ${homedir}/${makefile}.util ROOTDIR=${homedir} HOST=${machine} ${web} ${filter} finalize  OBJECTS="" CRUNID=${crunid} RUNID=${runid} COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} DEBUG=${DEBUG} ${pass} FLAGS="${FLAGS}" --jobs --no-print-directory
+				echo "${pref} ${crunid} ${runid} $target step 5 finalization backgrounded..."
+			fi
+		done	# runid in $runids 
+	done	# target in $targets 
+	exit
+fi # crunid != ""
+#########################################################################################
+#
+# Final try...
+#
+#########################################################################################
+for target in ${targets}
+do
+	make -C ${homedir} -f ${homedir}/${makefile} ROOTDIR=${homedir} HOST=${machine} ${web} ${target} CRUNID=$crunid RUNID=$runid COMMANDLINE="$0 $*" ${comment} ${ECHO} ${RECHO} ${chip4correction} ${trace} ${pass} DEBUG=${DEBUG} FLAGS="${FLAGS}" --jobs --no-print-directory
+done
+exit

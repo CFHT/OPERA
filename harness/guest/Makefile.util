@@ -1,0 +1,255 @@
+#########################################################################################
+#
+# Makefile name: Makefile.util
+# Version: 1.0
+# Description: guest utility functions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_util_espadons
+#/// \brief utility functionss
+#/// \note This is where the multi-machine targets reside.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+# This section is generic stuff
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+help:	
+	@opera --help
+
+#########################################################################################
+# The current configuration
+#########################################################################################
+
+status:
+	@echo "$(pref) ************ Status for $(shell date) ************"
+	@echo "$(pref)Observatory   $(observatory)"
+	@echo "$(pref)Coordinates   $(observatory_coords)"
+	@echo "$(pref)NIGHT         $(NIGHT)"
+
+config configuration:
+	@echo $(versionstr)
+	@echo "badpix         = $($(DETECTOR)_badpix)"
+	@echo "spectradir     = $(spectradir)"
+	@echo "calibrationdir = $(calibrationdir)"
+
+#########################################################################################
+# The current paramter values for a mode/speed
+#########################################################################################
+
+parameters:
+	@echo "OPERA_PARAM minimumflatsforgain := $(minimumflatsforgain)"
+	@echo "OPERA_PARAM gainsubwindow := $(gainsubwindow)"
+	@echo "OPERA_PARAM gainMinPixPerBin := $(gainMinPixPerBin)"
+
+version:
+	@if [ -e TIMESTAMP ] ; then \
+		cat <TIMESTAMP ; \
+	else \
+		echo $(version) ; \
+	fi
+
+
+#########################################################################################
+#
+# make sure the directories are there
+#
+#########################################################################################
+directoriescreated:
+	@if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory directoriescreated; \
+		done ; \
+	else \
+		if [ -d $(DATADIR) ] ; then \
+			if [ ! -d $(spectradir) ]		; then mkdir -p $(spectradir); chmod a+rw $(spectradir) ; fi ; \
+			if [ ! -d $(configdir) ]		; then mkdir -p $(configdir); chmod a+rw $(configdir) ; fi ; \
+			if [ ! -d $(calibrationdir) ]	; then mkdir -p $(calibrationdir); chmod a+rw $(calibrationdir) ; fi ; \
+			if [ ! -d $(tmpdir) ]			; then mkdir -p $(tmpdir); chmod a+rw $(tmpdir) ; fi ; \
+			if [ ! -d $(logdir) ]			; then mkdir -p $(logdir); chmod a+rw $(logdir) ; fi ; \
+			if [ ! -d $(analysesdir) ]		; then mkdir -p $(analysesdir); chmod a+rw $(analysesdir) ; fi ; \
+		fi ; \
+	fi
+
+#########################################################################################
+#
+# the clean targets
+#
+#########################################################################################
+clean:	cleancals cleanrlist cleanalltargets cleantmp cleanapproved cleanprocessed cleanvisuals cleanbyproducts cleanallproducts cleanquicklook cleananalyses unlock
+ifeq ($(DATADIRS),)
+	@if [ -d $(spectradir) ] ; then rmdir $(spectradir) 2>/dev/null ; fi
+	@if [ -d $(calibrationdir) ] ; then rmdir $(calibrationdir) 2>/dev/null ; fi
+	@if [ -d $(tmpdir) ] ; then rmdir $(tmpdir) 2>/dev/null ; fi
+	@if [ -d $(visualsdir) ] ; then rmdir $(visualsdir) 2>/dev/null ; fi
+	@if [ -d $(logdir) ] ; then rmdir $(logdir) 2>/dev/null ; fi
+	@for machine in $(MACHINES) ; do \
+		if [ "$${machine}" != "$${HOSTNAME}" ] ; then \
+			$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then rmdir $(tmpdir) 2>/dev/null; fi" ; \
+		fi ; \
+	done
+else
+	@for datadir in $(DATADIRS) ; do \
+		$(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory clean; \
+	done
+endif
+
+cleanit:
+ifdef WHAT
+	@if [ "$$(basename $(DATADIR))" == "espadons" ] ; then \
+		echo "$(epref) Please specify a DATADIR= or NIGHT=" 2>&1 | tee -a $(errfile) ; \
+	else \
+		echo "$(pref) Cleaning \"$(WHAT)\" in directory $(DATADIR)..." ; \
+		for what in $(WHAT) ; do \
+			case "$${what}" in \
+				prof)  what=prof;; \
+				geom)  what=geom;; \
+				aper)  what=aper;; \
+				gain)  what=gain;; \
+				biase) what=bias;; \
+				fcal)  what=fcal;; \
+				line)  what=l;; \
+				disp)  what=disp;; \
+				visual) rm -f $(visualsdir)*.*; what="";; \
+				pol|pols|polars|polarimetry) $(MAKE) -f $(makedir)Makefile cleanpol DATADIR=$(DATADIR) --no-print-directory; what="";; \
+				spectra|int|nts|intensities|intensity) $(MAKE) -f $(makedir)Makefile cleanint DATADIR=$(DATADIR) --no-print-directory; what="";; \
+				cal|cals|calibrations) rm -f $(calibrationdir)*.*; what="";; \
+				snr!snrs) what=sn;; \
+				rlist|rlists|reductionlists) rm -f $(byproductsdir)*.rlst; rm -f $(tmpdir)*.flst; what="";; \
+				tmp|tmps|temps|temp) rm -f $(tmpdir)*.*; what="";; \
+				log|logs) rm -f $(logdir)*.*; what="";; \
+				lock|locks) rm -f $(byproductsdir)Lock_$$(basename $(DATADIR)); what="";; \
+				*) ;; \
+			esac ; \
+			if [ "$${what}" != "" ] ; then \
+				rm -f $(spectradir)*$${what}$(gzip) ; \
+				rm -f $(calibrationdir)*$${what}$(gzip) ; \
+				rm -f $(visualsdir)*.${what} ; \
+				rm -f $(tmpdir)*$${what} ; \
+				rm -f $(logdir)*$${what} ; \
+			fi ; \
+		done ; \
+	fi
+endif
+
+cleanspectra:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(spectradir) ] ; then echo "$(pref) cleaning spectradir in $(spectradir)..." ; fi
+	@if [ -d $(spectradir) ] ; then rm -f $(spectradir)* ; fi
+	@if [ -d $(spectradir) ] ; then rmdir $(spectradir) 2>/dev/null ; fi
+endif
+
+cleanvisuals:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(visualsdir) ] ; then echo "$(pref) cleaning visuals in $(visualsdir)..." ; fi
+	@if [ -d $(visualsdir) ] ; then rm -f $(visualsdir)* ;  fi
+	@if [ -d $(visualsdir) ] ; then rmdir $(visualsdir) 2>/dev/null ; fi
+	@if [ -d $(byproductsdir) ] ; then rm -f $(byproductsdir)*dat ; fi
+	@if [ -d $(byproductsdir) ] ; then rm -f $(byproductsdir)*.gnu ; fi
+endif
+
+cleantmp:
+	@for machine in $(MACHINES) ; do \
+		if [ "$${machine}" == "$${HOSTNAME}" ] ; then \
+			if [ -d $(tmpdir) ] ; then echo "$(pref) cleaning $${machine} $(tmpdir)..." ; fi ; \
+			if [ -d $(tmpdir) ] ; then rm -f $(tmpdir)* ; fi ; \
+			if [ -d $(tmpdir) ] ; then rmdir $(tmpdir) 2>/dev/null ; fi ; \
+		else \
+			$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then echo \"$(pref) cleaning $${machine} $(tmpdir)...\" ; fi" ; \
+			$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then rm -f $(tmpdir)* ; fi" ; \
+			$(remoteshell) $${machine} "if [ -d $(tmpdir) ] ; then rmdir $(tmpdir) ; fi" ; \
+		fi ; \
+	done
+
+cleanlogs: 
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(logdir) ] ; then echo "$(pref) cleaning logs $(logdir)..." ; fi
+	@if [ -d $(logdir) ] ; then rm -f $(logdir)* ; fi
+	@if [ -d $(logdir) ] ; then rmdir $(logdir) ; fi
+endif
+
+cleancals:
+ifneq ($(DATADIR),$(queuedir)/)
+	@if [ -d $(calibrationdir) ] ; then echo "$(pref) cleaning calibrations in $(calibrationdir)..." ; fi
+	@if [ -d $(calibrationdir) ] ; then rm -f $(calibrationdir)* ; fi
+	@if [ -d $(calibrationdir) ] ; then rmdir $(calibrationdir) ; fi
+	@if [ -d $(calibrationdir) ] ; then rmdir $(calibrationdir) 2>/dev/null ; fi
+endif
+
+cleanbadpix cleanbadpixelmask:
+	@if [ -d $(configdir) ] ; then echo "$(pref) cleaning bad pixel masks in $(configdir)..." ; fi
+	@if [ -d $(configdir) ] ; then rm -f $(configdir)badpix*.$(FITS)* ; fi
+
+clean%:
+	@echo "$(epref)Unknown clean target \"$@\"."
+	@echo "$(pref)The clean targets are:"
+	@echo "$(pref) clean cleancals cleanrlist(s) cleanalltargets cleantmp cleanapproved cleanprocessed cleanvisuals cleanbyproducts cleanallproducts cleanquicklook cleananalyses"
+	@echo "$(pref) cleanbadpix cleanlogs cleansnr cleanlines cleanaper cleangeom cleanwcal cleandisp cleanprof cleantell cleanrvel cleanfcal"
+	@echo "$(pref) cleansemester SEMESTER=<semester>"
+	@echo "$(pref) cleanit WHAT=<suffix>"
+
+#########################################################################################
+# unlock a night directory, typically after a user started a reduction and aborted
+# leaving the directory locked. Locking prevents two or more users from trying to
+# reduce the same data at the same time.
+#########################################################################################
+unlock:
+	@if [[ "$(DATADIRS)" != "" ]] ; then \
+		for datadir in $(DATADIRS) ; do \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile DATADIRS= DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --jobs --no-print-directory unlock; \
+		done ; \
+	else \
+        if [ -e $(byproductsdir)Lock_$$(basename $(DATADIR)) ] ; then \
+            rm -f $(byproductsdir)Lock_$$(basename $(DATADIR)) ; \
+        else \
+			if [ -d $(byproductsdir) ] ; then \
+				echo "$(wpref)$$(basename $(DATADIR)) is not locked." ; \
+			fi ; \
+        fi ; \
+	fi
+
+#########################################################################################
+# a special rule to figure out what defines the compiler has on this machine
+#########################################################################################
+compilerdefines:
+	@touch ./dummy.hxx
+	@cpp -dM ./dummy.hxx
+	@rm ./dummy.hxx
+
+#########################################################################################
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

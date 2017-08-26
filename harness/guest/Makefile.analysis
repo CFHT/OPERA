@@ -1,0 +1,61 @@
+#########################################################################################
+#
+# Makefile name: Makefile.analysis
+# Version: 1.0
+# Description: Analysis routines
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_analysis_espadons
+#/// \brief Collaborators may include their analysis targets here.
+#/// \note This version implements OLAPA as well as EEV1 modes
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# Create new analysis targets here. In general output should go to the
+# $(analysesdir) directory. Create a main target to be called from the
+# opera command line (like polarbinning or radialvelocitysequence).
+# And then create the odometers target using % in place of the odometer,
+# giving the product a unique extension (like .b or .rv). Usually the
+# products are gzip'd to save space and improve read/write speed.
+# opera will automatically pick up the new command. See the examples below.
+#
+#########################################################################################
+
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

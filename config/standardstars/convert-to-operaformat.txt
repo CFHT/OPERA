@@ -1,0 +1,9 @@
+cat HR1544.dat | awk '{print $1/10, $2}' > HR1544_operaFluxCal.dat
+cat HR3454.dat | awk '{print $1/10, $2}' > HR3454_operaFluxCal.dat
+cat HR4468.dat | awk '{print $1/10, $2}' > HR4468_operaFluxCal.dat
+cat HR718.dat | awk '{print $1/10, $2}' > HR718_operaFluxCal.dat
+cat HR5501.dat | awk '{print $1/10, $2}' > HR5501_operaFluxCal.dat
+cat HR7596.dat | awk '{print $1/10, $2}' > HR7596_operaFluxCal.dat
+cat HR7950.dat | awk '{print $1/10, $2}' > HR7950_operaFluxCal.dat
+cat HR8634.dat | awk '{print $1/10, $2}' > HR8634_operaFluxCal.dat
+cat HR9087.dat | awk '{print $1/10, $2}' > HR9087_operaFluxCal.dat

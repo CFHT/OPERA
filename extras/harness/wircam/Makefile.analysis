@@ -1,0 +1,1165 @@
+#########################################################################################
+#
+# Makefile name: Makefile.analysis.wircam
+# Version: 1.0
+# Description: wircam analysis functions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_analysis_wircam
+#/// \brief analysis functions
+#/// \brief Collaborators may include their analysis targets here.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+# This section is generic stuff
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+metareport:
+	@echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) $(RUNID) metadata</FONT></CENTER></H1>"; \
+	echo "<p>Metadata creation for $(RUNID) is complete." ;\
+	echo "Please review the metadata at this URL:</p>" ;\
+	urls=`$(homedir)/iiwi21 $(RUNID) url` ; \
+	for url in $${urls} ; do \
+		echo "<p><a href=$${url}>$${url}</a></p>" ;\
+	done; \
+	magics=`$(bindir)wirmagic --magic $(RUNID) | tail -1` ; \
+	for magic in $${magics} ; do \
+		if [[ -e /data/limu/share_pi/$${magic}/summary.txt ]] ;  then \
+			echo "<H2><P ALIGN=CENTER>Summary</P></H2>" ; \
+			echo "<P ALIGN=CENTER><TABLE bgcolor=PowderBlue border=2>"; \
+			((linecount=0)) ; \
+			cat /data/limu/share_pi/$${magic}/summary.txt | while read line ; \
+			do \
+				if (( linecount == 0 )) ; then \
+					echo "<THEAD bgcolor=#CCFFCC><font size=+2><b>"; \
+					echo "$${line}" | sed -e 's:^:<td>:' -e 's:|:</td><td>:'g -e 's:$$$$:</td>:' ; \
+					echo "</b></font></THEAD>"; \
+				elif (( linecount%2 )) ; \
+				then \
+					echo "<TR bgcolor=Linen>"; \
+					echo "$${line}" | sed -e 's:^:<td>:' -e 's:|:</td><td>:'g -e 's:$$$$:</td>:' ; \
+					echo "</TR>"; \
+				else \
+					echo "<TR bgcolor=LightCyan>"; \
+					echo "$${line}" | sed -e 's:^:<td>:' -e 's:|:</td><td>:'g -e 's:$$$$:</td>:' ; \
+					echo "</TR>"; \
+				fi ; \
+				((linecount++)) ; \
+			done ; \
+			echo "</TABLE></P>"; \
+		fi ; \
+		if [[ -s /data/limu/share_pi/$${magic}/missing_list ]] ;  then \
+			echo "<H2><P ALIGN=CENTER>Missing Files</P></H2><P ALIGN=CENTER><pre>" ; \
+			cat /data/limu/share_pi/$${magic}/missing_list ; \
+			echo "</pre></P>" ; \
+		fi ; \
+		if [[ -s /data/limu/share_pi/$${magic}/failed_list ]] ;  then \
+			echo "<H2><P ALIGN=CENTER>Failures</P></H2><P ALIGN=CENTER><pre>" ; \
+			cat /data/limu/share_pi/$${magic}/failed_list ; \
+			echo "</pre></P>" ; \
+		fi ; \
+	done
+
+mailmeta:
+ifdef RUNID
+	@start=$$SECONDS; \
+	recipients=teeple ; \
+	echo "$(pref) Sending metadata report email to $$recipients." ; \
+	echo "To: $$recipients" >$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "From: wircam@cfht.hawaii.edu" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "Subject: metadata for $(RUNID) complete" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "Content-Type: text/html" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "Content-Transfer-Encoding: 7bit" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "<HTML><BODY>" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml; \
+	$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.util ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) metareport >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml; \
+	if [[ -e $(IIWI_WEB_DIR)$(RUNID).mpg ]] ; then \
+		echo "<p align=center><a target=_blank href=http://www.cfht.hawaii.edu/images/iiwi2/$(RUNID).mpg>$(RUNID)</a></p>" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ;\
+	fi ; \
+	echo "</BODY></HTML>" >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml; \
+	echo  >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml  ; \
+	echo  >>$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml  ; \
+	sendmail -i -t <$(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml; \
+	rm -f $(IIWI_ROOT_DIR)tmp/report_$(RUNID).eml ; \
+	echo "${pref} Sent night report email to $$recipients"
+else
+	@echo "$(pref) Please specify RUNID."
+endif
+
+nightreport:
+ifdef NIGHT
+	@echo "<HTML><BODY>" ; \
+	echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) Night Report $(CRUNID) </FONT></CENTER></H1>" ; \
+	echo "<P ALIGN=CENTER><TABLE bgcolor=PowderBlue border=2>" ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Movie</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR bgcolor=Linen>" ; \
+	if [[ -e $(IIWI_WEB_DIR)$(NIGHT).mpg ]] ; then \
+		echo "<TD bgcolor=LavenderBlush align=center><a target=_blank href=http://www.cfht.hawaii.edu/images/iiwi2/$(NIGHT).mpg>$(NIGHT)</a></TD>" ;\
+	else \
+		echo "<TD bgcolor=LavenderBlush align=center><i>Movie not available.</i></TD>" ; \
+	fi ; \
+	echo "</TR>" ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>KML</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD colspan=7 align=center><b><a href=http://www.cfht.hawaii.edu/images/iiwi2/WIRCam_$(CRUNID).kml target=_blank>KML $(CRUNID)</a></b></TD>" ; \
+	echo "</TR>" ; \
+	echo "</TABLE></P>" ; \
+	echo "</BODY></HTML>"
+else
+ifdef CRUNID
+	@echo "<HTML><BODY>" ; \
+	echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) Night Report $(CRUNID) </FONT></CENTER></H1>" ; \
+	echo "<H2><CENTER><FONT COLOR=DarkGray>`date`</FONT></CENTER></H2>" ; \
+	echo "<P ALIGN=CENTER><TABLE align=top bgcolor=PowderBlue border=2>" ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Movie</b></TD>" ; \
+	echo "</TR>" ; \
+	start=`$(bindir)wirenvdb "select convert(varchar, startdatetime, 101) from cqrunids where crunid = '$(CRUNID)'"`; \
+	enddt=`$(bindir)wirenvdb "select convert(varchar, enddatetime,101) from cqrunids where crunid = '$(CRUNID)'"`; \
+	endmonth=`echo $$enddt | sed -e 's:/.*::'` ;\
+	startmonth=`echo $$start | sed -e 's:/.*::'` ;\
+	endday=`echo $$enddt | sed -e 's:[0-9][0-9]/\([0-9]*\)/[0-9]*:\1:'` ;\
+	startday=`echo $$start | sed -e 's:[0-9][0-9]/\([0-9]*\)/[0-9]*:\1:'` ;\
+	echo "endday=$$endday startday=$$startday";\
+	qrunid=`${bindir}wirenvdb "select distinct qrunid from cqrunids where crunid = '$(CRUNID)'"` ; \
+	smonthname=`echo $$startmonth | sed -e 's:01:Jan:' -e 's:02:Feb:' -e 's:03:Mar:' -e 's:04:Apr:' -e 's:05:May:' -e 's:06:Jun:' -e 's:07:Jul:' -e 's:08:Aug:' -e 's:09:Sep:' -e 's:10:Oct:' -e 's:11:Nov:' -e 's:12:Dec:'`  ; \
+	emonthname=`echo $$endmonth   | sed -e 's:01:Jan:' -e 's:02:Feb:' -e 's:03:Mar:' -e 's:04:Apr:' -e 's:05:May:' -e 's:06:Jun:' -e 's:07:Jul:' -e 's:08:Aug:' -e 's:09:Sep:' -e 's:10:Oct:' -e 's:11:Nov:' -e 's:12:Dec:'`  ; \
+	startmonthint=`echo $$startmonth | awk '{printf("%d",$$1)}'` ; \
+	endmonthint=`echo $$endmonth | awk '{printf("%d",$$1)}'` ; \
+	startdayint=`echo $$startday | awk '{printf("%d",$$1)}'` ; \
+	enddayint=`echo $$endday | awk '{printf("%d",$$1)}'` ; \
+	echo "<TR bgcolor=LemonChiffon><TD colspan=2 align=center><font size=+2>$$qrunid-$${smonthname}$$startdayint -- $$qrunid-$${emonthname}$$enddayint</font></TD></TR>" ; \
+	((origenddayint=enddayint)) ; \
+	monthdays=(0 31 29 31 30 31 30 31 31 30 31 30 31); \
+	if (( endmonthint > startmonthint )) ; then \
+		enddayint=$${monthdays[$$startmonthint]} ; \
+	fi ; \
+	((m=startmonthint)); \
+	((d=startdayint)) ; \
+	((linecount=0)) ; \
+	while (( m <= endmonthint )) ; do \
+		mm=`echo $$m | awk '{printf("%02d",$$1)}'` ; \
+		mmname=`echo $$mm | sed -e 's:01:Jan:' -e 's:02:Feb:' -e 's:03:Mar:' -e 's:04:Apr:' -e 's:05:May:' -e 's:06:Jun:' -e 's:07:Jul:' -e 's:08:Aug:' -e 's:09:Sep:' -e 's:10:Oct:' -e 's:11:Nov:' -e 's:12:Dec:'`  ; \
+		while (( d <= enddayint )) ; do \
+			dd=`echo $$d | awk '{printf("%02d",$$1)}'` ; \
+			if (( linecount%2 )) ; \
+			then \
+				echo "<TR bgcolor=Linen>" ; \
+			else \
+				echo "<TR bgcolor=LightCyan>" ; \
+			fi ; \
+				echo "<TD align=center><b>$$qrunid-$${mmname}$$dd</b></TD>" ; \
+				if [[ -e $(IIWI_WEB_DIR)$$qrunid-$${mmname}$$dd.mpg ]] ; then \
+					echo "<TD align=center><a target=_blank href=http://www.cfht.hawaii.edu/images/iiwi2/$$qrunid-$${mmname}$$dd.mpg>$$qrunid-$${mmname}$$dd</a></TD>" ;\
+				else \
+					echo "<TD bgcolor=LavenderBlush align=center><i>Movie not available.</i></TD>" ; \
+				fi ; \
+			echo "</TR>" ; \
+			((d++)); \
+			((linecount++)) ; \
+		done ; \
+		((m++)); \
+		((d=1)); \
+		((enddayint=origenddayint)) ; \
+	done ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>KML</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD colspan=7 align=center><b><a href=http://www.cfht.hawaii.edu/images/iiwi2/WIRCam_$(CRUNID).kml target=_blank>KML $(CRUNID)</a></b></TD>" ; \
+	echo "</TR>" ; \
+	echo "</TABLE></P>" ; \
+	echo "</BODY></HTML>"
+else
+	@echo "<HTML><BODY>" ; \
+	echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) Night Report $(CRUNID) </FONT></CENTER></H1>" ; \
+	echo "<H2><CENTER><FONT COLOR=DarkGray>`date`</FONT></CENTER></H2>" ; \
+	echo "<P ALIGN=CENTER><TABLE bgcolor=PowderBlue border=2>" ; \
+	echo "<THEAD bgcolor=#CCFFCC>" ; \
+	echo "<TH>Night Movie</TH>" ; \
+	echo "</THEAD>" ; \
+	echo "</TR>" ; \
+	echo "<TD bgcolor=LavenderBlush colspan=2>Please specify a camera runid.</TD>" ; \
+	echo "</TR>" ; \
+	echo "</TABLE></P>" ; \
+	echo "</BODY></HTML>"
+endif
+endif
+
+#
+# caled in iiwi_morningcals to generate report of night activities
+#
+mailnightreport:
+ifdef NIGHT
+	@start=$$SECONDS; \
+	recipients="teeple,manset,kanoa,karun,chyan,eder,devost,tburd,ros" ; \
+	echo "$(pref) Sending night report email to $$recipients." ; \
+	echo "To: $$recipients" >$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "From: wircam@cfht.hawaii.edu" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "Subject: $(NIGHT) Night Report" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "Content-Type: text/html" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "Content-Transfer-Encoding: 7bit" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "<HTML><BODY>" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml
+	@echo "$(pref) Generating kml..."
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) CRUNID=$(CRUNID) kml >$(IIWI_WEB_DIR)/WIRCam_$(CRUNID).kml
+	@echo "$(pref) Generating night report..."
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.util ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) CRUNID=$(CRUNID) nightreport >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml --no-print-directory
+	@echo "$(pref) Generating html stats..."
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) CRUNID=$(CRUNID) statshtml >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml --no-print-directory
+	@cat $(IIWI_WEBSTATS_DIR)/WIRCamTwilightFlatsStatus.head >$(IIWI_WEB_DIR)/WIRCamTwilightFlatsStatus.html
+	@echo "$(pref) Generating html stats web page..."
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) CRUNID=$(CRUNID) statshtml >>$(IIWI_WEB_DIR)/WIRCamTwilightFlatsStatus.html
+	@cat $(IIWI_WEBSTATS_DIR)/WIRCamTwilightFlatsStatus.tail >>$(IIWI_WEB_DIR)/WIRCamTwilightFlatsStatus.html
+	@echo "</BODY></HTML>" >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml; \
+	echo  >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml  ; \
+	echo  >>$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml  ; \
+	sendmail -i -t <$(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml; \
+	rm -f $(IIWI_ROOT_DIR)tmp/report_$(NIGHT).eml ; \
+	echo "${pref} Sent night report email"
+else
+	@echo "$(pref) Please specify NIGHT"
+endif
+
+report:
+	@echo "<HTML><BODY>" ; \
+	echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) Report</FONT></CENTER></H1>" ; \
+	echo "<H2><CENTER><FONT COLOR=DarkGray>`date`</FONT></CENTER></H2>" ; \
+	echo "<P ALIGN=CENTER><TABLE align=top bgcolor=PowderBlue border=2>" ; \
+	echo "<THEAD bgcolor=#CCFFCC>" ; \
+	echo "<TH>Crunid</TH>" ; \
+	echo "<TH>Runid</TH>" ; \
+	echo "<TH>PI</TH>" ; \
+	echo "<TH>Object</TH>" ; \
+	echo "<TH>Raw Images</TH>" ; \
+	echo "<TH>Skysubtracted/<br>Calibrated<br>(p.fits)</TH>" ; \
+	echo "<TH>Detrended/<br>Calibrated<br>(s.fits)</TH>" ; \
+	echo "<TH>Mask<br>(m.fits)</TH>" ; \
+	echo "<TH>Weight<br>(w.fits)</TH>" ; \
+	echo "<TH>Sky<br>(y.fits)</TH>" ; \
+	echo "<TH>% Completion</TH>" ; \
+	echo "</THEAD>" ; \
+	crunid="$(CRUNID)" ; \
+	crunids="$(CRUNID)" ; \
+	runid="$(RUNID)" ; \
+	if [[ "$${runid}" != "" && "$${crunid}" == "" ]] ;  then \
+		crunids=`$(bindir)/wirenvdb "select distinct crunid from exposure where runid='$${runid}'" | tr '\n' ' '` ; \
+	fi ; \
+	if [[ "$${runid}" == "" ]] ; then \
+		runids=`$(bindir)/wirenvdb "select distinct runid from exposure where crunid='$${crunid}'"` ; \
+	else \
+		runids="$${runid}" ; \
+	fi ; \
+	((count=1)) ; \
+	((linecount=0)) ; \
+	crunidcount=`$(bindir)wircount $${crunids}` ; \
+	for crunid in $$crunids ; do \
+		for runid in $$runids ; do \
+			pi=`$(bindir)/wirph2db "select u.fname,u.lname from usr u, prg p where u.id=p.usr_id and p.runid = '$$runid'"` ; \
+			objects=`$(bindir)/wirenvdb "select distinct object from exposure where etype='OBJECT' and crunid='$${crunid}' and runid='$$runid'"` ; \
+			for object in $$objects ; do \
+				counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and crunid='$${crunid}' and runid='$$runid' and object='$$object'"` ; \
+				countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(PFITS) and object='$$object'"` ; \
+				counts=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(SFITS) and object='$$object'"` ; \
+				countm=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(MFITS) and object='$$object'"` ; \
+				countw=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(WFITS) and object='$$object'"` ; \
+				county=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(YFITS) and object='$$object'"` ; \
+				if (( linecount%2 )) ; \
+				then \
+					echo "<TR bgcolor=Linen>" ; \
+				else \
+					echo "<TR bgcolor=LightCyan>" ; \
+				fi ; \
+				echo "<TD>$$crunid</TD>" ; \
+				echo "<TD>$$runid</TD>" ; \
+				echo "<TD>$$pi</TD>" ; \
+				echo "<TD>$$object</TD>" ; \
+				echo "<TD align=center>$$counto</TD>" ; \
+				if (( countp == 0 )) ; then \
+					echo "<TD bgcolor=LightPink align=center>$$countp</TD>" ; \
+				elif (( countp < counto )) ; then \
+					echo "<TD bgcolor=LemonChiffon align=center>$$countp</TD>" ; \
+				else \
+					echo "<TD bgcolor=palegreen align=center>$$countp</TD>" ; \
+				fi ; \
+				if (( counts == 0 )) ; then \
+					echo "<TD bgcolor=LightPink align=center>$$counts</TD>" ; \
+				elif (( counts < counto )) ; then \
+					echo "<TD bgcolor=LemonChiffon align=center>$$counts</TD>" ; \
+				else \
+					echo "<TD bgcolor=palegreen align=center>$$counts</TD>" ; \
+				fi ; \
+				if (( countm == 0 )) ; then \
+					echo "<TD bgcolor=LightPink align=center>$$countm</TD>" ; \
+				elif (( countm < counto )) ; then \
+					echo "<TD bgcolor=LemonChiffon align=center>$$countm</TD>" ; \
+				else \
+					echo "<TD bgcolor=palegreen align=center>$$countm</TD>" ; \
+				fi ; \
+				if (( countw == 0 )) ; then \
+					echo "<TD bgcolor=LightPink align=center>$$countw</TD>" ; \
+				elif (( countw < counto )) ; then \
+					echo "<TD bgcolor=LemonChiffon align=center>$$countw</TD>" ; \
+				else \
+					echo "<TD bgcolor=palegreen align=center>$$countw</TD>" ; \
+				fi ; \
+				if (( county == 0 )) ; then \
+					echo "<TD bgcolor=LightPink align=center>$$county</TD>" ; \
+				elif (( county < counto )) ; then \
+					echo "<TD bgcolor=LemonChiffon align=center>$$county</TD>" ; \
+				else \
+					echo "<TD bgcolor=palegreen align=center>$$county</TD>" ; \
+				fi ; \
+				((percent=0)) ; \
+				if (( counto > 0 )) ; then \
+					percent=`echo $$countp $$counts $$counto | awk '{printf("%d",(($$1+$$2)/2*100)/$$3)}'` ; \
+					if (( percent == 100 )) ; then \
+						echo "<TD align=center bgcolor=palegreen>$$percent</TD>" ; \
+					elif (( percent < 100 && percent > 0 )) ; then \
+						echo "<TD align=center bgcolor=LemonChiffon>$$percent</TD>" ; \
+					else \
+						echo "<TD align=center bgcolor=LightPink>$$percent</TD>" ; \
+					fi ; \
+				else \
+					echo "<TD align=center bgcolor=LightPink>$$percent</TD>" ; \
+				fi ; \
+				echo "</TR>" ; \
+				((linecount++)) ; \
+			done ; \
+			counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and crunid='$${crunid}' and runid='$$runid'"` ; \
+			countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(PFITS)"` ; \
+			counts=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(SFITS)"` ; \
+			countm=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(MFITS)"` ; \
+			countw=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(WFITS)"` ; \
+			county=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$$runid' and target_ext = $(YFITS)"` ; \
+			echo "<TR bgcolor=BurlyWood>" ; \
+			echo "<TD>$$crunid</TD>" ; \
+			echo "<TD>$$runid</TD>" ; \
+			echo "<TD>$$pi</TD>" ; \
+			echo "<TD align=center>Summary</TD>" ; \
+			echo "<TD align=center>$$counto</TD>" ; \
+			echo "<TD align=center>$$countp</TD>" ; \
+			echo "<TD align=center>$$counts</TD>" ; \
+			echo "<TD align=center>$$countm</TD>" ; \
+			echo "<TD align=center>$$countw</TD>" ; \
+			echo "<TD align=center>$$county</TD>" ; \
+			((percent=0)) ; \
+			if (( counto > 0 )) ; then \
+				percent=`echo $$countp $$counts $$counto | awk '{printf("%d",(($$1+$$2)/2*100)/$$3)}'` ; \
+				if (( percent == 100 )) ; then \
+					echo "<TD align=center bgcolor=palegreen>$$percent</TD>" ; \
+				elif (( percent < 100 && percent > 0 )) ; then \
+					echo "<TD align=center bgcolor=LemonChiffon>$$percent</TD>" ; \
+				else \
+					echo "<TD align=center bgcolor=LightPink>$$percent</TD>" ; \
+				fi ; \
+			else \
+				echo "<TD align=center bgcolor=LightPink>$$percent</TD>" ; \
+			fi ; \
+			echo "</TR>" ; \
+		done ; \
+		((count++)) ; \
+	done ; \
+	colspan=11 ; \
+	echo "<TR><TD COLSPAN=$$colspan width=100% align=center><B><FONT SIZE=+1>Errors</FONT></B></TD></TR>" ; \
+	runidclause="" ; \
+	if [[ "$${runid}" != "" ]] ; then \
+		runidclause="and runid='$${runid}'" ; \
+	fi ; \
+	count=`$(bindir)/wirenvdb "select count(*) from error where crunid='$${crunid}' $$runidclause and severity='ERROR'"` ; \
+	if (( count == 0 )) ; then \
+		echo "<TR bgcolor=palegreen><TD COLSPAN=$$colspan width=100% align=center>$${count}</TD></TR>" ; \
+	else \
+		echo "<TR bgcolor=Pink><TD COLSPAN=$$colspan width=100% align=center>$${count}</TD></TR>" ; \
+	fi ; \
+	echo "<TR><TD COLSPAN=$$colspan width=100% align=center><B><FONT SIZE=+1>Warnings</FONT></B></TD></TR>" ; \
+	count=`$(bindir)/wirenvdb "select count(*) from error where crunid='$${crunid}' $$runidclause and severity='WARNING'"` ; \
+	if (( count == 0 )) ; then \
+		echo "<TR bgcolor=palegreen><TD COLSPAN=$$colspan width=100% align=center>$${count}</TD></TR>" ; \
+	else \
+		echo "<TR bgcolor=LightYellow><TD COLSPAN=$$colspan width=100% align=center>$${count}</TD></TR>" ; \
+	fi ; \
+	echo "</TABLE></P>" ; \
+	echo "</BODY></HTML>"
+
+sanitycheck:
+ifdef RUNID
+ifdef CRUNID
+ifeq ($(DEBUG),1)
+	@$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --skipbadamps
+else
+	@$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --calsonly
+	@$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --products
+endif
+else
+	@echo "$(pref) Please specify a RUNID and CRUNID for sanity checking."
+endif
+else
+	@echo "$(pref) Please specify a RUNID and CRUNID for sanity checking."
+endif
+	
+quicksanitycheck:
+ifdef RUNID
+ifdef CRUNID
+	$(bindir)/iiwi_sanitycheck $(CRUNID) $(RUNID) --quickproducts
+else
+	@echo "$(pref) Please specify a RUNID and CRUNID for sanity checking."
+endif
+else
+	@echo "$(pref) Please specify a RUNID and CRUNID for sanity checking."
+endif
+	
+#########################################################################################
+#
+#	movies
+#
+#########################################################################################
+
+movie:
+	@if [[ "$(DEST)" == "" ]] ; then \
+		dest=o.fits; \
+	else \
+		dest=$(DEST) ; \
+		dest=$${dest#DEST=}; \
+	fi ; \
+	runid=$(RUNID); \
+	crunid=$(CRUNID); \
+	flags="--ratio=16 $(FLAGS) --args='-equalize' --margs='-r 4 -b 1000' --pi --name"; \
+	if [[ "$(NIGHT)" != "" ]] ; then \
+		flags="$${flags} --src=/data/$(SESSIONHOST)/wircam/$(NIGHT)"; \
+		if [[ "$(MOVIENAME)" == "" ]] ; then \
+			moviename=$(IIWI_WEB_DIR)$(NIGHT).mpg; \
+		else \
+			moviename=$(MOVIENAME) ; \
+		fi ; \
+	else \
+		if [[ "$(MOVIENAME)" == "" ]] ; then \
+			qualifier=$$(basename $${dest} .fits) ; \
+			moviename=$(IIWI_WEB_DIR)$${crunid}$${runid}$${qualifier}.mpg; \
+		else \
+			moviename=$(MOVIENAME) ; \
+		fi ; \
+	fi ; \
+	if [[ "$${crunid}" != "" || "$${runid}" != "" ]] ; then \
+		if [[ "$${dest}" == "p.fits" || "$${dest}" == "s.fits" ]] ; then \
+			adir="$(IIWI_PROCESSED_DIR)$${runid}/*$${dest}" ; \
+		else \
+			adir="$(IIWI_REDUCTION_DIR)*$${dest}" ; \
+		fi ; \
+		clause="" ; \
+		if [[ "$${crunid}" != "" && "$${runid}" != "" ]] ; then \
+			clause="crunid='$${crunid}' and runid='$${runid}'" ; \
+		fi; \
+		if [[ "$${crunid}" != ""  && "$${runid}" == "" ]] ; then \
+			echo "$(epref) Cannot do a whole camera run." ; \
+			exit 1 ; \
+		fi; \
+		if [[ "$${crunid}" == ""  && "$${runid}" != "" ]] ; then \
+			clause="runid='$${runid}'" ; \
+		fi; \
+		if [[ "$${dest}" == "o.fits" ]] ; then \
+			filenames=`$(bindir)wirenvdb "select filename from exposure where $${clause} and etype = 'OBJECT'"` ; \
+			if [[ "$${filenames}" != "" ]] ; then \
+				objects=`$(archivebindir)arlocate $${filenames}` ; \
+				if [[ "$$objects" == "" || "`echo $$objects | grep 'not.on.disk'`" != "" ]] ; then \
+					objects=$$adir ; \
+				fi ; \
+			fi ; \
+		else \
+			objects="$${adir}" ; \
+		fi ; \
+	else \
+		if [[ "$(NIGHT)" != "" ]] ; then \
+			objects="/data/$(SESSIONHOST)/wircam/$(NIGHT)/[0-9]*$${dest}" ; \
+		else \
+			objects="$(OBJECTS)" ; \
+		fi ; \
+	fi ; \
+	if [[ "$${objects}" == "" ]] ; then \
+		echo "$(epref) No images were specified to make the movie." ; \
+		exit 1 ; \
+	fi ; \
+	$(ECHO) runon konane $(bindir)iiwi_preview --output=$${moviename} "$${flags}" $${objects}
+
+# Note: the above is a pain because special libraries are needed.
+
+#########################################################################################
+#
+#	Finalization
+#
+#########################################################################################
+
+finalize:
+ifdef RUNID
+	@start=$$SECONDS; \
+	recipients=teeple ; \
+	runid="$(RUNID)" ; \
+	if [[ "$(CRUNID)" != "" ]] ; then \
+		crunids="$(CRUNID)" ; \
+	else \
+		crunids=`wirenvdb "select distinct crunid from processedimage where runid='$(RUNID)'" | tr '\n' ' '` ; \
+	fi ; \
+	((total=0)) ; \
+	grandtotal=`$(bindir)/wirenvdb "select count(*) from processedimage where runid='$(RUNID)' and _use>0"` ; \
+	for crunid in $${crunids} ; do \
+		((count=0)) ; \
+		crunidcount=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${crunid}' and runid='$(RUNID)' and _use>0"` ; \
+		adate=`date "+%Y/%m/%d %X%p"` ; \
+		$(bindir)/wirenvdb "update run set status = 'FINALIZE START', startdatetime = convert(datetime, '$$adate'), comment = 'Finalization Started $(RUNID)' where crunid = '$${crunid}'" ; \
+		echo "$(pref) Starting finalization step for $$crunid $$runid." ; \
+		cd  $(IIWI_ROOT_DIR)processed/ ; \
+		if [[ ! -d $$runid/ ]] ; then \
+			mkdir -m 777 $$runid/ ; \
+		fi ; \
+		cd - ; \
+		howmanyprocessed=`$(bindir)/wirenvdb "select count(*) from processedimage where runid='$(RUNID)' and crunid='$${crunid}' and _use>0"` ; \
+		if (( howmanyprocessed == 0 )) ; then \
+			echo "$(pref) No images to be Finalized in $$runid." ; \
+		else  \
+			$(bindir)/wirenvdb "select filename from processedimage where runid='$(RUNID)' and crunid='$${crunid}' and _use>0" >$(IIWI_ROOT_DIR)processed/$$runid/input_files ; \
+			targets="" ; \
+			((tc=0)) ; \
+			cat $(IIWI_ROOT_DIR)processed/$$runid/input_files | while read file ; \
+			do \
+				((count++)) ; \
+				((total++)) ; \
+				if [[ -e $(IIWI_PROCESSED_DIR)$$runid/$$file.fz ]] ; then \
+					printf "$(pref) %5s /%5s (%5s /%5s)) %s %s %s already exists, skipping... (do a cleandist to remove it)\n" $$count $$crunidcount $$total $$grandtotal $$crunid $$runid $${file}.fz ; \
+				else \
+					printf "$(pref) %5s /%5s (%5s /%5s)) %s %s %s\n" $$count $$crunidcount $$total $$grandtotal $$crunid $$runid $$file; \
+					targets=`$(bindir)/wirappend $$file.fz "$$targets"` ; \
+					((tc++)) ; \
+				fi ; \
+				if (( tc >= 256 || count == crunidcount )) ; then \
+					if (( tc != 0 )) ; then \
+						echo "$(pref) Packing $${tc} images..." ; \
+						$(ECHO) $(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) FILTERS="" TARGETS="$$targets" CRUNID=$$crunid RUNID=$$runid VERSION=$(VERSION) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs --no-print-directory ; \
+						targets="" ; \
+						((tc=0)); \
+					fi ; \
+				fi ; \
+			done ; \
+			echo "$(pref) Finalization step for $$crunid $$runid complete." ; \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			$(bindir)/wirenvdb "update run set status = 'FINALIZE COMPLETE', enddatetime = convert(datetime, '$$adate'), comment = 'Finalization Complete $(RUNID)' where crunid = '$${crunid}'" ; \
+		fi ; \
+	done ; \
+	if (( howmanyprocessed > 0 )) ; then \
+		rm -f $(IIWI_ROOT_DIR)processed/$$runid/input_files ; \
+		echo "$(pref) Starting metadata creation..." ; \
+		rm -f /data/konane2/spool/$${runid}/missing_list ; \
+		lrunid=`echo $${runid} | tr [:upper:] [:lower:]` ; \
+		echo "$(pref) Starting metadata creation for $${lrunid}..." ; \
+		runon konane $(archivebindir)WC_adh -i $${lrunid} ; \
+		if (( $$? != 0 )) ; then \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('', '','ERROR','$(CRUNID)','$${lrunid}','metadata failed.')" ; \
+		fi ; \
+		if [[ -s /data/konane2/spool/$${runid}/missing_list ]] ; then \
+			mcount=`cat /data/konane2/spool/$${runid}/missing_list | wc -l` ; \
+			echo "$(pref) metadata found $$mcount missing odometers..." ; \
+			cat /data/konane2/spool/$${runid}/missing_list ; \
+		fi ; \
+		echo "$(pref) Sending report to $$recipients." ; \
+		echo "To: teeple" >$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo "From: wircam@cfht.hawaii.edu" >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo "Subject: Finalization for $$runid complete." >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo "Content-Type: text/html" >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo "Content-Transfer-Encoding: 7bit" >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		echo >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ; \
+		$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.util ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$$runid report >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml ;\
+		echo  >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml  ; \
+		echo  >>$(IIWI_ROOT_DIR)tmp/report_$$runid.eml  ; \
+		sendmail -i -t <$(IIWI_ROOT_DIR)tmp/report_$$runid.eml; \
+		rm -f $(IIWI_ROOT_DIR)tmp/report_$$runid.eml; \
+	fi ; \
+	echo "$(pref) Finalization time for $$grandtotal images in $$runid $(deltat)."
+else
+	@echo "$(pref) Please specify a RUNID for finalization."
+endif
+
+verify:
+ifdef CRUNID
+ifdef RUNID
+	@echo "$(pref) Verifying $(RUNID) $(CRUNID)." ; \
+	filenames=`$(bindir)wirenvdb "select filename from exposure where crunid='$(CRUNID)' and runid='$(RUNID)' and etype = 'OBJECT'"` ; \
+	((errcount=0)) ; \
+	((count=0)) ; \
+	for filename in $${filenames} ; do \
+		object=`$(archivebindir)arlocate $${filename}` ; \
+		if [[ "$$object" != "not.on.disk" ]] ; then \
+			fitsverify -q -e $${object} &> /dev/null; \
+			if (( $$? != 0 )) ; then \
+				fitsverify $${object} ; \
+				((errcount++)) ; \
+			fi ; \
+		else \
+			echo "${pref} $${filename} $${object}" ; \
+		fi ; \
+		((count++)) ; \
+	done ; \
+	echo "$(pref) $${errcount} failures in $${count} files."
+else
+	@echo "$(pref) Please specify a RUNID to verify."
+endif
+else
+	@echo "$(pref) Please specify a CRUNID to verify."
+endif
+
+#########################################################################################
+# Master Dark plotting
+# Three types:
+# 1. TYPE=series (default) plots all slices for all images where x = slice
+# 2. TYPE=etime median collapsed graph where x = etime
+# 3. TYPE=date median collapsed graph where x = date
+# 4. TYPE=flats median collapsed graph where x = extension (chip)
+#
+# opera DATADIR=... instrument=wircam TYPE=etime masterdarkanalysis -p -v
+# 
+#########################################################################################
+
+masterdarkanalysis: 
+	@start=$$SECONDS; \
+	echo "$(pref) Starting dark analysis" ; \
+	type=series; \
+	mediancollapse=0 ; \
+	if [[ "$(TYPE)" != "" ]] ; then \
+		type=$(TYPE) ; \
+	fi ; \
+	if [[ "$${type}" != "series" ]] ; then \
+		mediancollapse=1 ; \
+	fi ; \
+	if [[ "$(DATADIR)" != "" ]] ; then \
+		darks=`ls $(DATADIR)/*d.fits 2>/dev/null |tr '\n' ' '` ; \
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			pargs="--plotfilename=$(IIWI_BYPRODUCTS_DIR)$@.eps --datafilename=$(IIWI_TMP_DIR)$@.pdat --scriptfilename=$(IIWI_BYPRODUCTS_DIR)$@.gnu" ; \
+		fi ; \
+		$(ECHO) $(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)wirdarkanalysis $${darks} $${pargs} --mediancollapse=$${mediancollapse} --badpixelmask=/data/wircam/badpix16_20120727HST192309_v100.fits $(optargs)" ; \
+		if [[ "$(PLOT)" != "0" ]] ; then \
+			$(MAKE) -f $(IIWI_MAKE_DIR)Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) dark$${type}.eps ; \
+		fi ; \
+		echo "$(pref) processing time $(deltat)." ; \
+	else \
+		if [[ "$(CRUNID)" == "" ]] ; then \
+			echo "$(pref) Please specify a CRUNID=... or DATADIR=..." ; \
+		else \
+			if [[ "$${type}" == "flats" ]] ; then \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)/wirdarkquery.sh $(CRUNID) >$(IIWI_TMP_DIR)$${type}.pdat" ; \
+				darklist="`$(bindir)/wirdarkquery.sh $(CRUNID) | xargs -n1 $(archivebindir)arlocate | tr '\n' ' '`" ; \
+			else \
+				darklist="`$(bindir)/wirenvdb \"select odometer from exposure where crunid='$(CRUNID)' and object='Darks'\" | xargs -n1 $(archivebindir)arlocate | tr '\n' ' '`"  ; \
+			fi ; \
+			echo "darklist = $${darklist}" ; \
+			name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and crunid='$(CRUNID)' and _use > 0"` ; \
+			if [[ "$${name_badpix}" == "" ]] ; then \
+				name_badpix=`$(bindir)/wirenvdb "select distinct filename from calibration where type='BADPIX' and _use > 0" | tail -1` ; \
+			fi ; \
+			echo "$(pref) Using bad pixel mask $$name_badpix"; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				pargs="--plotfilename=$(IIWI_BYPRODUCTS_DIR)$@.eps --datafilename=$(IIWI_TMP_DIR)$@.pdat --scriptfilename=$(IIWI_BYPRODUCTS_DIR)$@.gnu" ; \
+			fi ; \
+			$(ECHO) $(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)wirdarkanalysis $${darklist} $${pargs} --mediancollapse=$${mediancollapse} --badpixelmask=$(IIWI_CALS_BADPIX_DIR)$${name_badpix} $(optargs)" ; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				$(ECHO) $(MAKE) -f $(IIWI_MAKE_DIR)Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) dark$${type}.eps ; \
+			fi ; \
+			echo "$(pref) processing time $(deltat)." ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# prelude to all plot files 
+# written in to .gnu
+#########################################################################################
+define prelude
+			echo "################################################################" >$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "# " >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "# Plot script generated by opera for $@" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "# by $(IIWI_VERSION)" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "# " >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "set terminal postscript noenhanced color \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+			echo "set style line 1 linetype -1 linecolor rgb \"red\" linewidth 0.00001" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set style line 2 linetype -1 linecolor rgb \"green\" linewidth 0.00001" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set style line 3 linetype -1 linecolor rgb \"blue\" linewidth 0.00001" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set style line 4 linetype -1 linecolor rgb \"orange\" linewidth 0.00001" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set style line 5 linetype -1 linecolor rgb \"magenta\" linewidth 0.00001" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set palette rgb 33,33,10" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set datafile missing \"nan\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set output \"$(IIWI_BYPRODUCTS_DIR)$@\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set title \"Plot of $(NIGHT) $1 $${object} $(comment)\" font \"FreeSans, 18\""  >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set xlabel \"$2\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set ylabel \"$3\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set format x \"%.4f\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set format y \"%.4g\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			if [[ "$(xrange)" != "" ]] ;  then \
+				echo "set xrange [$(xrange)]" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			fi ; \
+			if [[ "$(yrange)" != "" ]] ;  then \
+				echo "set yrange [$(yrange)]" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			fi ; \
+			echo "set grid" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set key top right" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+			echo "set key box"  >>$(IIWI_BYPRODUCTS_DIR)$1.gnu
+endef
+
+#########################################################################################
+# darkseries.eps:
+# TYPE = series
+# Individual .pdats and plots for each dark
+#		rm -f $(IIWI_TMP_DIR)$${dark}.pdat ; \
+#########################################################################################
+darkseries.eps:
+	@start=$$SECONDS; \
+	file=$(basename $@) ; \
+	odometers=`cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | awk '{print $$8}' | sort | uniq` ; \
+	for odometer in $${odometers} ; do \
+		cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | grep $${odometer} >$(IIWI_TMP_DIR)$${odometer}.pdat1 ; \
+		slices=`cat <$(IIWI_TMP_DIR)$${odometer}.pdat1 | awk '{print $$3}' | uniq | tail -1`; \
+		awk "{print; if (FNR%$$slices==0) printf(\"\n\n\");}" $(IIWI_TMP_DIR)$${odometer}.pdat1 >$(IIWI_TMP_DIR)$${odometer}.pdat ; \
+		rm -f $(IIWI_TMP_DIR)$${odometer}.pdat1 ; \
+		$(MAKE) -f $(IIWI_MAKE_DIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) $${odometer}.s.eps ; \
+		if [[ "$(I)" != "" ]] ; then \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(IIWI_BYPRODUCTS_DIR)$${odometer}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(IIWI_BYPRODUCTS_DIR)$${odometer}.gnu"  ; \
+		fi ; \
+	done
+
+#########################################################################################
+# darkflats.eps:
+# TYPE = flats 
+# A series of darks with and without flats
+# One .pdat and one plot for each expsoure time, line for with flats = one colour, 
+# without flats = different colour
+#
+# .pdats have form: all data (all extensions) for with flat, one space between each dark,
+# then two spaces, then all data (all extensions) for without flat, one space between
+# each dark
+#
+# Want to make a .pdat for each etime that contains the odometers in order of chip 1, 2,
+# 3, 4, next odometer.
+# 
+# - sort out etimes
+# - make temporary {file}_$${etime}.pdat1 that contains all of the data for that etime
+# - check that there is more than one odometer in this
+# - if more than one odometer, check if it is with or without a flat
+# - organize by with or without flat, while keeping all chips for one odometer together
+# - groups of with chip or without chip, one space in between each odometer, two spaces 
+#   between the two groups
+#
+#########################################################################################
+darkflats.eps:
+	@start=$$SECONDS; \
+	file=$(basename $@) ; \
+	etimes=`cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | awk '{print $$7}' | sort | uniq` ; \
+	rm -f $(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+	for etime in $${etimes} ; do \
+		echo ; \
+		echo "Makefile.analysis: darkflats.eps: etime = $${etime}" ; \
+		cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | grep "^[0-9]* [0-9]* [0-9]* [-0-9\.]* [-0-9\.]* [-0-9\.]* $${etime} " >$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 ; \
+		odometers=`cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | awk '{print $$8}' | sort | uniq` ; \
+		if (( `echo "$${odometers}" | wc -l` > 1 )) ; then \
+			lista="" ; \
+			listb="" ; \
+			for odometer in $${odometers} ; do \
+				which="a" ; \
+				exec 4< $(IIWI_TMP_DIR)flats.pdat ; \
+				while read line <&4 ; \
+				do \
+					if [[ "$${line}" == "" ]] ; then \
+						which="b" ; \
+					fi ; \
+					if [[ "$${line}" == "$${odometer}" ]] ; then \
+						if [[ "$${which}" == "a" ]] ; then \
+							lista="$${lista} $${odometer}"; \
+						else \
+							listb="$${listb} $${odometer}"; \
+						fi ; \
+					fi ; \
+				done ; \
+				exec 4>&- ; \
+			done ; \
+			echo "lista = $${lista}" ; \
+			echo "listb = $${listb}" ; \
+			if [[ "$${lista}" != "" && "$${listb}" != "" ]] ; then \
+				echo "Makefile.analysis: darkflats.eps: etime $${etime}s found with and without flats..." ; \
+				echo "Makefile.analysis: darkflats.eps: Making pdat for etime $${etime}s." ; \
+				for odometer in $${lista} ; do \
+					cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | grep $${odometer} >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+					echo >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+				done ; \
+				echo >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+				for odometer in $${listb} ; do \
+					cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | grep $${odometer} >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+					echo >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+				done ; \
+				rm -f $(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 ; \
+				$(MAKE) -f $(IIWI_MAKE_DIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) $${file}_$${etime}.f.eps ; \
+				if [[ "$(I)" != "" ]] ; then \
+					$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(IIWI_BYPRODUCTS_DIR)$${file}_$${etime}.gnu" ; \
+				else \
+					$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(IIWI_BYPRODUCTS_DIR)$${file}_$${etime}.gnu" ; \
+				fi ; \
+			else \
+				echo "Makefile.analysis: darkflats.eps: etime $${etime}s not found for without flat, no comparison to be made." ; \
+			fi ; \
+		else \
+			echo "Makefile.analysis: darkflats.eps: Only one odometer found for etime $${etime}s, no plot to be made." ; \
+		fi ; \
+		rm -f $(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 ; \
+	done
+
+#########################################################################################
+# darketime.eps:
+# TYPE = etime
+# A sequence of darks plotted on one graph over exposure time
+# One .pdat and one plot for all darks in a run, x-axis is etime, plots points
+#########################################################################################
+darketime.eps:
+	@start=$$SECONDS; \
+	file=$(basename $@) ; \
+	extensions=`cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | awk '{print $$2}' | sort | uniq` ; \
+	rm -f $(IIWI_TMP_DIR)$${file}.pdat ; \
+	for extension in $${extensions} ; do \
+		cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | grep "^[0-9]* $${extension} " >>$(IIWI_TMP_DIR)$${file}.pdat ; \
+		echo >>$(IIWI_TMP_DIR)$${file}.pdat ; \
+		echo >>$(IIWI_TMP_DIR)$${file}.pdat ; \
+	done ; \
+	$(MAKE) -f $(IIWI_MAKE_DIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) $${file}.t.eps ; \
+	if [[ "$(I)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(IIWI_BYPRODUCTS_DIR)$${file}.gnu"  ; \
+	else \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(IIWI_BYPRODUCTS_DIR)$${file}.gnu"  ; \
+	fi
+
+#########################################################################################
+# darkdate.eps:
+# TYPE = date
+# A sequence of darks plotted on multiple graphs, one .pdat and one plot per etime,
+# x-axis is etime
+#########################################################################################
+darkdate.eps:
+	@start=$$SECONDS; \
+	file=$(basename $@) ; \
+	etimes=`cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | awk '{print $$7}' | sort | uniq` ; \
+	for etime in $${etimes} ; do \
+		cat <$(IIWI_TMP_DIR)masterdarkanalysis.pdat | grep "^[0-9]* [0-9]* [0-9]* [-0-9\.]* [-0-9\.]* [-0-9\.]* $${etime} " >$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 ; \
+		odometers=`cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | awk '{print $$8}' | sort | uniq` ; \
+		if (( `echo "$${odometers}" | wc -l` > 1 )) ; then \
+			extensions=`cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | awk '{print $$2}' | sort | uniq`; \
+			rm -f $(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+			for extension in $${extensions} ; do \
+				cat <$(IIWI_TMP_DIR)$${file}_$${etime}.pdat1 | grep "^[0-9]* $${extension} " >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+				echo >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+				echo >>$(IIWI_TMP_DIR)$${file}_$${etime}.pdat ; \
+			done ; \
+			$(MAKE) -f $(IIWI_MAKE_DIR)/Makefile ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) DATADIR=$(DATADIR) $${file}_$${etime}.d.eps ; \
+			if [[ "$(I)" != "" ]] ; then \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(IIWI_BYPRODUCTS_DIR)$${file}_$${etime}.gnu"  ; \
+			else \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(IIWI_BYPRODUCTS_DIR)$${file}_$${etime}.gnu"  ; \
+			fi ; \
+		else \
+			echo "Makefile.analysis: darkdate.eps: Only one odometer found for etime $${etime} s" ; \
+		fi ; \
+	done
+
+#########################################################################################
+# darks3d.eps: 
+# TYPE = series
+# Create a 3D plot out of all of the data
+#########################################################################################
+darks3d.eps: 
+	@start=$$SECONDS; \
+	echo "$(pref) Starting 3d darks plot" ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "################# Master Dark Analysis ###################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "# counter extension slice mean median sigma exptime odometer mediansigma #" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "#   1		 	2	    3	 4	 	5	  6	  	7		 8			9	   #" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "reset" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "unset key" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set xlabel \"Slice\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set ylabel \"Extension\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set zlabel \"Median/Image\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set ytics 1,1,4" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set terminal postscript enhanced color solid lw 1.5 \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "set output \"masterdarkanalysis.eps\"" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu; \
+	echo "set hidden3d" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "splot \"masterdarkanalysis.pdat\" using 4 with lines" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "#set terminal x11" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "#set output" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "#replot" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "$(pref) processing time $(deltat)."
+
+#########################################################################################
+# %.f.eps:
+# TYPE = flats
+# Create a 2D plot out of all of the flats/noflats data - uses median collapsed cubes
+# One plot per exposure time, with flats = one colour, without flats = a different colour
+#########################################################################################
+%.f.eps:
+	@start=$$SECONDS; \
+	etime=`echo $* | sed -e 's:darkflats_::'` ; \
+	echo "flats/noflats odometers are in $(FLATS)" ; \
+	$(call prelude,$*,'','') ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "################# Master Dark Analysis ###########################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# counter extension slice mean median sigma exptime filename mediansigma		   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#   1		 	2	    3	  4	 	5	  6	  	7		 8			9			   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# Creates plots of median, mean, and sigma vs odometer(date) for each WIRCam chip#" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# Compares darks taken right after flats and without flats					   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "reset" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set terminal postscript enhanced color solid lw 1.5 \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set output \"$(IIWI_BYPRODUCTS_DIR)$*.eps\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key on" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key font \",15\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key box" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key height 1.5" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key at screen 0.85, 0.35" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set multiplot layout 2, 2 title \"WIRCam Analysis - With Flats vs Without Flats, etime: $${etime}s \" font \",25\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xtics 1,1,4" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 1: Mean vs Extension (chip)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xlabel \"Extension (chip)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xtics font \",12\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Mean\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Mean as a function of extension\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 2:4 with lines title \"With Flats\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 2:4 with lines title \"Without Flats\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 2: Median vs Extension (chip)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Median\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Median as a function of extension\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 2:5 with lines title \"With Flats\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 2:5 with lines title \"Without Flats\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 3: Sigma vs Extension (chip)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Sigma\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Sigma as a function of extension\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 2:6 with lines title \"With Flats\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 2:6 with lines title \"Without Flats\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#####" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset multiplot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set terminal x11" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set output" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#replot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu
+
+#########################################################################################
+# %.s.eps:
+# TYPE = series
+# Create a 2D plot out of all of the data - uses raw cubes
+#########################################################################################
+%.s.eps:
+	@start=$$SECONDS; \
+	$(call prelude,$*,Slice,'') ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "################# Master Dark Analysis ###################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "# counter extension slice mean median sigma exptime odometer mediansigma #" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "#   1		 	2	    3	 4	 	5	  6	  	7		 8			9	   #" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$1.gnu ; \
+	echo "reset" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set terminal postscript enhanced color solid lw 1.5 \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set output \"$(IIWI_BYPRODUCTS_DIR)$*.eps\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key on" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key font \",15\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key box" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key height 1.5" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key at screen 0.85, 0.35" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set multiplot layout 2, 2 title \"WIRCam Analysis - Dark $*\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xtics 1,1,15" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 1: Mean vs Slice" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xlabel \"Slice\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Mean\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Mean as a function of slice\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 3:4 with lines linestyle 1 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 3:4 with lines linestyle 2 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 3:4 with lines linestyle 3 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 3:4 with lines linestyle 4 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 2: Median vs Slice" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Median\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Median as a function of slice\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 3:5 with lines linestyle 1 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 3:5 with lines linestyle 2 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 3:5 with lines linestyle 3 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 3:5 with lines linestyle 4 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 3: Sigma vs Slice" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Sigma\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Sigma as a function of slice\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 3:6 with lines  linestyle 1 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 3:6 with lines linestyle 2 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 3:6 with lines linestyle 3 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 3:6 with lines linestyle 4 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#####" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset multiplot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set terminal x11" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set output" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#replot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu
+
+################################################################################################
+# %.t.eps:
+# TYPE = etime
+# Create a 2D plot out of all of the data - uses median collapsed cubes, x-axis is exposure time
+################################################################################################
+%.t.eps:
+	@start=$$SECONDS; \
+	$(call prelude,$*,Slice,'') ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "################# Master Dark Analysis ###################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# counter extension slice mean median sigma exptime filename mediansigma #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#   1		 	2	    3	  4	 	5	  6	  	7		 8			9	   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# Creates plots of median, mean, and sigma vs etime for each WIRCam chip #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##########################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "reset" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set terminal postscript enhanced color solid lw 1.5 \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set output \"$(IIWI_BYPRODUCTS_DIR)$*.eps\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key on" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key font \",15\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key box" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key height 1.5" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key at screen 0.85, 0.35" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set multiplot layout 2, 2 title \"WIRCam Analysis - ALL CHIPS vs etime\" font \",25\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 1: Mean vs exposure time" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xlabel \"Exposure Time (s)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Mean\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Mean as a function of exposure time\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 7:4 with points pointtype 7 pointsize 0.75 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 7:4 with points pointtype 7 pointsize 0.75 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 7:4 with points pointtype 7 pointsize 0.75 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 7:4 with points pointtype 7 pointsize 0.75 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 2: Median vs exposure time" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Median\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Median as a function of exposure time\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 7:5 with points pointtype 7 pointsize 0.75 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 7:5 with points pointtype 7 pointsize 0.75 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 7:5 with points pointtype 7 pointsize 0.75 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 7:5 with points pointtype 7 pointsize 0.75 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 3: Sigma vs exposure time" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Sigma\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Sigma as a function of exposure time\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 7:6 with points pointtype 7 pointsize 0.75 title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 7:6 with points pointtype 7 pointsize 0.75 title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 7:6 with points pointtype 7 pointsize 0.75 title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 7:6 with points pointtype 7 pointsize 0.75 title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#####" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset multiplot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set terminal x11" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set output" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#replot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu
+
+##################################################################################################
+# %.d.eps:
+# TYPE = date
+# Create a 2D plot out of all of the data - uses median collapsed cubes, x-axis is odometer (date)
+# $@ == darkdate_<etime>.d.eps
+# Creates one plot for each etime
+##################################################################################################
+%.d.eps:
+	@start=$$SECONDS; \
+	etime=`echo $* | sed -e 's:darkdate_::'` ; \
+	$(call prelude,$*,Odometer,'') ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "################# Master Dark Analysis ###########################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# counter extension slice mean median sigma exptime filename mediansigma		   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#   1		 	2	    3	  4	 	5	  6	  	7		 8			9			   #" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "# Creates plots of median, mean, and sigma vs odometer(date) for each WIRCam chip#" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##################################################################################" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "reset" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set terminal postscript enhanced color solid lw 1.5 \"Helvetica\" 14" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set output \"$(IIWI_BYPRODUCTS_DIR)$*.eps\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key on" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key font \",15\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key box" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key height 1.5" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set key at screen 0.85, 0.35" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set multiplot layout 2, 2 title \"WIRCam Analysis - ALL CHIPS, etime: $${etime} \" font \",25\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 1: Mean vs date (odometer)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xlabel \"Date (odometer)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set xtics font \",7\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Mean\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Mean as a function of date (odometer)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 8:4 with lines title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 8:4 with lines title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 8:4 with lines title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 8:4 with lines title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 2: Median vs date (odometer)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Median\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Median as a function of date (odometer)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 8:5 with lines title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 8:5 with lines title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 8:5 with lines title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 8:5 with lines title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "##### Plot 3: Sigma vs date (odometer)" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset ylabel" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set ylabel \"Sigma\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "set title \"Sigma as a function of date (odometer)\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "plot \"$(IIWI_TMP_DIR)$*.pdat\" index 0 using 8:6 with lines title \"Chip 1\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 1 using 8:6 with lines title \"Chip 2\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 2 using 8:6 with lines title \"Chip 3\",\\" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "\"$(IIWI_TMP_DIR)$*.pdat\" index 3 using 8:6 with lines title \"Chip 4\"" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#####" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "unset multiplot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set terminal x11" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#set output" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu ; \
+	echo "#replot" >>$(IIWI_BYPRODUCTS_DIR)$*.gnu
+
+cleandarkanalysis:
+	@rm -f $(IIWI_TMP_DIR)/*
+	@rm -f $(IIWI_BYPRODUCTS_DIR)[0-9]*.gnu
+	@rm -f $(IIWI_BYPRODUCTS_DIR)[0-9]*.eps
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

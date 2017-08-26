@@ -1,0 +1,3 @@
+## List of spectral regions to calculate cross-correlation for RV measurements
+## By Eder Martioli - LNA Jan 26, 2015
+750 900

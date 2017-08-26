@@ -1,0 +1,141 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+
+#########################################################################################
+#
+#  iiwi-2.0 general envdb query
+#
+#  Teeple April 2009
+#
+#  
+#########################################################################################
+#. /apps/sybase/local/etc/sybase_env.sh
+# sqsh -U iiwi -P iiwiiiwi -S envdb -D iiwi
+#sp_help
+#go
+#
+#database connection  info:
+#
+#linux host: envdb
+#sybase server: envdb
+#database: iiwi
+#user: iiwi
+#pw: iiwiiiwi 
+#
+#########################################################################################
+# calibration     dbo             user table
+#	 Column_name     Type            Length      Prec Scale Nulls Default_name    Rule_name       Access_Rule_name               Identity
+#	 --------------- --------------- ----------- ---- ----- ----- --------------- --------------- ------------------------------ --------
+#	 startdatetime   datetime                  8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 enddatetime     datetime                  8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 crunid          varchar                  10 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 filter          varchar                  12 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 type            varchar                  12 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 etime           float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 filename        varchar                  24 NULL  NULL     1 NULL            NULL            NULL                                  0
+#########################################################################################
+# cqrunids        dbo             user table
+#	 Column_name     Type            Length      Prec Scale Nulls Default_name    Rule_name       Access_Rule_name               Identity
+#	 --------------- --------------- ----------- ---- ----- ----- --------------- --------------- ------------------------------ --------
+#	 startdatetime   datetime                  8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 enddatetime     datetime                  8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 qrunid          varchar                  10 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 crunid          varchar                  10 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 instrument      varchar                  24 NULL  NULL     1 NULL            NULL            NULL                                  0
+#########################################################################################
+# exposure        dbo             user table
+#	 Column_name                    Type                           Length      Prec Scale Nulls Default_name                   Rule_name                      Access_Rule_name               Identity
+#	 ------------------------------ ------------------------------ ----------- ---- ----- ----- ------------------------------ ------------------------------ ------------------------------ --------
+#	 odometer                       int                                  	 4 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 filename                       varchar                                  5 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 semester                       varchar                                  4 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 mydatetime                     datetime                                 8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 object                         varchar                                 24 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 plaintext_object               varchar                                 24 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 runid                          varchar                                 10 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 crunid                         varchar                                 10 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 dpi                            smallint                                 2 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 dpn                            smallint                                 2 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 d_ra                           varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 d_dec                          varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 ra                             varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 dec                            varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 target_type                    varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 filter                         varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 mdcoords                       int                                      4 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 etype                          varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 slices                         smallint                                 2 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 airmass                        float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 etime                          float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 sky_med0                       float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 sky_med1                       float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 sky_med2                       float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 sky_med3                       float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#########################################################################################
+# iiwi_preproc    dbo             user table
+#	 Column_name     Type            Length      Prec Scale Nulls Default_name    Rule_name       Access_Rule_name               Identity
+#	 --------------- --------------- ----------- ---- ----- ----- --------------- --------------- ------------------------------ --------
+#	 odometer        int                       4 NULL  NULL     0 NULL            NULL            NULL                                  0
+#	 slice           int                       4 NULL  NULL     0 NULL            NULL            NULL                                  0
+#	 image_type      varchar                   8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 runid           char                      6 NULL  NULL     1 NULL            NULL            NULL                                  0
+#########################################################################################
+# processing      dbo             user table
+#	 Column_name                    Type                           Length      Prec Scale Nulls Default_name                   Rule_name                      Access_Rule_name               Identity
+#	 ------------------------------ ------------------------------ ----------- ---- ----- ----- ------------------------------ ------------------------------ ------------------------------ --------
+#	 filename                       varchar                                 24 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 runid                          varchar                                 10 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 object                         varchar                                 24 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 filter                         varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 mindp                          int                                      4 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 maxtime                        float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 dpradius                       float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 rejcurr                        float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 crosstalk                      float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 gwincrosstalk                  float                                    8 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 skymask                        varchar                                 24 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#	 observing_strategy             varchar                                 12 NULL  NULL     1 NULL                           NULL                           NULL                                  0
+#########################################################################################
+# zeropoint       dbo             user table
+#	 Column_name     Type            Length      Prec Scale Nulls Default_name    Rule_name       Access_Rule_name               Identity
+#	 --------------- --------------- ----------- ---- ----- ----- --------------- --------------- ------------------------------ --------
+#	 crunid          varchar                  10 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 filter          varchar                  12 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp              float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_err          float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_wonlc        float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext1         float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext1_err     float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext2         float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext2_err     float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext3         float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext3_err     float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext4         float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 zp_ext4_err     float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#	 gain            float                     8 NULL  NULL     1 NULL            NULL            NULL                                  0
+#
+#########################################################################################
+#
+if {[llength $argv] < 1} {
+   puts "wirenvdb: send a direct query to the env database. e.g."
+	puts "	dbq \"select * from cqrunids where instrument='wircam'\""
+   exit 1
+}
+source /cfht/lib/syblib
+set usr "iiwi"
+set pass "iiwiiiwi"
+set query [lindex $argv 0]
+set db [sybconnect $usr $pass moka iiwi]
+sybuse $db iiwi 
+if [catch {sybsql $db $query} msg] {
+	puts $sybmsg(msgtext)
+	exit 1
+}
+sybnext $db {
+	puts @0
+}
+catch {close $db}
+
+exit

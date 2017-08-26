@@ -1,0 +1,64 @@
+#########################################################################################
+#
+# Makefile name: Makefile.parameters
+# Version: 1.0
+# Description: guest parameter definitions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_parameters_espadons
+#/// \brief OPERA Instrument Parameter Definitions
+#/// \brief - all instrument-specific parameter definitions go here
+#/// \brief Parameter definitions are specific to a particular instrument.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# example guest-specific Instrument Parameter Definitions
+#
+#########################################################################################
+
+geom_limit						:= 0.2
+geomsubformat					:= 8 2040 3 4600
+maxorders						:= 44
+spectralElementHeight			:= 1
+FFTfilter_sp1					:= 1		# smooth using a low-pass FFT filters
+FFTfilter_sp2					:= 0		# smooth using a low-pass FFT filters
+FFTfilter_pol					:= 0		# smooth using a low-pass FFT filters
+FFTfilter						:= $(FFTfilter_$(MODE))		# smooth using a low-pass FFT filters
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

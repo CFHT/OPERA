@@ -1,0 +1,983 @@
+#########################################################################################
+#
+# Makefile name: Makefile.util.wircam
+# Version: 1.0
+# Description: wircam utility functions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses 
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_util_wircam
+#/// \brief utility functionss
+#/// \note This is where the multi-machine targets reside.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+# This section is generic stuff
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+
+define deltat
+	`echo "$$SECONDS - $$start" | bc | awk '{printf("%d:%02d:%02d",$$1/3600,($$1/60)%60,$$1%60)}'`
+endef
+
+define SetupForFlatsAndDarks
+	$(ECHO) clicmd @detcom.mode observing ; \
+	$(ECHO) clicmd @wircamfilter.wait ; \
+	$(ECHO) clicmd @detcom.filename odometer ; \
+	$(ECHO) clicmd @detcom.guide park ; \
+	$(ECHO) clicmd @gcoords none ; \
+	$(ECHO) clicmd @pointing off
+endef
+
+define GetMasterDark
+	name_dark=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERDARK' and etime=$${etime} and crunid='$(CRUNID)' and _use > 0"` ; \
+	if [[ "$$name_dark" == "" ]] ; then \
+		upper=`echo "$${etime#0} + ( $${etime#0}* 2 )" | bc` ; \
+		lower=`echo "$${etime#0} - ( $${etime#0}* 2 )" | bc` ; \
+		name_dark=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERDARK' and crunid='$(CRUNID)' and etime between $$lower and $$upper and _use > 0" | tail -1` ; \
+	fi ; \
+	if [[ "$$name_dark" == "" ]] ; then \
+		adate=`wirenvdb "select convert(varchar,startdatetime,100) from cqrunids where crunid='$(CRUNID)'" | sed -e 's:{::' -e 's:}::'` ; \
+		prevcrunid=`wirenvdb "select crunid from cqrunids where enddatetime < '$$adate' and instrument='wircam' order by startdatetime" | tail -1` ; \
+		echo "$(pref) Could not find a dark for $$name_raw of etime $${etime} with bounds $${lower} $${upper} in $(CRUNID), checking $${prevcrunid}." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+		name_dark=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERDARK' and etime=$${etime} and crunid='$$prevcrunid' and _use > 0"` ; \
+	fi ; \
+	if [[ "$$name_dark" == "" ]] ; then \
+		echo "$(epref) Could not find a dark for $$name_raw of etime $${etime} with bounds $${lower} $${upper}." | tee -a $(IIWI_LOG_DIR)/$$log_name; \
+	fi
+endef
+
+#########################################################################################
+# 
+# Master  twilight flat backoff algorithm
+#
+# 1. Current run twilight flat.
+# 2. Current run dome flat.
+# 3. Current run sky flat.
+# 4. Last run twilight flat
+# 5. Last run dome flat.
+# 
+#########################################################################################
+
+define GetMasterFlat
+	name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERFLAT' and filter='$${filter}' and crunid='$(CRUNID)' and _use > 0"` ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		echo "$(pref) Valid twilight flat not found in $${prevcrunid},  filter $${filter}, trying DOMEFLAT..." ; \
+		name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MADOMEFLAT' and filter='$${filter}' and crunid='$(CRUNID)' and _use > 0"` ; \
+	fi ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		adate=`wirenvdb "select convert(varchar,startdatetime,100) from cqrunids where crunid='$(CRUNID)'" | sed -e 's:{::' -e 's:}::'` ; \
+		prevcrunid=`${bindir}/wirenvdb "select crunid from cqrunids where enddatetime < '$$adate' and instrument='wircam' order by startdatetime" | tail -1` ; \
+		echo "$(pref) Valid twilight flat not found in $(CRUNID), filter $${filter}, trying $${prevcrunid}..." ; \
+		name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERFLAT' and crunid='$$prevcrunid' and filter='$${filter}' and _use > 0" | tail -1` ; \
+	fi ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		echo "$(pref) Valid twilight flat not found in $${prevcrunid},  filter $${filter}, trying DOMEFLAT..." ; \
+		name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MADOMEFLAT' and crunid='$$prevcrunid' and filter='$${filter}' and _use > 0"` ; \
+	fi ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		echo "$(pref) Valid dome flat not found in $${prevcrunid},  filter $${filter}, trying any crunid..." ; \
+		name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERFLAT' and filter='$${filter}' and _use > 0" | tail -1` ; \
+	fi ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		echo "$(epref) Valid dome flat not found for filter $${filter}." ; \
+	fi
+endef
+
+#########################################################################################
+# 
+# badpixelmask backoff algorithm
+#
+# As for the board band filters, the following list tells you the
+# coverage.  It reads, J band flat can be used for Low-OH1 and Low-OH2
+# images if their flats are not available.
+# 
+# J:  Low-OH1, Low-OH2
+# H:  CH4-on, CH4-off
+# Ks :  Brg, H2, K-cont
+#########################################################################################
+
+define GetBadPixelMask
+endef
+
+define LockFile
+	function lockfile () \
+	{ \
+		TEMPFILE="$$1.lock" ; \
+		LOCKFILE="$$1" ; \
+		test -e $$LOCKFILE && { \
+			echo 1 ; \
+			return ; \
+		} ; \
+		echo $$$$ > $$TEMPFILE >& /dev/null || { \
+			echo 1 ; \
+			return ; \
+		} ; \
+		ln $$TEMPFILE $$LOCKFILE >& /dev/null && { \
+			rm -f $$TEMPFILE ; \
+			echo 0 ; \
+			return ; \
+		} ; \
+		kill -0 `cat $$LOCKFILE` >& /dev/null && { \
+			rm -f $$TEMPFILE ; \
+			echo 1 ; \
+			return ; \
+		} ; \
+		rm -f $$TEMPFILE ; \
+		echo 1 ; \
+	} ; \
+	function unlockfile () \
+	{ \
+		TEMPFILE="$$1.lock" ; \
+		rm -f $$TEMPFILE ; \
+	}
+endef
+
+#########################################################################################
+#
+# utilities
+#
+#########################################################################################
+
+install:
+	@rm -f tmp/*
+
+installtools:
+	@install tools/* /cfht/bin/
+
+installdirs: directoriescreated
+ifndef DISK
+	@echo "$(pref) Please specify a disk i.e. DISK=polena"
+else
+	mkdir -p -m 777 $(IIWI_ROOT_DIR)
+	mkdir -p -m 777 $(IIWI_LOCK_DIR)
+endif
+
+installmaster: install
+
+uninstall:
+
+machines: .FORCE
+	@echo "$(MACHINES)" | tr ' ' '\n' | sort | uniq | tr '\n' ' '
+
+loadmap: .FORCE
+	@echo "$(MACHINES)"
+	@echo "$(LOADMAP)"
+
+errlog:
+ifdef CRUNID
+	@if [[ -e $(IIWI_LOG_DIR)/error.log ]] ; then \
+		cat $(IIWI_LOG_DIR)/error.log ; \
+	fi
+endif
+
+log:
+ifdef CRUNID
+	@if [[ -e $(IIWI_LOG_DIR)/process.log ]] ; then \
+		cat $(IIWI_LOG_DIR)/process.log ; \
+	fi
+else
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		for locked in $${locks} ; do \
+			echo "$(pref) ************ Log of $${locked}  ************" ; \
+			cat $(IIWI_LOG_DIR)/$${locked}_process.log ; \
+			echo "$(pref) ************ End of $${locked}  ************" ; \
+		done ; \
+	fi
+endif
+	@if [[ "$(OBJECTS)" != "" ]] ; then \
+		for o in $(OBJECTS) ; do \
+			b=`echo $${o} | sed -e 's:o.fits::'` ; \
+			echo "$(pref) ************ Log of $${b}.log  ************" ; \
+			cat $(IIWI_LOG_DIR)/$${b}.log ; \
+			echo "$(pref) ************ End of $${b}.log  ************" ; \
+		done ; \
+	fi
+
+status:
+	@echo "$(pref) ************************ Status ************************"
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	for locked in $${locks} ; do \
+		if [[ -e $(IIWI_LOCK_DIR)/Lock_$${locked} ]] ; then \
+			echo "$(pref)PROCESSING  `cat $(IIWI_LOCK_DIR)/Lock_$${locked}`" ; \
+		fi ; \
+	done
+	@if [[ "$(CRUNID)" != "" ]] ; then \
+		echo "$(pref)CRUNID      $(CRUNID)" ; \
+	fi
+	@if [[ "$(QRUNID)" != "" ]] ; then \
+		echo "$(pref)QRUNID      $(QRUNID)" ; \
+	fi
+	@if [[ "$(RUNID)" != "" ]] ; then \
+		echo "$(pref)RUNID       $(RUNID)" ; \
+	fi
+	@echo "$(pref)HOST        $(MACHINE)"
+	@echo -n "$(pref)SERVERS "
+	@machines=`echo $(MACHINES) | tr ' ' '\n' | sort | uniq | tr '\n' ' '` ; \
+	for m in $${machines} ; do \
+		printf "%9s" $$m ; \
+	done
+	@echo
+	@echo -n "$(pref)LOADAVGS"
+	@machines=`echo $(MACHINES) | tr ' ' '\n' | sort | uniq | tr '\n' ' '` ; \
+	for m in $${machines} ; do \
+		loadavg=`rsh $$m cat /proc/loadavg 2>/dev/null` ; \
+		printf "%9.2f" `$(bindir)/wirgetword 1 $$loadavg` ; \
+	done
+	@echo 
+	
+ifdef CRUNID	
+ifdef RUNID	
+	@echo -n "$(pref)COMPLETION"
+	@counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and runid = '$(RUNID)' and crunid='$(CRUNID)'"` ; \
+	countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$(CRUNID)' and runid = '$(RUNID)' and target_ext = $(PFITS)"` ; \
+	if (( counto == 0 )) ; then \
+		printf " %4.f%%\n" $${counto} ; \
+	else \
+		echo "$$countp $$counto" | awk '{printf(" %4.f%%\n", $$1*100.0/$$2)}' ; \
+	fi
+else
+	@echo -n "$(pref)COMPLETION"
+	@counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and crunid='$(CRUNID)'"` ; \
+	countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$(CRUNID)' and target_ext = $(PFITS)"` ; \
+	if (( counto == 0 )) ; then \
+		printf " %4.f%%\n" $${counto} ; \
+	else \
+		echo "$$countp $$counto" | awk '{printf(" %4.f%%\n", $$1*100.0/$$2)}' ; \
+	fi
+endif
+else
+ifdef RUNID	
+	@echo -n "$(pref)COMPLETION"
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		for locked in $${locks} ; do \
+			counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and crunid='$${locked}'"` ; \
+			countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${locked}' and runid='$(RUNID)' and target_ext = $(PFITS)"` ; \
+			if (( (( counto == 0 )) ; then \
+				printf "%9s %4.f%%\n" $${locked} $${counto} ; \
+			else \
+				echo "$${locked} $$countp $$counto" | awk '{printf("%9s %4.f%%\n", $$1, $$2*100.0/$$3)}' ; \
+			fi ; \
+		done ; \
+	fi
+else
+	@echo -n "$(pref)COMPLETION"
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		for locked in $${locks} ; do \
+			counto=`$(bindir)/wirenvdb "select count(*) from exposure where etype='OBJECT' and crunid='$${locked}'"` ; \
+			countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${locked}' and target_ext = $(PFITS)"` ; \
+			if (( counto == 0 )) ; then \
+				printf "%9s %4.f%%\n" $${locked} $${counto} ; \
+			else \
+				echo "$${locked} $$countp $$counto" | awk '{printf("%9s %4.f%%\n", $$1, $$2*100.0/$$3)}' ; \
+			fi ; \
+		done ; \
+	else \
+		printf "\n" ; \
+	fi
+endif
+endif
+
+	@echo -n "$(pref)THROUGHPUT"
+ifdef CRUNID	
+ifdef RUNID
+	@adate=`date "+%Y/%m/%d %X%p"` ; \
+	dt=`$(bindir)/wirenvdb "select datediff(hour,startdatetime,'$${adate}') from run where crunid='$(CRUNID)'" | tail -1` ; \
+	countp=`$(bindir)/wirenvdb "select count(*) from processedimage where runid='$(RUNID)' and crunid='$(CRUNID)' and target_ext = $(PFITS)"` ; \
+	if (( dt >= 1 )) ; then \
+		echo "$${countp} $${dt}" | awk '{printf(" %4.f images(%d)/hour(%d)\n", $$1 / $$2, $$1, $$2)}' ; \
+	else \
+		printf " %4.f images(%d)/hour(%d)\n" 0 $${countp} $${dt}; \
+	fi
+else
+	@adate=`date "+%Y/%m/%d %X%p"` ; \
+	dt=`$(bindir)/wirenvdb "select datediff(hour,startdatetime,'$${adate}') from run where crunid='$(CRUNID)'" | tail -1` ; \
+	countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$(CRUNID)' and target_ext = $(PFITS)"` ; \
+	if (( dt >= 1 )) ; then \
+		echo "$${countp} $${dt}" | awk '{printf(" %4.f images(%d)/hour(%d)\n", $$1 / $$2, $$1, $$2)}' ; \
+	else \
+		printf " %4.f images(%d)/hour(%d)\n" 0 $${countp} $${dt}; \
+	fi
+endif
+else
+ifdef RUNID
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		for locked in $${locks} ; do \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			dt=`$(bindir)/wirenvdb "select datediff(hour,startdatetime,'$${adate}') from run where crunid='$${locked}'" | tail -1` ; \
+			countp=`$(bindir)/wirenvdb "select count(*) from processedimage where runid='$(RUNID)' and crunid='$${locked}' and target_ext = $(PFITS)"` ; \
+			if (( dt >= 1 )) ; then \
+				echo "$${countp} $${dt}" | awk '{printf(" %4.f images(%d)/hour(%d)\n", $$1 / $$2, $$1, $$2)}' ; \
+			else \
+				printf " %4.f images(%d)/hour(%d)\n" 0 $${countp} $${dt}; \
+			fi
+		done ; \
+	fi
+else
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		for locked in $${locks} ; do \
+			adate=`date "+%Y/%m/%d %X%p"` ; \
+			dt=`$(bindir)/wirenvdb "select datediff(hour,startdatetime,'$${adate}') from run where crunid='$${locked}'" | tail -1` ; \
+			countp=`$(bindir)/wirenvdb "select count(*) from processedimage where crunid='$${locked}' and target_ext = $(PFITS)"` ; \
+			if (( dt >= 1 )) ; then \
+				echo "$${countp} $${dt}" | awk '{printf(" %4.f images(%d)/hour(%d)\n", $$1 / $$2, $$1, $$2)}' ; \
+			else \
+				printf " %4.f images(%d)/hour(%d)\n" 0 $${countp} $${dt}; \
+			fi ; \
+		done ; \
+	else \
+		printf "\n" ; \
+	fi
+endif
+endif
+	
+	@echo -n "$(pref)SCRIPTS "
+	@machines=`echo $(MACHINES) | tr ' ' '\n' | sort | uniq | tr '\n' ' '` ; \
+	for m in $${machines} ; do \
+		printf "%9d" `rsh $$m ps ax --cols=800 | grep 'IIWI2_STEP' | wc -l` ; \
+	done
+	@echo 
+	@echo -n "$(pref)LOCKS   "
+	@printf "%9d" `ls -l $(IIWI_REDUCTION_DIR) $(IIWI_BYPRODUCTS_DIR) | awk '{printf("%s %s\n",$$5,$$9)}' | awk '/^0/{print $$2}' | wc -l`
+	@echo 
+	@echo -n "$(pref)WAITERS "
+	@machines=`echo $(MACHINES) | tr ' ' '\n' | sort | uniq | tr '\n' ' '` ; \
+	for m in $${machines} ; do \
+		printf "%9d" `rsh $$m ps ax --cols=800 | grep 'wirwait' | wc -l` ; \
+	done
+	@echo 
+	@echo "$(pref)LOADMETRICS"
+	@echo "$(pref)`$(bindir)/iiwi_loadmetrics --view`"
+	@echo "$(pref)LOADMAP"
+	@if [[ -e $(IIWI_CONFIG_DIR)/loadmap21.txt ]] ; then \
+		echo "$(pref)`cat $(IIWI_CONFIG_DIR)/loadmap21.txt`" ; \
+	else \
+		echo "$(pref)$(MACHINES)" ; \
+		echo "$(pref)$(LOADMAP)" ; \
+	fi
+	@echo "$(pref)$(DISKMAP)"
+	@echo "$(pref)PROCESSES "
+	@machines=`echo $(MACHINES) | tr ' ' '\n' | sort | uniq | tr '\n' ' '` ; \
+	for m in $${machines} ; do \
+		echo "******** $$m:" ; \
+		rsh $$m ps ef  --cols=200 | grep 'IIWI2_STEP' | sed -e 's:.*IIWI2_STEP=\"::' -e 's:\".*::'; \
+		rsh $$m ps efx --cols=200 | grep 'iiwi_\|make\|\\_' | awk '{printf("%s\n",substr($$0,28,index($$0,"PWD=")-28))}'; \
+		echo "********" ; \
+	done
+	@echo "$(pref)DISKS   " ; \
+	for disk in $(DISKS) ; \
+	do \
+		dl=`df -k /data/$${disk}/wircam/iiwi2 | tail -1 | awk '{printf("%4s    %s",$$(NF-1),$$(NF))}'` ; \
+		echo "$(pref)            $$dl"; \
+	done
+ifdef CRUNID
+	@echo "$(pref) ************************ Files  ************************" 
+	@printf "$(pref)s.fits                 %4d\n" `ls $(IIWI_REDUCTION_DIR)/*s.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)p.fits                 %4d\n" `ls $(IIWI_REDUCTION_DIR)/*p.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)w.fits                 %4d\n" `ls $(IIWI_REDUCTION_DIR)/*w.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)m.fits                 %4d\n" `ls $(IIWI_REDUCTION_DIR)/*m.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)y.fits                 %4d\n" `ls $(IIWI_REDUCTION_DIR)/*y.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)s-uncalibrated.fits    %4d\n" `ls $(IIWI_BYPRODUCTS_DIR)/*s-uncalibrated.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)p-uncalibrated.fits    %4d\n" `ls $(IIWI_BYPRODUCTS_DIR)/*p-uncalibrated.fits 2>/dev/null | wc -l` 
+	@printf "$(pref)defaultsky.fits        %4d\n" `ls $(IIWI_CALS_DEFAULTSKIES_DIR)/defaultsky*$(CRUNID)*.fits 2>/dev/null | wc -l` 
+	@echo "$(pref) ************************ Flats  ************************"
+	@$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) PASS=1 --jobs=$(jobs) --no-print-directory flatlist 
+	@echo "$(pref) ************ Darks  ************" 
+	@etimes=`${bindir}/wirenvdb "select distinct convert(int,floor(etime+0.5)) from exposure where crunid='$(CRUNID)' and (etype='OBJECT' or etype='FLAT')" | tr '\n' ' '` ; \
+	echo "$(pref) Darks have been taken for the etimes: $$etimes" 
+	@echo "$(pref) ************************  Info  ************************" 
+	@$(homedir)iiwi21 $(CRUNID) $(RUNID) info 
+	@echo "$(pref) ************************  Run   ************************" 
+	@echo "$(pref) `$(bindir)/iiwi_dbtable run show $(CRUNID) | tail -1`"
+else
+	@locks=`ls  $(IIWI_LOCK_DIR)/Lock_* 2>/dev/null | sed -e 's:.*/::g' -e 's/Lock_//g'` ; \
+	if [[ "$${locks}" != "" ]] ; then \
+		echo "$(pref) ************************ Files  ************************" ; \
+		for locked in $${locks} ; do \
+			printf "$(pref)s.fits              $${locked} %4d\n" `echo $(IIWI_REDUCTION_DIR)/$${locked}/*s.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)p.fits              $${locked} %4d\n" `echo $(IIWI_REDUCTION_DIR)/$${locked}/*p.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)w.fits              $${locked} %4d\n" `echo $(IIWI_REDUCTION_DIR)/$${locked}/*w.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)m.fits              $${locked} %4d\n" `echo $(IIWI_REDUCTION_DIR)/$${locked}/*m.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)y.fits              $${locked} %4d\n" `echo $(IIWI_REDUCTION_DIR)/$${locked}/*y.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)s-uncalibrated.fits $${locked} %4d\n" `echo $(IIWI_BYPRODUCTS_DIR)/$${locked}/*s-uncalibrated.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)p-uncalibrated.fits $${locked} %4d\n" `echo $(IIWI_BYPRODUCTS_DIR)/$${locked}/*p-uncalibrated.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			printf "$(pref)defaultsky.fits     $${locked} %4d\n" `echo $(IIWI_CALS_DEFAULTSKIES_DIR)/defaultsky*$${locked}*.fits 2>/dev/null | sed -e s:.*/:: | tr '\n' ' ' | wc -w` ; \
+			echo "$(pref) ************************ Flats  ************************" ; \
+			$(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$${locked} QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) PASS=1 --jobs=$(jobs) --no-print-directory flatlist ; \
+			etimes=`${bindir}/wirenvdb "select distinct convert(int,floor(etime+0.5)) from exposure where crunid='$${locked}' and (etype='OBJECT' or etype='FLAT')" | tr '\n' ' '` ; \
+			echo "$(pref) ************************ Darks  ************************" ; \
+			echo "$(pref) Darks have been taken for the etimes: $$etimes" ; \
+			echo "$(pref) ************************  Info  ************************" ; \
+			$(homedir)iiwi2 $${locked} $(RUNID) info ; \
+			echo "$(pref) ************************  Run   ************************" ; \
+			echo "$(pref) `$(bindir)/iiwi_dbtable run show $${locked} | tail -1`"; \
+		done ; \
+	fi
+endif
+
+#########################################################################################
+#
+# cleanup / utilities
+#
+#########################################################################################
+
+diff:
+ifdef FILE
+ifdef DEVELOPER
+	@diff ./$(FILE) /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$(FILE)
+else
+	@diff ./$(FILE) $(iiwisrcdir)/$(FILE)
+endif
+else
+ifdef DEVELOPER
+	@for s in $(srcs) ; \
+	do \
+		if [[ ! -d ./$$s ]]  ; then \
+			if [[ "`diff ./$$s /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s`" != "" && "`diff ./$$s $(iiwisrcdir)$$s`" != ""  && "`diff /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s $(iiwisrcdir)$$s`" != "" ]]  ; then \
+				echo "*** COLLISION *** Your file $$s and $(DEVELOPER)'s source file differ from the master source" ; \
+			else \
+				if [[ "`diff ./$$s /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s`" != "" ]]  ; then \
+					if [[ ./$$s -nt /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s ]] ; then \
+						echo "Your file $$s is newer than $(DEVELOPER)'s source" ; \
+					fi ; \
+					if [[ ./$$s -ot /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s ]] ; then \
+						echo "Your file $$s is older than $(DEVELOPER)'s source" ; \
+					fi ; \
+				fi ; \
+				if [[ "`diff ./$$s $(iiwisrcdir)$$s`" != "" ]]  ; then \
+					if [[ ./$$s -nt $(iiwisrcdir)$$s ]] ; then \
+						echo "Your file $$s is newer than the master source" ; \
+					fi ; \
+					if [[ ./$$s -ot $(iiwisrcdir)$$s ]] ; then \
+						echo "Your file $$s is older than the master source" ; \
+					fi ; \
+				fi ; \
+			fi ; \
+		fi ; \
+	done
+	@m=`ls /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/` ; \
+	s=`ls .` ; \
+	for f in $$m ; do \
+		if [[ `${bindir}/wirfindword $$f $$s` == "" ]] ;  then \
+			echo "$$f exists on $(DEVELOPER)'s sources but not local." ; \
+		fi ; \
+	done ; \
+	for f in $$s ; do \
+		if [[ `${bindir}/wirfindword $$f $$m` == "" ]] ; then \
+			echo "$$f exists on the local but not $(DEVELOPER)'s sources." ; \
+		fi ; \
+	done
+	@echo "diff with $(DEVELOPER) complete."
+else
+	@for s in $(srcs) ; \
+	do \
+		if [[ ! -d ./$$s ]]  ; then \
+			if [[ "`diff ./$$s $(iiwisrcdir)$$s`" != "" ]]  ; then \
+				if [[ ./$$s -nt $(iiwisrcdir)$$s ]] ; then \
+					echo "Your file $$s is newer than the master source" ; \
+				fi ; \
+				if [[ ./$$s -ot $(iiwisrcdir)$$s ]] ; then \
+					echo "Your file $$s is older than the master source" ; \
+				fi ; \
+			fi ; \
+		fi ; \
+	done
+	@m=`ls $(iiwisrcdir)` ; \
+	s=`ls .` ; \
+	for f in $$m ; do \
+		if [[ `${bindir}/wirfindword $$f $$s` == "" ]] ;  then \
+			echo "$$f exists on the master but not local." ; \
+		fi ; \
+	done ; \
+	for f in $$s ; do \
+		if [[ `${bindir}/wirfindword $$f $$m` == "" ]] ; then \
+			echo "$$f exists on the local but not master." ; \
+		fi ; \
+	done
+	@echo "diff complete."
+endif
+endif
+	
+rsyncget get: 
+ifdef DEVELOPER
+	@for s in $(srcs) ; \
+	do \
+		if [[ ./$$s -ot /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s && ! -d ./$$s ]] ; then \
+			rsync -tuv --exclude 'RCS' /h/$(DEVELOPER)/iiwi-$(IIWI_MAJOR)/$$s ./$$s ; \
+		fi ; \
+	done ; \
+	echo "sync from $(DEVELOPER) complete."
+else
+	@for s in $(srcs) ; \
+	do \
+		if [[ ./$$s -ot $(iiwisrcdir)$$s && ! -d ./$$s ]] ; then \
+			rsync -tuv --exclude 'RCS' $(iiwisrcdir)$$s ./$$s ; \
+		fi ; \
+	done ; \
+	echo "sync down complete."
+endif
+
+rsyncput put: 
+	@for s in $(srcs) ; \
+	do \
+		if [[ ./$$s -nt $(iiwisrcdir)$$s && ! -d ./$$s ]] ; then \
+			rsync -tuv --exclude 'RCS' ./$$s $(iiwisrcdir)$$s ; \
+		fi ; \
+	done ; \
+	echo "sync up complete."
+	
+rsyncmerge merge: 
+	@for s in $(srcs) ; \
+	do \
+		if [[ "`diff ./$$s $(iiwisrcdir)$$s`" != "" ]]  ; then \
+			if [[ ./$$s -nt $(iiwisrcdir)$$s && ! -d ./$$s ]] ; then \
+				rsync -tuv --exclude 'RCS' ./$$s $(iiwisrcdir)$$s ; \
+			elif [[ ./$$s -ot $(iiwisrcdir)$$s && ! -d ./$$s ]] ; then \
+				rsync -tuv --exclude 'RCS' $(iiwisrcdir)$$s ./$$s ; \
+			fi ; \
+		fi ; \
+	done ; \
+	echo "sync merge complete."
+	
+cleanall:	cleanlogs cleandb cleantmp cleanbyproducts cleanrt cleancals cleanerrors cleantouch cleanmeta cleantargets unlock
+
+pristine:
+	@echo "${pref} Cleaning byproducts directory for $(CRUNID)"
+	@rm -rf $(IIWI_BYPRODUCTS_DIR)/*
+	@rmdir -p $(IIWI_BYPRODUCTS_DIR)
+	@echo "${pref} Cleaning reduction directory for $(CRUNID)"
+	@rm -rf $(IIWI_REDUCTION_DIR)/*
+	@rmdir -p $(IIWI_REDUCTION_DIR)
+	@echo "${pref} Cleaning tmp directory for $(CRUNID)"
+	@rm -rf $(IIWI_TMP_DIR)/*
+	@rmdir -p $(IIWI_TMP_DIR)
+	@echo "${pref} Cleaning log directory for $(CRUNID)"
+	@rm -f $(IIWI_LOG_DIR)/*
+	@rmdir -p $(IIWI_LOG_DIR)
+	@echo "${pref} Cleaning locks for $(CRUNID)"
+	@rm -f $(IIWI_LOCK_DIR)/*
+	@for machine in $(MACHINES) ; \
+	do \
+		runon $${machine} /bin/sh -c 'rm -rf $(IIWI_TMP_DIR)/*' ; \
+	done ; \
+	for disk in $(DISKS) ; \
+	do \
+		echo "${pref} Cleaning $$machine disk $$disk calibration data." ; \
+		rm -rf /data/$${disk}//wircam/iiwi2/byproducts/* ; \
+		rmdir -p /data/$${disk}//wircam/iiwi2/byproducts ; \
+		rm -rf /data/$${disk}//wircam/iiwi2/reductions/* ; \
+		rmdir -p /data/$${disk}//wircam/iiwi2/reductions ; \
+	done
+
+cleanstart: cleantmp cleantouch cleanerrors unlock
+	@echo "${pref} Cleaned $(CRUNID)/$(RUNID) and ready for reduction."
+
+cleanprocesses:
+	@for i in 1 2 3 4 ; do \
+		for m in $(MACHINES) ; do \
+			pids=`rsh $$m ps ax | grep make | awk '{print $$1}' | tr '\n' ' '` ; \
+			if [[ "$$pids" != "" ]] ; then \
+				echo "$$m kill $$pids" ; \
+				rsh -n $$m kill $$pids ; \
+			fi ; \
+			pids=`rsh $$m ps ax | grep iiwi_ | awk '{print $$1}' | tr '\n' ' '` ; \
+			if [[ "$$pids" != "" ]] ; then \
+				echo "$$m kill $$pids" ; \
+				rsh -n $$m kill $$pids ; \
+			fi ; \
+			pids=`rsh $$m ps ax | grep 'iiwi-' | awk '{print $$1}' | tr '\n' ' '` ; \
+			if [[ "$$pids" != "" ]] ; then \
+				echo "$$m kill $$pids" ; \
+				rsh -n $$m kill $$pids ; \
+			fi ; \
+			pids=`rsh $$m ps ax | grep 'IIWI2_STEP' | awk '{print $$1}' | tr '\n' ' '` ; \
+			if [[ "$$pids" != "" ]] ; then \
+				echo "$$m kill $$pids" ; \
+				rsh -n $$m kill $$pids ; \
+			fi ; \
+			pids=`rsh $$m ps ax | grep wirwait | awk '{print $$1}' | tr '\n' ' '` ; \
+			if [[ "$$pids" != "" ]] ; then \
+				echo "$$m kill $$pids" ; \
+				rsh -n $$m kill $$pids ; \
+			fi ; \
+		done ; \
+		killall runon make ; \
+	done
+
+cleandist:
+ifdef RUNID
+	@rm -f $(IIWI_PROCESSED_DIR)$(RUNID)/* ; \
+	lcrunid=`echo $(RUNID) | tr [:upper:] [:lower:]` ; \
+	rm -rf /data/konane2/spool/$$lcrunid/
+else
+	@echo "$(pref) Please specify a RUNID to clean the distribution."
+endif
+
+cleantargets: cleanlogs cleanbyproducts cleantmp cleanerrors cleantouch unlock
+ifdef CRUNID
+ifdef RUNID
+	@echo "${pref} Cleaning targets for $(CRUNID)/$(RUNID)" ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*s.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*p.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*s.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*y.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*m.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*w.fits ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*.tmp ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*.matchedcat ; \
+	rm -f $(IIWI_REDUCTION_DIR)/*.lock ; \
+	$(bindir)/wirenvdb "delete from processedimage where crunid='$(CRUNID)' and runid='$(RUNID)'" ; \
+	@echo "$(pref) Targets for $(CRUNID)/$(RUNID) cleaned."
+else
+	@echo "$(pref) Please specify a RUNID to remove targets."
+endif
+else
+	@echo "$(pref) Please specify a CRUNID to remove targets."
+endif
+	
+cleanzeropoints: cleantmp cleanerrors cleantouch
+ifdef CRUNID
+	@semester="$(SEMESTER)" ; \
+	for runid in $${semester}Q87 $${semester}Q89 ; do \
+		echo "${pref} Cleaning zeropoints for $(CRUNID)/$${runid} in semester $${semester}" ; \
+		rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_* ; \
+		rm -f $(IIWI_WEB_DIR)/zeropoint_*.jpg ; \
+		rm -f $(IIWI_WEB_DIR)/zeropoint*$(CRUNID)* ; \
+		rm -rf /data/iiwi/reductions/$(CRUNID)/$${runid}/ ; \
+		rm -rf /data/iiwi/byproducts/$(CRUNID)/$${runid}/ ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID to remove standard star products."
+endif
+
+cleanbyproducts: 
+ifdef CRUNID
+ifdef RUNID
+	@echo "${pref} Cleaning byproducts for $(CRUNID)/$(RUNID)"
+	@rm -rf $(IIWI_BYPRODUCTS_DIR)
+	@for disk in $(DISKS) ; \
+	do \
+		echo "${pref} Cleaning $$machine disk $$disk byproducts." ; \
+		rm -rf /data/$${disk}/wircam/iiwi2/byproducts/$(CRUNID)/$(RUNID)/x ; \
+	done
+	@echo "${pref} Byproducts for $(CRUNID) cleaned"
+else
+	@echo "$(pref) Please specify a RUNID to remove byproducts."
+endif
+else
+	@echo "$(pref) Please specify a CRUNID to remove byproducts."
+endif
+
+cleanup:
+ifdef CRUNID
+	@objects="$(OBJECTS)" ; \
+	if [[ "$${objects}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filename=`echo $${objects} | sed -e 's:\@::'`; \
+		objects=`cat $${filename} | tr '\n' ' '`; \
+	fi ; \
+	for object in $${objects} ; \
+	do \
+		odo=$$(basename $${object} o.fits) ; \
+		rm -f $(IIWI_BYPRODUCTS_DIR)/$${odo}* ; \
+		rm -f $(IIWI_TMP_DIR)/$${odo}* ; \
+		echo "${pref} $${odo} cleaned up." ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID to remove odometer byproducts."
+endif
+
+cleanodometer:
+ifdef CRUNID
+	@objects="$(OBJECTS)" ; \
+	if [[ "$${objects}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filename=`echo $${objects} | sed -e 's:\@::'`; \
+		objects=`cat $${filename} | tr '\n' ' '`; \
+	fi ; \
+	lcrunid=`echo $(RUNID) | tr [:upper:] [:lower:]` ; \
+	for object in $${objects} ; \
+	do \
+		odo=$$(basename $${object} o.fits) ; \
+		rm -f $(IIWI_BYPRODUCTS_DIR)/$${odo}* ; \
+		rm -f $(IIWI_TMP_DIR)/$${odo}* ; \
+		rm -f $(IIWI_REDUCTION_DIR)/$${odo}* ; \
+		rm -f $(IIWI_PROCESSED_DIR)/$(RUNID)/$${odo}* ; \
+		rm -f $(IIWI_WEB_DIR)/$${odo}* ; \
+		rm -f /data/konane2/spool/$$lcrunid/raw/$${odo}*; \
+		rm -f /data/konane2/spool/$$lcrunid/pre-sky/$${odo}*; \
+		rm -f /data/konane2/spool/$$lcrunid/detrended/$${odo}*; \
+		rm -f /data/konane2/spool/$$lcrunid/sky-construct/$${odo}*; \
+		rm -f /data/konane2/spool/$$lcrunid/weightmap/$${odo}*; \
+		rm -f /data/konane2/spool/$$lcrunid/header/$${odo}*; \
+		$(bindir)/wirenvdb "delete from processedimage where odometer=$${odo}" ; \
+		echo "${pref} $(CRUNID) $(RUNID) $${object} cleaned." ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID to remove odometer."
+endif
+
+cleantmp: directoriescreated
+ifdef CRUNID
+	@echo "${pref} Cleaning temp files..."
+	@-rm -rf $(IIWI_TMP_DIR)/
+	@-rmdir -p $(IIWI_ROOT_DIR)tmp/$(CRUNID)/$(RUNID)/ 2>/dev/null || echo -n
+	@-for machine in $(MACHINES) ; \
+	do \
+		runon $${machine} /bin/sh -c 'rm -f /tmp/iiwi2/*' ; \
+	done
+	@-rm -f $(HOME)/tmp/*.sav 2>/dev/null || echo -n ""
+	@echo "${pref} Temp files in $(IIWI_TMP_DIR) cleaned."
+else
+	@echo "$(pref) Please specify a CRUNID to clean tmp."
+endif
+
+cleanidl:
+	@rm -f $(idldir)/*.sav
+	@rm -f /tmp/*.sav* 2>/dev/null
+	@for machine in $(MACHINES) ; \
+	do \
+		runon $${machine} /bin/sh -c 'rm -f /tmp/*.sav* 2>/dev/null' ; \
+	done
+
+cleanthumbs:
+	@echo "${pref} Cleaning thumbnails."
+	@rm -f $(IIWI_WEB_DIR)/*.jpg
+	@rm -f $(IIWI_WEB_DIR)/*s-thumb.png
+	@rm -f $(IIWI_WEB_DIR)/*s.png
+	@rm -f $(IIWI_WEB_DIR)/*o-thumb.png
+	@rm -f $(IIWI_WEB_DIR)/*o.png
+	@rm -f $(IIWI_WEB_DIR)/*p-thumb.png
+	@rm -f $(IIWI_WEB_DIR)/*p.png
+	
+cleanmeta:
+ifdef RUNID
+	@lcrunid=`echo $(RUNID) | tr [:upper:] [:lower:]` ; \
+	rm -f /data/konane2/spool/$${lcrunid}/img/*
+else
+	@echo "$(pref) Please specify a RUNID."
+endif
+
+cleancals: cleandomeflats cleantwilightflats cleandarks cleanzeropoints unlock
+
+cleantwilightflats:
+ifdef CRUNID
+	@echo "${pref} Cleaning twilightflats for $(CRUNID)"
+	@rm -f $(IIWI_CALS_TWILIGHTFLATS_DIR)/twilightflat*$(CRUNID)*
+	@rm -f $(IIWI_CALS_TWILIGHTFLATS_DIR)/mastertwilightflat*$(CRUNID)*
+	@rm -f $(IIWI_WEB_DIR)/twilightflat*$(CRUNID)*
+	@rm -f $(IIWI_WEB_DIR)/mastertwilightflat*$(CRUNID)*
+	@echo "${pref} Cleaning envdb calibration tables."
+	@wirenvdb "delete from calibration where crunid='$(CRUNID)' and (type='PROCESS_FLAT' or type='MASTERFLAT' or type='TWILIGHTPLOT')"
+	@for disk in $(DISKS) ; \
+	do \
+		echo "${pref} Cleaning $$machine disk $$disk twilight flat data." ; \
+		rm -f /data/$${disk}/wircam/iiwi2/calibrations/twilightflat*$(CRUNID)* ; \
+		rm -f /data/$${disk}/wircam/iiwi2/calibrations//mastertwilightflat*$(CRUNID)* ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+cleandarks:
+ifdef CRUNID
+	@echo "${pref} Cleaning darks for $(CRUNID)"
+	@rm -f $(IIWI_CALS_DARKS_DIR)/dark*$(CRUNID)*
+	@rm -f $(IIWI_CALS_DARKS_DIR)/masterdark*$(CRUNID)*
+	@rm -f $(IIWI_WEB_DIR)/dark*$(CRUNID)*
+	@rm -f $(IIWI_WEB_DIR)/masterdark*$(CRUNID)*
+	@wirenvdb "delete from calibration where crunid='$(CRUNID)' and (type='PROCESS_DARK' or type='MASTERDARK')"
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+cleantouch: .FORCE
+ifdef CRUNID
+	@echo "${pref} Cleaning touch locks for $(CRUNID)/$(RUNID)"
+	@files=`ls $(IIWI_TMP_DIR)/*.fits $(IIWI_TMP_DIR)/*.lock 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*o.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*.lock 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*.skylist 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*.ns 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*s-uncalibrated.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_BYPRODUCTS_DIR)/*p-uncalibrated.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*.lock 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*w.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*m.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*y.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*p.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@files=`ls $(IIWI_REDUCTION_DIR)/*s.fits 2>/dev/null` ; \
+	for f in $$files ; do \
+		if [[ -e $$f && ! -s $$f ]] ; then \
+			rm -f $$f ; \
+		fi ; \
+	done
+	@echo "${pref} Touch locks for $(CRUNID) cleaned"
+else
+	@echo "$(pref) Please specify a CRUNID to remove touched byproducts."
+endif
+
+cleanerrors:
+ifdef CRUNID
+	@echo "${pref} Cleaning error table for $(CRUNID)"
+	@$(bindir)/wirenvdb "delete from error where crunid='$(CRUNID)'"
+else
+	@echo "$(pref) Please specify a CRUNID to clean errors."
+endif
+
+cleandb: cleanerrors
+ifdef CRUNID
+ifdef CRUNID
+	@echo "${pref} Cleaning calibration table for $(CRUNID)/$(RUNID)"
+	@$(bindir)/wirenvdb "delete from calibration where crunid='$(CRUNID)'"
+	@echo "${pref} Cleaning processedimage table for $(CRUNID)/$(RUNID)"
+	@$(bindir)/wirenvdb "delete from processedimage where crunid='$(CRUNID)' and runid='$(RUNID)'"
+	@echo "${pref} Cleaning run table for $(CRUNID)"
+	@$(bindir)/wirenvdb "delete from run where crunid='$(CRUNID)'"
+else
+	@echo "$(pref) Please specify a RUNID to clean db tables."
+endif
+else
+	@echo "$(pref) Please specify a CRUNID to clean db tables."
+endif
+
+cleanlogs:
+ifdef CRUNID
+ifdef RUNID
+	@echo "${pref} Cleaning logs for $(CRUNID)/$(RUNID)"
+	@rm -rf $(IIWI_LOG_DIR)/
+endif
+endif
+	
+cleanrt:
+	@rt_dir="/data/$(SESSIONHOST)/wircam/realtime/rt_processed" ; \
+	if [[ -d $$rt_dir ]] ; then \
+		rm -rf $$rt_dir/ ; \
+		mkdir -p -m 777 $$rt_dir/ ; \
+	fi
+	@rt_dir="/data/$(SESSIONHOST)/wircam/realtime/rt_checked" ; \
+	if [[ -d $$rt_dir ]] ; then \
+		rm -rf $$rt_dir/ ; \
+		mkdir -p -m 777 $$rt_dir/ ; \
+	fi
+	@rt_dir="/data/$(SESSIONHOST)/wircam/realtime/rt_raw" ; \
+	if [[ -d $$rt_dir ]] ; then \
+		rm -rf $$rt_dir/ ; \
+		mkdir -p -m 777 $$rt_dir/ ; \
+	fi
+	@rt_dir="/data/$(SESSIONHOST)/wircam/focusarchive" ; \
+	if [[ -d $$rt_dir ]] ; then \
+		rm -rf $$rt_dir/ ; \
+		mkdir -p -m 777 $$rt_dir/ ; \
+	fi
+	@rt_dir="/data/$(SESSIONHOST)/wircam/realtime/rt_stats" ; \
+	if [[ -d $$rt_dir ]] ; then \
+		rm -rf $$rt_dir/ ; \
+		mkdir -p -m 777 $$rt_dir/ ; \
+	fi
+
+unlock:
+ifdef CRUNID
+	@rm -f $(IIWI_LOCK_DIR)/Lock_$(CRUNID)
+else
+	@echo "$(pref) Please specify a CRUNID to unlock."
+endif
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

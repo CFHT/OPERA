@@ -1,0 +1,115 @@
+#! /bin/bash
+#########################################################################################
+#
+# Script name: espgetobscomment
+# Version: 1.0
+# Description: get qcoord comments from db given  runid or odometer range
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: May/2013
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package espgetobscomment
+#/// \brief get qcoord comments from db given  runid or odometer range
+#/// \ingroup scripts
+#
+#########################################################################################
+
+DBINFOFILE=$HOME/.dbrc
+if [ -f $DBINFOFILE ] ; then
+    source $DBINFOFILE
+fi
+function usage () {
+	echo "usage: getobscomment <night> | [type=obs|qc] ]"
+	echo "type is either obs[ever] or qc[oordinator]"
+	echo "night e.g. 08AQ13-Jul20"
+}
+export COLUMNS=200
+sessionhost=`ls -l /h/espadons/.director/sessionhost | sed -e 's/.*-> //' | sed -e 's/\..*//'`
+
+bindir=/cfht/bin
+espadonsdir="/data/${sessionhost}/espadons/"
+upenadir=/data/uhane5/upena
+logdir=${upenadir}/upena_logs
+tmpdir=${upenadir}/upenatmp
+odo1=""
+odo2=""
+runid=""
+who=qc
+for arg in $*
+do
+	case $arg in 
+   	 -h | --help)
+			usage;
+			exit 1 ;
+			;;
+   	 type=qc*)
+			who=${arg#type=};
+			;;
+   	 type=obs*)
+			who=${arg#type=};
+			;;
+   	 type=*)
+			echo "type should be obs or qc"
+			usage;
+			exit 1 ;
+			;;
+	[0-9]*o.fits) 
+		odo=${arg#o.fits};
+		echo "Getting ${who} comments for ${odo}..."
+		${bindir}/espxexpdb $odo $who
+		exit
+		;;
+	[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9]|[0-9][0-9][AB][QE][0-9][0-9]-[A-Z][a-z][a-z][0-9][0-9][abc-]*) 
+		night=$arg;
+		files=`ls ${espadonsdir}/${night}/*o.fits 2>/dev/null | sed -e 's:.*/::' -e 's/o.fits//' | tr '\n' ' '`
+		if [[ `echo $files | wc -w` == 0 ]]
+		then
+			echo "No object files found in $arg"
+			exit 1 
+		fi
+		min=1000000000
+		max=0
+		for f in $files
+		do
+			if [[ `expr $f '<' $min` == 1 ]]
+			then
+				min=$f
+			fi
+			if [[ `expr $f '>' $max` == 1 ]]
+			then
+				max=$f
+			fi
+		done
+		odo1=$min
+		odo2=$max
+		echo "Getting ${who} comments for ${odo1} thru ${odo2}..."
+		${bindir}/espxexpdb $odo1 $odo2 $who | sed -e 's:>:&gt;:g'  -e 's:<:&lt;:g'
+		exit
+		;;
+	*)
+		usage;
+		exit 1;
+		;;
+	esac
+done
+exit 0

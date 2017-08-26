@@ -1,0 +1,2134 @@
+#!/bin/bash 
+#########################################################################################
+#
+# Script name: ds9opera
+# Version: 1.0
+# Description: Start the CFHT espadons realtime image viewer.
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Sep/2012
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// ds9opera
+#/// \brief Start the CFHT realtime espadons image viewer.
+#/// \details script to start ds9 for espadons
+#/// \details and update as the image changes in "current.fits".
+#/// \note Interfaces ONLY to ds9v4.
+#/// \ingroup scripts
+#
+################################################################################################################
+prog="ds9v4"
+home="~/opera-1.0/"
+export opera=$HOME/opera-1.0
+title="ESPaDOnS - ds9opera"
+debug=0
+verbose=0
+trace=0
+file=""
+flags=""
+me=`basename $0`
+
+function usage() {
+	echo "usage: $me [-d|--debug] [-v|--verbose] [-t|--trace] [--dir=<initial directory>] [--file=<filename>]"
+	return 0
+}
+
+for arg in $@
+do
+   case "${arg}" in
+     --debug|-d) 
+			debug=1;
+			flags="$flags -debug";
+         ;;
+     --verbose|-v) 
+			verbose=1;
+			flags="$flags -verbose";
+         ;;
+     --trace|-t) 
+			trace=1;
+			flags="$flags -trace";
+         ;;
+     --file=*) 
+			file="${arg#--file=}";
+			flags="$flags -file ${file}";
+			title="$title - `basename $file`"
+         ;;
+     --dir=*) 
+			dir=${arg#--dir=};
+			cd ${dir};
+         ;;
+     --clean|-c) 
+			rm -f .${me}.tcl;
+			exit 0;
+         ;;
+		*h*)
+			usage;
+			exit 0
+			;;
+	esac
+done
+
+################################################################################################################
+# make sure ds9v4 is available
+################################################################################################################
+if [ `which $prog` == "" ]
+then
+	echo "Can't find ds9v4, please install it in your path."
+	exit 1
+fi
+
+################################################################################################################
+# a long interlude while we generate the tcl code for ds9 to ingest (in .ds9opera.tcl)
+################################################################################################################
+(
+cat <<'EOF'
+#!/bin/sh
+# \
+exec wish "$0" "$@"
+#!/usr/local/bin/wish
+
+################################################################################################################
+# Start .ds9opera.tcl
+################################################################################################################
+
+set sessionhost niele
+set currfile "current.fits"	
+set currfilename ${currfile}
+set started 0
+set viewframe -1
+set viewing(state,home) 1
+set viewing(state,thumb) 0
+set viewing(state,snr) 0
+set viewing(state,spectrum) 0
+set viewing(mode,stats) 0
+set viewing(mode,exposuremeter) 0
+set etypes [list {object} {spectrum} {focus} {bias} {comparison} {flat} {align} ]
+set etypesext [list {o} {i} {x} {b} {c} {f} {a} ]
+set etype object
+set etypeext o
+set currdate {}
+set fileisloading 0
+set findex 0 
+set peakadu -999
+set signaltonoise -999
+set tilt 0.0
+set programid {}
+set peakadustring ""
+set saturatedcount -999
+set saturatedpercent -999
+set wavelength -999
+set eMeterTick 0
+set eMeterData "EXPIRED"
+set eMeterPlot {}
+set eMeterStarted 0
+set quicklooking 1
+set _trace 0
+set _verbose 0
+set _debug 0
+set lastx 0
+set lasty 0
+set calcdone 0
+set mousestopped 0
+set gzip ".gz"
+set extension ".fz"
+set playlist {}
+
+set home "$env(HOME)"
+set homedir "${home}/opera-1.0/"
+set homeimagedir [ exec pwd ]
+set currdir ${homeimagedir}
+set adate [file tail ${homeimagedir}]
+set bindir "${homedir}/bin/"
+set operadir "/data/uhane5/opera/"
+set spectradir "${operadir}/spectra/"
+set calibrationdir "${operadir}/calibrations/"
+set visualsdir "${operadir}/visuals/"
+set configdir "${homedir}/config/"
+set sessiondir "/data/niele/espadons/"
+
+# the session host may have changed..
+catch {
+	set sessionhost [ exec ls -l /h/espadons/.director/sessionhost | sed -e 's/.*-> //' | sed -e 's/\..*//' ] 
+} errno
+if { $errno != 0 } {
+	set sessionhost "niele"
+}
+catch {
+	set sessiondir "/data/$sessionhost/espadons/"
+	if { [file exists "${sessiondir}/${currfilename}"] } {
+		set currfile [file readlink "${sessiondir}/${currfilename}"]
+		set homeimagedir [file dirname ${currfile} ]
+		set currdir ${homeimagedir}
+	}
+	cd $homeimagedir
+	set adate [file tail ${homeimagedir}]
+}
+
+# check for running at summit
+catch {
+	if { [file exists ${sessiondir}/opera/calibrations/${adate}/ ] } {
+		set operadir "${sessiondir}/opera/"
+	}
+	set spectradir "${operadir}/spectra/${adate}/"
+	set calibrationdir "${operadir}/calibrations/${adate}/"
+	set visualsdir "${operadir}/visuals/${adate}/"
+}
+set detector ""
+set amplifier ""
+set instmode ""
+set readspeed ""
+set mode ""
+set modestring ""
+set speed ""
+set qualifiers ""
+set gain 99.9
+set noise 99.9
+set stokes i
+set spectralorder 44
+set stokesparam ""
+set seqvalue ""
+set snrfilename ""
+set thumbfilename ""
+set spectrumfilename ""
+set spectrumfitsfilename ""
+set snrfitsfilename ""
+set espobject ""
+set etime 0
+set snrlist {}
+set requestedsnr -999
+set objectlist {}
+set _flags ""
+
+set qldaemon(viewinglog) 0
+
+set mtimer(save) {}
+set mtimer(count) 0
+set mtimer(id) 0
+set mtimer(timer) 0
+set mtimer(timer,abort) 0
+
+
+set help(aboutEspadons,message) "\
+ds9opera was written by D. Teeple\n \
+                Version 1.0\n \
+               October 2012\n \
+"
+
+proc CreateEspadonsButtons {} {
+	global ds9
+	global buttons
+	global arrays
+	global viewing
+	global fits
+	global modestring
+	global speed
+	global peakadustring
+	global spectralorder
+	global wavelength
+	global peakadu
+
+	set buttons(espadons,files)			[msgcat::mc "Files"]
+	set buttons(espadons,dir)			[msgcat::mc "Directory"]
+	set buttons(espadons,home)			[msgcat::mc "Home"]
+	set buttons(espadons,thumb)			[msgcat::mc "Thumbnails"]
+	set buttons(espadons,snr)			[msgcat::mc "SNR"]
+	set buttons(espadons,spectrum)		[msgcat::mc "Spectrum"]
+	set buttons(espadons,stats)			[msgcat::mc "Statistics"]
+	set buttons(espadons,play)			[msgcat::mc "Play"]
+	set buttons(espadons,exposuremeter)	[msgcat::mc "Exposure"]
+
+	frame $ds9(buttons).espadons
+	ButtonButton $ds9(buttons).espadons.files $buttons(espadons,files) { ChooseFilesDialog }
+	ButtonButton $ds9(buttons).espadons.dir $buttons(espadons,dir) { ChooseDirDialog }
+	CheckButton $ds9(buttons).espadons.home $buttons(espadons,home) viewing(state,home) { ChooseHome }
+	CheckButton $ds9(buttons).espadons.spectrum $buttons(espadons,spectrum) viewing(state,spectrum) { ChooseSpectrum  }
+	CheckButton $ds9(buttons).espadons.thumb $buttons(espadons,thumb) viewing(state,thumb) { ChooseThumb  }
+	CheckButton $ds9(buttons).espadons.snr $buttons(espadons,snr) viewing(state,snr) { ChooseSNR  }
+
+	CheckButton $ds9(buttons).espadons.stats $buttons(espadons,stats) viewing(mode,stats) { doStatistics }
+	CheckButton $ds9(buttons).espadons.play $buttons(espadons,play) viewing(mode,play) { doPlay }
+	CheckButton $ds9(buttons).espadons.exposuremeter $buttons(espadons,exposuremeter) viewing(mode,exposuremeter) { doExposureMeter }
+
+	$ds9(buttons).espadons.files configure -foreground green3
+	$ds9(buttons).espadons.dir configure -foreground green3
+	$ds9(buttons).espadons.home configure -foreground green4
+	$ds9(buttons).espadons.thumb configure -foreground green4
+	$ds9(buttons).espadons.snr configure -foreground green4
+	$ds9(buttons).espadons.spectrum configure -foreground green4
+
+	$ds9(buttons).espadons.stats configure -foreground blue2 
+	$ds9(buttons).espadons.play configure -foreground blue2 
+	$ds9(buttons).espadons.exposuremeter configure -foreground blue2
+
+	set buttons(espadons) [msgcat::mc "ESPaDOnS"]
+	RadioButton $ds9(buttons).major.espadons $buttons(espadons) buttons(majorCurrent) $ds9(buttons).espadons MajorButton
+
+	MajorButton
+
+	label $ds9(info).espSeqLabel -text "Seq"
+	label $ds9(info).espSeqValue -relief groove  -textvariable seqvalue
+
+	$ds9(info).espSeqValue configure -width 13 
+
+	set row 2
+	grid $ds9(info).espSeqLabel -row $row -column 3 -sticky e
+	grid $ds9(info).espSeqValue -row $row -column 4 -padx 2
+
+	label $ds9(info).espTitle -text "Wavelength"
+	label $ds9(info).espXLabel -text "(nm)"
+	label $ds9(info).espXValue -relief groove  -textvariable wavelength
+	label $ds9(info).espYLabel -text "Order"
+	label $ds9(info).espYValue -relief groove  -textvariable spectralorder
+
+	$ds9(info).espXValue configure -width 13 
+	$ds9(info).espYValue configure -width 13
+
+	set row 12
+	grid $ds9(info).espTitle -row $row -column 0 -sticky w
+	grid $ds9(info).espXLabel -row $row -column 1 -sticky e
+	grid $ds9(info).espXValue -row $row -column 2 -padx 2
+	grid $ds9(info).espYLabel -row $row -column 3 -sticky e
+	grid $ds9(info).espYValue -row $row -column 4 -padx 2
+
+	label $ds9(info).esp2Title -text "Statistics"
+	label $ds9(info).esp2XLabel -text "SNR"
+	label $ds9(info).esp2XValue -relief groove  -textvariable signaltonoise
+	label $ds9(info).esp2YLabel -text "Peak"
+	label $ds9(info).esp2YValue -relief groove  -textvariable peakadustring
+
+	$ds9(info).esp2XValue configure -width 13 
+	$ds9(info).esp2YValue configure -width 13
+
+	set row 13
+	grid $ds9(info).esp2Title -row $row -column 0 -sticky w
+	grid $ds9(info).esp2XLabel -row $row -column 1 -sticky e
+	grid $ds9(info).esp2XValue -row $row -column 2 -padx 2
+	grid $ds9(info).esp2YLabel -row $row -column 3 -sticky e
+	grid $ds9(info).esp2YValue -row $row -column 4 -padx 2
+}
+
+proc CreateEspadonsMenuExtensions { } {
+	global menu
+	global view
+	global ds9
+
+	set menu(spectralorder) [msgcat::mc "Graph Order"]
+	set menu(spectralorder,0) [msgcat::mc "->"]
+	set menu(spectralorder,a) [msgcat::mc "22-30"]
+	set menu(spectralorder,b) [msgcat::mc "31-40"]
+	set menu(spectralorder,c) [msgcat::mc "41-50"]
+	set menu(spectralorder,d) [msgcat::mc "51-60"]
+
+	$ds9(mb).view add separator
+	$ds9(mb).view add cascade -label $menu(spectralorder) -menu $ds9(mb).view.spectralorder
+	menu $ds9(mb).view.spectralorder -tearoff $menu(tearoff) -selectcolor $menu(selectcolor)
+
+	$ds9(mb).view.spectralorder add cascade -label $menu(spectralorder,a) -menu $ds9(mb).view.spectralordera
+	menu $ds9(mb).view.spectralordera -tearoff $menu(tearoff) -selectcolor $menu(selectcolor)
+
+	$ds9(mb).view.spectralorder add cascade -label $menu(spectralorder,b) -menu $ds9(mb).view.spectralorderb
+	menu $ds9(mb).view.spectralorderb -tearoff $menu(tearoff) -selectcolor $menu(selectcolor)
+
+	$ds9(mb).view.spectralorder add cascade -label $menu(spectralorder,c) -menu $ds9(mb).view.spectralorderc
+	menu $ds9(mb).view.spectralorderc -tearoff $menu(tearoff) -selectcolor $menu(selectcolor)
+
+	$ds9(mb).view.spectralorder add cascade -label $menu(spectralorder,d) -menu $ds9(mb).view.spectralorderd
+	menu $ds9(mb).view.spectralorderd -tearoff $menu(tearoff) -selectcolor $menu(selectcolor)
+
+	$ds9(mb).view.spectralordera add radiobutton -label "22" -variable spectralorder -value 22 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "23" -variable spectralorder -value 23 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "24" -variable spectralorder -value 24 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "25" -variable spectralorder -value 25 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "26" -variable spectralorder -value 26 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "27" -variable spectralorder -value 27 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "28" -variable spectralorder -value 28 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "29" -variable spectralorder -value 29 -command ChangeOrder
+	$ds9(mb).view.spectralordera add radiobutton -label "30" -variable spectralorder -value 30 -command ChangeOrder
+
+	$ds9(mb).view.spectralorderb add radiobutton -label "31" -variable spectralorder -value 31 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "32" -variable spectralorder -value 32 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "33" -variable spectralorder -value 33 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "34" -variable spectralorder -value 34 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "35" -variable spectralorder -value 35 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "36" -variable spectralorder -value 36 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "37" -variable spectralorder -value 37 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "38" -variable spectralorder -value 38 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "39" -variable spectralorder -value 39 -command ChangeOrder
+	$ds9(mb).view.spectralorderb add radiobutton -label "40" -variable spectralorder -value 40 -command ChangeOrder
+
+	$ds9(mb).view.spectralorderc add radiobutton -label "41" -variable spectralorder -value 41 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "42" -variable spectralorder -value 42 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "43" -variable spectralorder -value 43 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "44" -variable spectralorder -value 44 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "45" -variable spectralorder -value 45 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "46" -variable spectralorder -value 46 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "47" -variable spectralorder -value 47 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "48" -variable spectralorder -value 48 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "49" -variable spectralorder -value 49 -command ChangeOrder
+	$ds9(mb).view.spectralorderc add radiobutton -label "50" -variable spectralorder -value 50 -command ChangeOrder
+
+	$ds9(mb).view.spectralorderd add radiobutton -label "51" -variable spectralorder -value 51 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "52" -variable spectralorder -value 52 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "53" -variable spectralorder -value 53 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "54" -variable spectralorder -value 54 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "55" -variable spectralorder -value 55 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "56" -variable spectralorder -value 56 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "57" -variable spectralorder -value 57 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "58" -variable spectralorder -value 58 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "59" -variable spectralorder -value 59 -command ChangeOrder
+	$ds9(mb).view.spectralorderd add radiobutton -label "60" -variable spectralorder -value 60 -command ChangeOrder
+
+	$ds9(mb).view add separator
+	set menu(viewQLLog) [msgcat::mc "QuickLook Log"]
+	$ds9(mb).view add checkbutton -label $menu(viewQLLog) -variable qldaemon(viewinglog) -command ViewQuickLookLog
+
+	set menu(help,aboutespadons) "ESPaDOnS..."
+	$ds9(mb).help add command -label $menu(help,aboutespadons) -command EspadonsAboutBox
+
+	set view(info,wcs) 0
+	set view(info,image) 0
+}
+
+proc ChangeOrder { } {
+	global viewing
+	
+	if { $viewing(mode,stats) == 1 } {
+		doPlotSpectra
+	}
+}
+
+proc doStatus { } {
+	global sessionhost
+	global currdir
+	global currfile
+	global currfilename
+	global spectradir
+	global bindir
+	global spectrumfilename
+	global snrfilename
+	global detector
+	global amplifier
+	global instmode
+	global readspeed
+	global mode
+	global modestring
+	global speed
+	global gain
+	global noise
+	global stokes
+	global stokesparam
+	global espobject
+	global snrlist
+	global adate
+
+	setEspadonsMode
+
+	SetWatchCursor
+
+	doLog "\n     ------------- STATUS as of [clock format [clock seconds] -format "%D %T"] -------------"
+	doLog "Working directory: $currdir"
+	if { ! [file exists "$currfile"] } {
+		doLog "Current file:      $currfilename (Not Yet Available)"
+	} else {
+		doLog "Current file:      $currfilename"
+	}
+	set base [file tail [string range ${currfilename} 0 [expr [string length ${currfilename}] - 7]]]
+	doLog "Odometer:          $base"
+	doLog "Spectrum file:     $spectrumfilename"
+	doLog "SNR file:          $snrfilename"
+	doLog "Object:            $espobject"
+	doLog "Detector:          $detector"
+	doLog "Amplifier:         $amplifier"
+	doLog "Mode:              $mode"
+	doLog "Speed:             $speed"
+	doLog "Stokes:            $stokesparam"
+
+	if { [llength $snrlist] > 1 } {
+		doLog "The last [llength $snrlist] SNR max values are: ${snrlist}"
+	}
+	UnsetWatchCursor
+}
+
+proc ViewQuickLookLog { } {
+	global operadir
+	
+	set text "<<no log>>\n"
+	catch {
+		set text [exec cat <${operadir}/logs/espql.log]
+	}
+	SimpleTextDialog ql "ESPaDOnS Quick Look Daemon Log" 72 24 insert bottom "${text}\n"
+}
+
+proc setEspadonsMode {} {
+	global currfile
+	global currdir
+	global spectradir
+	global operadir
+	global calibrationdir
+	global bindir
+	global snrfilename
+	global currfile
+	global currfilename
+	global spectrumfilename
+	global thumbfilename
+	global snrfitsfilename
+	global spectrumfitsfilename
+	global detector
+	global amplifier
+	global instmode
+	global readspeed
+	global mode
+	global modestring
+	global speed
+	global qualifiers
+	global spectralorder
+	global gain
+	global noise
+	global peakadu
+	global etype
+	global peakadustring
+	global signaltonoise
+	global saturatedcount
+	global saturatedpercent
+	global stokes
+	global stokesparam
+	global seqvalue
+	global espobject
+	global snrlist
+	global seqvalue
+	global adate
+	global ds9
+	global objectlist
+	global requestedsnr
+	global gzip
+	global extension
+	global programid
+	global tilt
+	global _flags
+
+	DisableEspadonsButtons
+	catch {
+		if { [file exists ${currfile} ] } {
+			set base [file tail [string range ${currfile} 0 [expr [string length ${currfile}] - 7]]]
+			set instmode [exec ${bindir}/operagetheader --keyword=INSTMODE ${currfile} ]
+			set espobject [exec ${bindir}/operagetheader --keyword=OBJECT ${currfile} ]
+			set stokesparam [exec ${bindir}/operagetheader --keyword=CMMTSEQ ${currfile} ]
+			if { ${stokesparam} == " " } {
+				set seqvalue [exec ${bindir}/operagetheader --keyword=OBSTYPE ${currfile} ]
+			} else {
+				set ttt [split $stokesparam]
+				set seqvalue "[lindex $ttt 0] [lindex $ttt 4] [lindex $ttt 5] [lindex $ttt 6] exp [lindex [split [lindex $ttt 2], ","] 0]"
+			}
+			set etype [string trim [exec ${bindir}/operagetheader --keyword=EXPTYPE ${currfile} ]]
+			set detector [exec ${bindir}/operagetdetector ${currfile}]
+			set mode [exec ${bindir}/operagetmode ${currfile}]
+			set amplifier [exec ${bindir}/operagetamplifier ${currfile}]
+			set speed [exec ${bindir}/operagetspeed ${currfile}]
+			set qualifiers "${detector}${amplifier}_${mode}_${speed}"
+			set stokes [exec ${bindir}/operagetstokes ${currfile}]
+			if { $stokes == {} || $mode == "pol" } {
+				set stokes i
+			}
+			set spectrumfilename "${base}.q${gzip}"
+			set thumbfilename "${base}t.fits"
+			set snrfilename "${base}q.sn${gzip}"
+			set spectrumfitsfilename "${base}q.fits"
+			set snrfitsfilename "${base}qsn.fits"
+			switch $mode pol {set modestring "Polar"} sp1 {set modestring "Star+Sky"} sp2 {set modestring "Star Only"}
+			#
+			# Now get the compressed gain/bias information using catz...
+			#
+			if { [file exists "${calibrationdir}/${qualifiers}.gain${gzip}"] } {
+				catch {
+					set gainfile [open "|${bindir}catz ${calibrationdir}/${qualifiers}.gain${gzip}" r]
+					# skip the comments...
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					gets $gainfile result
+					set noise [lindex [split $result] 1]
+					set gain [lindex [split $result] 2]
+					close $gainfile
+				} 
+			}
+			catch {
+				set p [exec ${bindir}/operaimagestats --peakunsaturated ${currfile} ]
+			} result
+			set peakadu [lindex [split $result] 0]
+			set saturatedpercent [lindex [split $result] 1]
+			set peakadustring "${peakadu} (${saturatedpercent}%)"
+			catch {
+				set r [exec ${bindir}/operaimagestats --saturated --saturation=65535 ${currfile} ]
+			} result
+			set saturatedcount [lindex [split $result] 0]
+			set newprogramid {}
+			if { [file exists "${spectradir}/${snrfilename}" ] } {
+				catch {
+					doTrace "${bindir}/operaimagestats --maxsnr ${spectradir}/${snrfilename}"
+					set signaltonoise [exec ${bindir}/operaimagestats --maxsnr ${spectradir}/${snrfilename} ]
+					set newprogramid  [exec ${bindir}/operagetheader --keyword=RUNID  ${currfile} ]
+					if { $programid != $newprogramid } {
+						set snrlist {}
+					}
+					set programid $newprogramid
+					lappend snrlist $signaltonoise
+					if { [llength $snrlist] > 5 } {
+						set snrlist [lrange $snrlist 1 end]
+					}
+				} 
+			}
+			# the last 4 images
+			if { [file exists "${currfile}" ] } {
+				catch {
+					if { $programid != $newprogramid } {
+						set objectlist {}
+					}
+					lappend objectlist ${currfile}
+					if { [llength $objectlist] > 5 } {
+						set objectlist [lrange $objectlist 1 end]
+					}
+				} 
+			}
+			#
+			# set the order to the maximal SNR order
+			#
+			if { [file exists "${spectradir}/${spectrumfilename}" ] } {
+				catch {
+					doTrace "${bindir}/operaimagestats --peakunsaturatedorder ${spectradir}/${spectrumfilename}"
+					set s [exec ${bindir}/operaimagestats --peakunsaturatedorder ${spectradir}/${spectrumfilename} ]
+				} spectralorder
+			}
+			#
+			# get the requested SNR
+			#
+			catch {
+				doTrace "${bindir}/opera FILE=${currfile} requestedsnr"
+				set requestedsnr [lindex [split [exec ${bindir}/opera FILE=${currfile} requestedsnr ]] 0]
+			}
+			#
+			# get the aperture tilt -- too slow
+			#
+			#catch {
+			#	if { [file exists "${calibrationdir}/${qualifiers}.aper${gzip}" ] } {
+			#		doTrace "${bindir}/operaimagestats --tilt --aperturefilename=${calibrationdir}/${qualifiers}.aper${gzip}"
+			#		set tilt [exec ${bindir}/operaimagestats --tilt --aperturefilename=${calibrationdir}/${qualifiers}.aper${gzip} ]
+			#	}
+			#}
+			doVerbose "setEspadonsMode: ${snrfilename} ${spectrumfilename} peakadu=$peakadu ${saturatedpercent}% $saturatedcount signaltonoise=$signaltonoise requestedsnr=${requestedsnr} tilt=${tilt}"
+		}
+	}
+	EnableEspadonsButtons
+}
+
+proc displayThumbStats { } {
+	global marker
+	global current
+	global snrlist
+	global viewing
+	global objectlist
+	global requestedsnr
+	
+	if { $viewing(state,thumb) == 1 } {
+		set input1 [file tail [lindex ${objectlist} 3]]
+		set input1 [file tail [string range ${input1} 0 [expr [string length ${input1}] - 7]]]
+		set input2 [file tail [lindex ${objectlist} 2]]
+		set input2 [file tail [string range ${input2} 0 [expr [string length ${input2}] - 7]]]
+		set input3 [file tail [lindex ${objectlist} 1]]
+		set input3 [file tail [string range ${input3} 0 [expr [string length ${input3}] - 7]]]
+		set input4 [file tail [lindex ${objectlist} 0]]
+		set input4 [file tail [string range ${input4} 0 [expr [string length ${input4}] - 7]]]
+			
+		set snr1 [lindex ${snrlist} 3]
+		set snr2 [lindex ${snrlist} 2]
+		set snr3 [lindex ${snrlist} 1]
+		set snr4 [lindex ${snrlist} 0]
+			
+		MarkerSelectAll
+		MarkerDeleteAll
+		
+		if { $input4 != {} && $snr4 != {} } {
+			set x 550
+			set y 210
+			set text ""
+			set color "white"
+			if { $snr4 < $requestedsnr } {
+				set color "cyan"
+			}
+			set text "$input4 SNR: $snr4 PI: $requestedsnr"
+			set marker(id) [eval "$current(frame) marker create text $x $y 0 text = \{\"$text\"\}  color = $color font = \{\"helvetica 8 bold\"\}"]
+		}
+		if { $input3 != {} && $snr3 != {} } {
+			set x 400
+			set y 210
+			set text ""
+			set color "white"
+			if { $snr3 < $requestedsnr } {
+				set color "cyan"
+			}
+			set text "$input3 SNR: $snr3 PI: $requestedsnr"
+			set marker(id) [eval "$current(frame) marker create text $x $y 0 text = \{\"$text\"\}  color = $color font = \{\"helvetica 8 bold\"\}"]
+		}
+		if { $input2 != {} && $snr2 != {} } {
+			set x 250
+			set y 210
+			set text ""
+			set color "white"
+			if { $snr2 < $requestedsnr } {
+				set color "cyan"
+			}
+			set text "$input2 SNR: $snr2 PI: $requestedsnr"
+			set marker(id) [eval "$current(frame) marker create text $x $y 0 text = \{\"$text\"\}  color = $color font = \{\"helvetica 8 bold\"\}"]
+		}
+		if { $input1 != {} && $snr1 != {} } {
+			set x 100
+			set y 210
+			set text ""
+			set color "white"
+			if { $snr1 < $requestedsnr } {
+				set color "cyan"
+			}
+			set text "$input1 SNR: $snr1 PI: $requestedsnr"
+			set marker(id) [eval "$current(frame) marker create text $x $y 0 text = \{\"$text\"\}  color = $color font = \{\"helvetica 8 bold\"\}"]
+		}
+	}
+}
+
+proc displayImageStats { pixelmax count percent snr } {
+	global current
+	global marker
+	global viewing
+	global saturatedcount
+	global bindir
+	global calibrationdir
+	global qualifiers
+	global configdir
+	global spectradir
+	global spectrumfilename
+	global requestedsnr
+	global spectralorder
+	global gzip
+	global _flags
+
+	if { $viewing(state,snr) == 1 || $viewing(state,home) == 1 } {
+		set LEFactor [expr { sqrt(2.6 / 1.8) } ]
+		set LESNR [expr { int ( $LEFactor * $snr ) } ]
+		set color "green"
+		set text "Peak ${pixelmax} ADU (${percent}%), SNR: $snr / $LESNR"
+		if { $saturatedcount > 25 } {
+			set color "yellow"
+			set text "Peak ${pixelmax} ADU (${percent}%), SNR: $snr / $LESNR"
+		}
+		if { $saturatedcount > 500 } {
+			set color "red"
+			set text "SATURATED Peak ${pixelmax} ADU (${percent}%), SNR: $snr / $LESNR"
+		}
+		if { $snr < $requestedsnr } {
+			set color "cyan"
+			set text "Peak ${pixelmax} ADU (${percent}%), SNR: $snr / $LESNR PI: $requestedsnr"
+		}
+		doVerbose "Imagestats: $pixelmax $count $percent $snr / $LESNR $requestedsnr"
+		#
+		# get the locations of the orders
+		#
+		MarkerSelectAll
+		MarkerDeleteAll
+		set result ""
+		if { [file exists "${calibrationdir}/${qualifiers}.geom${gzip}" ] } {
+			doTrace "${bindir}/operaimagestats --orders --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} ${spectradir}/${spectrumfilename}"
+			catch {
+				set r [exec ${bindir}/operaimagestats --orders --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} ${spectradir}/${spectrumfilename} ]
+			} result
+			doDebug "Imagestats: $result"
+		}
+		# annotate the orders
+		if { $result != "" } {
+			catch {
+				set lines [split $result "\n"]
+				set i 0
+				set line [lindex $lines $i]
+				while { $line != "" } {****************************************  
+					set order [lindex [split $line] 0]
+					set xmin [lindex [split $line] 1]
+					set ymin [lindex [split $line] 2]
+					set wlmin [lindex [split $line] 3]
+					set xmax [lindex [split $line] 4]
+					set ymax [lindex [split $line] 5]
+					set wlmax [lindex [split $line] 6]
+					set zx [lindex $current(zoom) 0]
+					set zy [lindex $current(zoom) 1]
+					set ordercolor white
+					if { $order == $spectralorder } {
+						set ordercolor green
+					}
+					set marker(id) [eval "$current(frame) marker create text [expr ( $xmin * $zx ) ] [expr ( ( 4640 - $ymin - 100 ) * $zy ) ] 0 text = \{\"$order\"\} color = $ordercolor font = \{\"helvetica 6\"\}"]
+					set marker(id) [eval "$current(frame) marker create text [expr ( $xmin * $zx ) ] [expr ( ( 4640 - $ymin + 60  ) * $zy ) ] 0 text = \{\"$wlmin\"\} color = $ordercolor font = \{\"helvetica 6\"\}"]
+					set marker(id) [eval "$current(frame) marker create text [expr ( $xmax * $zx ) ] [expr ( ( 4640 - $ymax + 300 ) * $zy ) ] 0 text = \{\"$order\"\} color = $ordercolor font = \{\"helvetica 6\"\}"]
+					set marker(id) [eval "$current(frame) marker create text [expr ( $xmax * $zx ) ] [expr ( ( 4640 - $ymax + 460 ) * $zy ) ] 0 text = \{\"$wlmax\"\} color = $ordercolor font = \{\"helvetica 6\"\}"]
+					incr i
+					set line [lindex $lines $i]
+					doDebug "$line"
+				}
+			}
+		}
+		set x2 454
+		set y2 209
+		
+		set x1 453
+		set y1 208
+		
+		set x 455
+		set y 210
+		set marker(id) [eval "$current(frame) marker create text $x1 $y1 0 text = \{\"$text\"\}  color = $color font = \{\"helvetica 10 bold\"\}"]
+		#set marker(id) [eval "$current(frame) marker create text $x2 $y2 0 text = \{\"$text\"\}  color = white font = \{\"helvetica 10 bold\"\}"]
+		#set marker(id) [eval "$current(frame) marker create text $x $y 0 text = \{\"$text\"\}  color = black font = \{\"helvetica 10 bold\"\}"]
+	}
+}
+
+proc LoadFile { dir file } {
+	global ds9
+	global currfilename
+	global currfile
+	global currdir
+	global fileisloading
+
+	set filep [file nativename [file join "${dir}" "${file}"]]
+
+	if { [file type $filep] == "link" }  {
+		catch {  
+			set fn [file readlink $filep]
+			set filep [file nativename [file join "${dir}" "${fn}"]]
+		}
+	}
+	if { [file exists ${filep} ] } {
+		StartLoad 
+		LoadFits ${filep}
+		UpdateGraphXAxis
+		UpdateGraphYAxis
+		set fileisloading 0
+		set ds9(info).fileValue [file tail ${filep}]
+		UpdateInfoBoxCurrent
+	}
+	FinishLoad
+}
+
+proc DisableEspadonsButtons {  } {
+	global ds9
+	global buttons
+
+	$ds9(buttons).major.espadons configure -state disabled
+	$ds9(buttons).espadons.files configure -state disabled
+	$ds9(buttons).espadons.thumb configure -state disabled
+	$ds9(buttons).espadons.snr configure -state disabled
+	$ds9(buttons).espadons.spectrum configure -state disabled
+	$ds9(buttons).espadons.stats configure -state disabled
+
+	$ds9(buttons).espadons.stats configure -foreground blue2 
+	$ds9(buttons).espadons.play configure -foreground blue2 
+	$ds9(buttons).espadons.exposuremeter configure -foreground blue2 
+}
+
+proc EnableEspadonsButtons {  } {
+	global ds9
+	global buttons
+	global currdir
+	global currfilename
+	global spectradir
+	global visualsdir
+	global spectrumfitsfilename
+	global spectrumfilename
+	global thumbfilename
+	global snrfitsfilename
+	global quicklooking
+
+	$ds9(buttons).espadons.home configure -state normal
+ 	if { [file exists "${currdir}/${currfilename}" ] } {
+		$ds9(buttons).major.espadons configure -state normal
+		$ds9(buttons).major.espadons configure -foreground green4
+	}
+	if { $quicklooking == 1  } { 
+		if { [file exists "${visualsdir}/${thumbfilename}" ] } {
+			$ds9(buttons).espadons.thumb configure -state normal
+		}
+		if { [file exists "${visualsdir}/${spectrumfitsfilename}" ] } {
+			$ds9(buttons).espadons.spectrum configure -state normal
+		}
+		if { [file exists "${visualsdir}/${snrfitsfilename}" ] } {
+			$ds9(buttons).espadons.snr configure -state normal
+		}
+	} else {
+		$ds9(buttons).espadons.spectrum configure -state normal
+		$ds9(buttons).espadons.thumb configure -state normal
+		$ds9(buttons).espadons.snr configure -state normal
+	}
+	
+	$ds9(buttons).espadons.stats configure -state normal
+	$ds9(buttons).espadons.exposuremeter configure -state normal
+	$ds9(buttons).espadons.play configure -state normal
+	$ds9(buttons).espadons.files configure -state normal
+	$ds9(buttons).espadons.dir configure -state normal
+	UnsetWatchCursor
+}
+
+proc doLog { text } {
+
+	SimpleTextDialog log "OPERA Version 1.0" 72 24 append bottom "$text\n"
+}
+
+proc doTrace { text } {
+	global _trace
+	
+	if { $_trace == 1 } {
+		puts "$text"
+	}
+}
+
+proc doVerbose { text } {
+	global _verbose
+	
+	if { $_verbose == 1 } {
+		puts "$text"
+	}
+}
+
+proc doDebug { text } {
+	global _debug
+	
+	if { $_debug == 1 } {
+		puts "$text"
+	}
+}
+
+proc doMouseTrackTimerStop {} {
+	global mtimer
+	
+	set mtimer(timer) 0
+}
+
+proc doMouseTrackTimerStart {} {
+	global mtimer
+
+	if {$mtimer(timer,abort)} {
+		set mtimer(timer,abort) 0
+		set mtimer(timer) 1
+	} else {
+		set mtimer(timer) 1
+		doMouseTrackTimer
+	}
+}
+
+proc doMouseTrackTimer {} {
+	global ds9
+	global mtimer
+
+    switch -- $mtimer(timer) {
+		0 {
+	   		 set mtimer(timer,abort) 0
+	   		 set mtimer(timer) 0
+	   		 set mtimer(id) 0
+	   		 $ds9(canvas) configure -cursor $mtimer(save)
+			}
+		1 {
+	   		 set mtimer(id) [after 1000 { doMouseTrack; doMouseTrackTimer}]
+			}
+		2 {
+	   		 set mtimer(timer) 1
+	   		 set mtimer(id) [after 1000 { doMouseTrack; doMouseTrackTimer}]
+			}
+    }
+}
+
+proc doMouseTrack { } {
+	global ds9
+	global current
+	global canvas
+	global info
+	global viewframe
+	global viewing
+	global marker
+	global calibrationdir
+	global spectradir
+	global configdir
+	global bindir
+	global snrfilename
+	global qualifiers
+	global signaltonoise
+	global spectralorder
+	global lastx
+	global lasty
+	global calcdone
+	global mousestopped
+	global gzip
+	global peakadu
+	global saturatedcount
+	global saturatedpercent
+	global wavelength
+    global _flags
+
+	set x [string trim $info(pPhysicalX)]
+	set y [string trim $info(pPhysicalY)]
+	if { $x == "" || $y == "" } {
+		set mousestopped 0
+		set calcdone  0
+		set lastx 0
+		set lasty 0
+		return
+	}
+	if { ( abs ( $x - $lastx ) < 10 ||  abs ( $y - $lasty ) < 10 ) && $lastx != $x && $lasty != $y } {
+		return
+	}
+	if { $lastx == $x && $lasty == $y } {
+		set mousestopped 1
+	}  else {
+		set mousestopped 0
+		set calcdone 0
+	}
+	# spectrum
+	if { $viewframe == 1 && $mousestopped } { 
+		if {  $info(pValue,red) != 0 ||  $info(pValue,green) != 0 || $info(pValue,blue) != 0 } {
+			set minxvalue 400.0
+			set maxxvalue 1048.0
+			set minxcanvas 226.0
+			set maxxcanvas 1132.0
+			set minyvalue 0.0
+			set maxyvalue 14.0
+			set minycanvas 145.0
+			set maxycanvas 672.0
+			set lambda [expr int( ( ($x - $minxcanvas) / ($maxxcanvas - $minxcanvas) ) * ($maxxvalue - $minxvalue) + $minxvalue ) ]
+			set value [expr ( ( ($y - $minycanvas) / ($maxycanvas - $minycanvas) ) * ($maxyvalue - $minyvalue) + $minyvalue ) ]
+			set valuef [format "%4.2f" $value ]
+			if { $lambda > $minxvalue && $lambda < $maxxvalue && $value > 0.02 } {
+				MarkerDeleteAll
+				set xx [expr ( $x * 0.3 + 10.0 ) ]
+				set yy [expr ( $canvas(height) - ( $y * 0.3 ) - 15.0 ) ]
+				set marker(id) [eval "$current(frame) marker create text $xx $yy 0 text = \{\"$lambda $valuef\"\}  color = white"]
+				$ds9(canvas) configure -cursor circle
+			} else {
+				$ds9(canvas) configure -cursor crosshair
+			}
+		} else {
+			$ds9(canvas) configure -cursor crosshair
+		}
+	}
+	# image, do SNR at x,y in Flux(0) and SNR(3) views
+	if { $viewframe == 0 || $viewframe == 3 } { 
+		if { $ds9(b1) } {
+			if { $mousestopped == 1 } {
+				# button 1 is down, set the spectralorder
+				if { [file exists "${calibrationdir}/${qualifiers}.geom${gzip}" ] } {
+					doTrace "${bindir}/operaimagestats --getorder --x=${x} --y=${y} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} ${spectradir}/${snrfilename}"
+					set s {}
+					catch {
+						set s [exec ${bindir}/operaimagestats --getorder --x=${x} --y=${y} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} ${spectradir}/${snrfilename} ]
+					} result
+					if { $viewing(mode,stats) == 1 } {
+						if { [string trim $result] != "" } {
+							set spectralorder [string trim $result]
+							ChangeOrder
+						}
+						doVerbose "doMouseTrack: button down $x $y $spectralorder"
+					}
+				}
+			}
+		} else {
+			if { $mousestopped == 1 && $calcdone == 0 } {
+				if { [file exists "${calibrationdir}/${qualifiers}.geom${gzip}" ] } {
+					doTrace "${bindir}/operaimagestats --snrpoint --x=${x} --y=${y} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} ${spectradir}/${snrfilename}"
+					set s {}
+					catch {
+						set s [exec ${bindir}/operaimagestats --snrpoint --x=${x} --y=${y} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} ${spectradir}/${snrfilename} ]
+						set calcdone 1
+					} result
+					if { [string trim $s] != "" } {
+						set spectralorder [string trim [lindex [split $s] 0]]
+						set signaltonoise [string trim [lindex [split $s] 2]]
+						set wavelength [string trim [lindex [split $s] 3]]
+						doVerbose "doMouseTrack: $x $y $signaltonoise $wavelength"
+						displayImageStats $peakadu $saturatedcount $saturatedpercent $signaltonoise
+					}
+				}
+			}
+		} 
+	}
+	set lastx $x
+	set lasty $y
+}
+
+proc SelectView { which } {
+	global current
+	global viewframe
+	global scale
+	global canvas
+	global ds9
+	global colorbar
+	global view
+	global mode
+	global peakadu
+	global saturatedcount
+	global saturatedpercent
+	global signaltonoise
+
+	doVerbose "SelectView: $which"
+	switch -- $which {
+	  object {
+			if { $viewframe != 0 }  {
+				set viewframe 0
+				set ds9(next) [lindex $ds9(active) $viewframe]
+				GotoFrame
+				#return
+			}
+			set view(graph,horz) 1
+			set view(graph,vert) 0
+			$ds9(graph,horz) configure -bd 20
+			UpdateView
+			set canvas(width) 636
+			set canvas(height) 238
+			LayoutDS9
+			set current(zoom) {0.3 0.05}
+			ChangeZoom
+			set scale(mode) minmax
+			ChangeScaleMode
+			set scale(type) histequ
+			ChangeScale
+			set colorbar(map) B
+			ChangeColormap
+			displayImageStats $peakadu $saturatedcount $saturatedpercent $signaltonoise
+			doMouseTrackTimerStart
+		  } 
+	  spectrum { 
+			if { $viewframe != 1 }  {
+				set viewframe 1
+				set ds9(next) [lindex $ds9(active) $viewframe]
+				GotoFrame
+				#return
+			}
+			set view(graph,horz) 1
+			set view(graph,vert) 0
+			UpdateView
+			set canvas(width) 636
+			set canvas(height) 238
+			LayoutDS9
+			set current(zoom) {0.3 0.05}
+			ChangeZoom
+			set scale(mode) 90
+			ChangeScaleMode
+			set scale(type) linear
+			ChangeScale
+			set colorbar(map) SLS
+			ChangeColormap
+			doMouseTrackTimerStart
+		}
+	  thumb { 
+			if { $viewframe != 2 }  {
+				set viewframe 2
+				set ds9(next) [lindex $ds9(active) $viewframe]
+				GotoFrame
+				#return
+			}
+			set view(graph,horz) 1
+			set view(graph,vert) 0
+			$ds9(graph,horz) configure -bd 20
+			UpdateView
+			set canvas(width) 636
+			set canvas(height) 238
+			LayoutDS9
+			set current(zoom) {0.3 0.05}
+			ChangeZoom
+			set scale(mode) 90
+			ChangeScaleMode
+			set scale(type) linear
+			ChangeScale
+			set colorbar(map) B
+			ChangeColormap
+			displayThumbStats
+			doMouseTrackTimerStop
+		}
+		snr {
+			if { $viewframe != 3 }  {
+				set viewframe 3
+				set ds9(next) [lindex $ds9(active) $viewframe]
+				GotoFrame
+				#return
+			}
+			set view(graph,horz) 1
+			set view(graph,vert) 0
+			$ds9(graph,horz) configure -bd 20
+			UpdateView
+			set canvas(width) 636
+			set canvas(height) 238
+			LayoutDS9
+			set current(zoom) {0.3 0.05}
+			ChangeZoom
+			set scale(mode) zscale
+			ChangeScaleMode
+			set scale(type) pow
+			ChangeScale
+			set colorbar(map) SLS
+			ChangeColormap
+			displayImageStats $peakadu $saturatedcount $saturatedpercent $signaltonoise
+			doMouseTrackTimerStart
+		}
+	}
+}
+
+proc doPlotSpectra { } {
+	global spectrumfilename
+	global currfile
+	global snrfilename
+	global viewing
+	global spectradir
+	global bindir
+	global spectralorder
+	global eMeterStarted
+	global ap
+    global _flags
+
+	if { $eMeterStarted != 0 && $viewing(mode,exposuremeter) == 1 } {
+		return
+	}
+
+	if { [file exists "${spectradir}/${spectrumfilename}" ] && [file exists "${spectradir}/${snrfilename}" ] } {
+		set spectre {}
+		set plotout {}
+		set snrlistout {}
+		if {[APPing $ap(tt)]} {
+			if {$ap($ap(tt),data,total) > 0} {
+				APClearData $ap(tt)
+				set ap($ap(tt),graph,title) "[file tail ${currfile}] Order ${spectralorder}"
+				set ap($ap(tt),graph,xaxis) "Wavelength (nm)"
+				set ap($ap(tt),graph,yaxis) "Normalized SNR (green) / Spectral Intensity (blue)"
+			}
+		} else {
+			APDialog $ap(tt) "OPERA Version 1.0" "[file tail ${currfile}] Order ${spectralorder}" "Wavelength (nm)" "Normalized SNR (green) / Spectral Intensity (blue)"
+		}
+		#
+		# get the SNR values
+		#
+		doTrace "${bindir}/operaimagestats --snr --normalize --count=1000 --noprintorder --order=${spectralorder} ${spectradir}/${snrfilename}"
+		catch {
+			set p [exec ${bindir}/operaimagestats --snr --normalize --count=1000 --noprintorder --order=${spectralorder} --specfilename=${spectradir}/${spectrumfilename} ${spectradir}/${snrfilename} ]
+		} plotout
+		#
+		# get spectrum values
+		#
+		doTrace "${bindir}/operaimagestats --spectrum --normalize --count=1000 --noprintorder --order=${spectralorder} ${spectradir}/${spectrumfilename}"
+		catch {
+			set s [exec ${bindir}/operaimagestats --spectrum --normalize --count=1000 --noprintorder --order=${spectralorder} ${spectradir}/${spectrumfilename} ]
+		} spectre
+		set ap($ap(tt),step,color) green
+		set ap($ap(tt),step,width) 2
+		set ap($ap(tt),step) 1
+		set ap($ap(tt),linear) 0
+		set ap($ap(tt),error) 0
+		APDataSet $ap(tt) 2 ${plotout}
+		APUpdateState $ap(tt)
+		set ap($ap(tt),linear,color) blue
+		set ap($ap(tt),linear,width) 2
+		set ap($ap(tt),step) 0
+		set ap($ap(tt),linear) 1
+		APDataSet $ap(tt) 2 ${spectre}
+		APUpdateState $ap(tt)
+		APUpdateGraph $ap(tt)
+		doDebug "doPlotSpectra: SNR: $plotout"
+		doDebug "doPlotSpectra: SPECTRUM: $spectre"
+	}
+}
+
+#
+# a CFHT-only feature...
+#
+proc doExposureMeter {  } {
+	global eMeterTick
+	global eMeterData
+	global eMeterPlot
+	global etime
+	global eMeterStarted
+	global viewing
+	global ap
+
+	set exposing "FALSE"
+	set eMeterData 0
+	catch {
+		catch {
+			set exposing	[exec ssGet "/i/espadons/detector/exposing" 2>/dev/null]
+			set etime		[exec ssGet "/i/espadons/detector/etime" 2>/dev/null]
+			set eMeterData  [exec ssGet "/i/espadons/expometerRate" 2>/dev/null]
+		}
+		if { $exposing != "TRUE" || $eMeterData == "EXPIRED" } {
+			set eMeterTick 0
+			set eMeterStarted 0
+			return
+		}
+		if { $exposing == "TRUE" && $eMeterData != "EXPIRED" } {
+			if { $eMeterTick == 0 } {
+				set eMeterPlot {}
+				for {set i 0} {$i <= $etime} {set i [expr $i + 1]} {
+					lappend eMeterPlot $i 0
+				}
+			}
+			lset eMeterPlot [expr $eMeterTick * 2 + 1] $eMeterData
+			incr eMeterTick
+		}
+	}
+	if { $viewing(mode,exposuremeter) == 1 } {
+		if {[APPing $ap(tt)]} {
+			if {$ap($ap(tt),data,total) > 0} {
+				APClearData $ap(tt)
+				set ap($ap(tt),graph,title) "Exposure Meter ($eMeterData)"
+				set ap($ap(tt),graph,xaxis) "Time"
+				set ap($ap(tt),graph,yaxis) "Intensity"
+			}
+		} else {
+			APDialog $ap(tt) "ds9opera" "Exposure Meter" "Time" "Intensity"
+		}
+		set eMeterStarted 1
+		set ap($ap(tt),step,color) red
+		set ap($ap(tt),step,width) 2
+		set ap($ap(tt),step) 1
+		set ap($ap(tt),linear) 0
+		set ap($ap(tt),error) 0
+		APDataSet $ap(tt) 2 ${eMeterPlot}
+		APUpdateState $ap(tt)
+		APUpdateGraph $ap(tt)
+	}
+	doVerbose "doExposureMeter: tick $exposing $eMeterData $etime $eMeterTick $eMeterStarted "
+}
+
+proc doPlayList { } {
+	global viewing
+	global currfilename
+	global currfile
+	global homeimagedir
+	global sessiondir
+	global bindir
+	global playlist
+	global currdate
+	global ds9
+	global spectrumfilename
+	global thumbfilename
+	global snrfilename
+	global spectrumfitsfilename
+	global snrfitsfilename
+	global detector
+	global amplifier
+	global instmode
+	global readspeed
+	global mode
+	global modestring
+	global speed
+	global qualifiers
+	global spectralorder
+	global gain
+	global noise
+	global peakadu
+	global etype
+	global stokes
+	global stokesparam
+	global seqvalue
+	global espobject
+	global gzip
+
+	catch {
+		if { $viewing(mode,play) && $playlist != {} } {
+			set file [lrange $playlist 0 0]
+			doVerbose "Playing: ${homeimagedir}/$file ${sessiondir}/${currfilename} ${homeimagedir}/${currfilename}"
+			$ds9(buttons).espadons.play configure -foreground red3 
+			########################################################################
+			# These lines trigger quicklook to do an analysis
+			#
+			exec rm -f ${sessiondir}/${currfilename}
+			exec ln -s ${homeimagedir}/$file ${sessiondir}/${currfilename}
+			exec rm -f ${homeimagedir}/${currfilename}
+			exec ln -s ${homeimagedir}/$file ${homeimagedir}/${currfilename}
+			#
+			########################################################################
+			DisableEspadonsButtons
+			set currfile [file readlink "${sessiondir}/${currfilename}" ]
+			set currdate [file mtime $currfile]
+			set base [file tail [string range ${currfile} 0 [expr [string length ${currfile}] - 7]]]
+			set instmode [exec ${bindir}/operagetheader --keyword=INSTMODE ${currfile} ]
+			set espobject [exec ${bindir}/operagetheader --keyword=OBJECT ${currfile} ]
+			set stokesparam [exec ${bindir}/operagetheader --keyword=CMMTSEQ ${currfile} ]
+			if { ${stokesparam} == " " } {
+				set seqvalue [exec ${bindir}/operagetheader --keyword=OBSTYPE ${currfile} ]
+			} else {
+				set ttt [split $stokesparam]
+				set seqvalue "[lindex $ttt 0] [lindex $ttt 4] [lindex $ttt 5] [lindex $ttt 6] exp [lindex [split [lindex $ttt 2], ","] 0]"
+			}
+			set etype [string trim [exec ${bindir}/operagetheader --keyword=EXPTYPE ${currfile} ]]
+			set detector [exec ${bindir}/operagetdetector ${currfile}]
+			set mode [exec ${bindir}/operagetmode ${currfile}]
+			set amplifier [exec ${bindir}/operagetamplifier ${currfile}]
+			set speed [exec ${bindir}/operagetspeed ${currfile}]
+			set qualifiers "${detector}${amplifier}_${mode}_${speed}"
+			set stokes [exec ${bindir}/operagetstokes ${currfile}]
+			if { $stokes == {} || $mode == "pol" } {
+				set stokes i
+			}
+			set spectrumfilename "${base}.q${gzip}"
+			set thumbfilename "${base}t.fits"
+			set snrfilename "${base}q.sn${gzip}"
+			set spectrumfitsfilename "${base}q.fits"
+			set snrfitsfilename "${base}qsn.fits"
+			exec sleep 10
+			setEspadonsMode
+			doGenerateImages
+			if { $viewing(mode,stats) == 1} {
+				doStatistics
+				doPlotSpectra
+			}
+			EnableEspadonsButtons
+			if { $viewing(state,home) == 1 } {
+				ChooseHome
+			}
+			if { $viewing(state,thumb) == 1 } {
+				ChooseThumb
+			}
+			UpdateInfoBoxCurrent
+			set playlist [lrange $playlist 1 end]
+			$ds9(buttons).espadons.play configure -foreground blue2 
+			after 200 { doPlayList }
+		} else {
+			set playlist {}
+			$ds9(buttons).espadons.play configure -foreground blue2 
+		}
+	}
+}
+
+proc doPlay { } {
+	global viewing
+	global playlist
+	global homeimagedir
+	global ds9
+	
+	catch {
+		if { $viewing(mode,play) } {
+			set playlist [ glob -nocomplain -types "f" -- *o.fits ]
+			doPlayList				
+		} else {
+			$ds9(buttons).espadons.play configure -foreground blue2 
+		}
+	}
+}
+
+proc doStatistics { } {
+	global ap
+	global currfile
+	global currfilename
+	global currdir
+	global bindir
+	global operadir
+	global spectradir
+	global configdir
+	global stokes
+	global stokesparam
+	global seqvalue
+	global detector
+	global mode
+	global instmode
+	global speed
+	global noise
+	global gain
+	global etype
+	global peakadu
+	global signaltonoise
+	global saturatedcount
+	global saturatedpercent
+	global viewing
+	global spectralorder
+	global snrlist
+	global requestedsnr
+	global extension
+	global gzip
+
+	if { $viewing(mode,stats) } {
+		SetWatchCursor
+		set filename [file tail ${currfile}]
+		set base [file tail [string range ${filename} 0 [expr [string length ${filename}] - 7]]]
+		set readspeed [exec ${bindir}/operagetheader --keyword=EREADSPD ${currfile} ]
+		set enoise [lindex [split $readspeed] 1]
+		set egain [lindex [split $readspeed] 3]
+		set exptime [exec ${bindir}/operagetheader --keyword=EXPTIME ${currfile} ]
+		set airmass [exec ${bindir}/operagetheader --keyword=AIRMASS ${currfile} ]
+		doLog "\nGenerating statistics for ${currfilename} mode ${mode} speed ${speed}"
+		doLog "EType:         $etype"
+		doLog "Time:          [exec ${bindir}/operagetheader --keyword=HSTTIME ${currfile} ]"
+		catch {doLog "Detector       [exec ${bindir}/operagetheader --keyword=DETECTOR ${currfile} ][exec ${bindir}/operagetheader --keyword=AMPLIST ${currfile} ]"}
+		doLog "Mode/Speed:    $instmode $speed"
+		doLog "Object:        [exec ${bindir}/operagetheader --keyword=OBJECT ${currfile} ]"
+		doLog "RUNID:         [exec ${bindir}/operagetheader --keyword=RUNID ${currfile} ]"
+		doLog "PIName:        [exec ${bindir}/operagetheader --keyword=PI_NAME ${currfile} ]"
+		doLog "Stokes:        $stokesparam"
+		doLog "Exposure time: ${exptime} second(s)"
+		doLog "Airmass:       ${airmass}"
+		doLog "Observation:   [exec ${bindir}/operagetheader --keyword=CMMTOBS ${currfile} ]"
+		doLog "Observer:      [exec ${bindir}/operagetheader --keyword=OBSERVER ${currfile} ]"
+		doLog "Expected noise:\t${enoise}\tgain:\t${egain}"
+		doLog "Measured noise:\t${noise}e\tgain:\t${gain}e/ADU"
+		doLog "PI requested SNR:  $requestedsnr"
+		set LEFactor [expr { sqrt(2.6 / 1.8) } ]
+		set LESNR [expr { int ( $LEFactor * $signaltonoise ) } ]
+		if { $signaltonoise != -999 } {
+			if { $signaltonoise < $requestedsnr } {
+				doLog "Peak SNR:          $signaltonoise / $LESNR *** WARNING Peak SNR is less than that requested by the PI"
+			} else {
+				doLog "Peak SNR:          $signaltonoise / $LESNR"
+			}
+		} else {
+			doLog "SNR not calculated"
+		}
+		doLog "Peak pixel value is ${peakadu} ADU, ${saturatedpercent}% of saturation, $saturatedcount saturated pixels."
+		doLog "\nDone stats for ${filename}.\n"
+		UnsetWatchCursor
+	}
+}
+
+proc ChooseHome { } {
+	global viewing
+	global homeimagedir
+	global currdir
+	global currfilename
+
+	set viewing(state,thumb) 0
+	set viewing(state,spectrum) 0
+	set viewing(state,snr) 0
+	SelectView object
+	LoadFile ${currdir} ${currfilename}
+	SelectView object
+}
+
+proc ChooseSpectrum { } {
+	global viewing
+	global spectrumfitsfilename
+	global visualsdir
+
+	set viewing(state,thumb) 0
+	set viewing(state,home) 0
+	set viewing(state,snr) 0
+	if { [file exists "${visualsdir}/${spectrumfitsfilename}"] } {
+		SelectView spectrum
+		LoadFile ${visualsdir} ${spectrumfitsfilename}
+		SelectView spectrum
+	}
+}
+
+proc ChooseSNR { } {
+	global viewing
+	global snrfitsfilename
+	global visualsdir
+
+	set viewing(state,home) 0
+	set viewing(state,spectrum) 0
+	set viewing(state,thumb) 0
+	if { [file exists "${visualsdir}/${snrfitsfilename}"] } {
+		SelectView snr
+		LoadFile ${visualsdir} ${snrfitsfilename}
+		SelectView snr
+	}
+}
+
+proc ChooseThumb { } {
+	global viewing
+	global thumbfilename
+	global visualsdir
+
+	set viewing(state,home) 0
+	set viewing(state,spectrum) 0
+	set viewing(state,snr) 0
+	if { [file exists "${visualsdir}/${thumbfilename}" ] } {
+		SelectView thumb
+		LoadFile ${visualsdir} ${thumbfilename}
+		SelectView thumb
+	}
+}
+
+proc ChooseDirDialog { } {
+	global currdir
+	global viewing
+	global homeimagedir
+	global currfilename
+	global adate
+
+	set d [tk_chooseDirectory]
+	if { $d != {} } {
+		set homeimagedir $d
+		set adate [file tail ${homeimagedir}]
+		set currdir $homeimagedir
+		set viewing(state,snr) 0
+		set viewing(state,thumb) 0
+		set viewing(state,spectrum) 0
+		set viewing(state,home) 1
+		SelectView object
+		LoadFile ${currdir} ${currfilename} 
+		SelectView object
+		if { $viewing(mode,stats) } {
+			doStatistics
+		}
+	}
+	setEspadonsMode
+}
+
+proc ChooseFilesDialog { } {
+	global slb
+	global etype
+	global chip
+	global viewing
+	global etypeext
+	global current
+	global currdir
+	global ds9
+
+	DisableEspadonsButtons
+
+	set viewing(state,thumb) 0
+	set viewing(state,home) 0
+	set viewing(state,spectrum) 0
+	set viewing(state,snr) 0
+
+	set etypeext o
+
+	ChooseFiles
+	FilesListDialog slb "Select Image" 36
+	if {$slb(ok) == 0} {
+		set viewing(state,home) 1
+		ChooseHome
+	}
+	setEspadonsMode
+	unset slb
+}
+
+proc ChooseFiles { } {
+	global slb
+	global current
+	global currdir
+	global spectradir
+	global currfile
+	global currfilename
+	global etypeext
+	global findex
+	global viewing
+	global bindir
+
+	set slb(count) 0
+	set datelist [list {}]
+	cd ${currdir}
+	if { ${etypeext} == "i" } {
+		cd ${spectradir}
+	}
+	set files [ glob -nocomplain -types "f" -- *${etypeext}.fits ]
+	set len [llength $files]
+	foreach f $files {
+	  lappend datelist "[file mtime $f] $f"
+	}
+	set datelist [lsort $datelist]
+	#set datelist [lrange $datelist [expr $len - 24] end]
+	set len [llength $datelist]
+	if { $datelist != {} } {
+	  foreach fil $datelist {
+		 incr slb(count)
+		 set f [lindex $datelist [expr $len - $slb(count)] ]
+		 if { $f == {} } {
+			set slb(count) [expr $slb(count) - 1]
+		 } else {
+			set ff [lindex [split $f] 1]
+			set ft [clock format [lindex [split $f] 0] -format {%T}]
+				set espobject [exec ${bindir}/operagetheader --keyword=OBJECT ${ff} ]
+				set mode [exec ${bindir}/operagetmode ${ff}]
+				set speed [exec ${bindir}/operagetspeed ${ff}]
+				switch $mode pol {set modestring "Polar"} sp1 {set modestring "Star+Sky"} sp2 {set modestring "Star Only"}
+				if { $ff == "$currfilename" } {
+					set findex [expr { $slb(count) - 1 } ]
+				}
+			set slb($slb(count),item) "$ft $ff $espobject $modestring $speed"
+			set slb($slb(count),value) $ff
+		 }
+	  }
+	}
+	cd ${currdir}
+}
+
+######################################################################################
+#   
+#   the Files ListBox Dialog
+#   
+proc FilesListDialog {varname title width} {
+	upvar #0 $varname var
+	global $varname
+	global etypeext
+	global etypesext
+	global etype
+	global etypes
+	global findex
+	global menu
+
+	set w ".slb"
+
+	set var(ok) 0
+	set var(item) {}
+	set var(value) {}
+
+	DialogCreate $w $title -borderwidth 2
+
+	frame $w.ed -relief groove -borderwidth 2
+	frame $w.buttons -relief groove -borderwidth 2
+	frame $w.selects -relief groove -borderwidth 2
+
+	pack $w.buttons -side bottom -fill x -ipadx 4 -ipady 4
+	pack $w.selects -side bottom -fill x -ipadx 4 -ipady 4
+	pack $w.ed -side top -fill both -expand true
+
+	# lists
+	scrollbar $w.ed.scroll -command "$w.ed.list yview"
+	set var(listbox) [listbox $w.ed.list \
+			  -yscroll "$w.ed.scroll set" \
+			  -width $width \
+			  -height 25 \
+			  -setgrid 1 \
+			  -selectmode single]
+	grid $w.ed.list $w.ed.scroll -sticky news
+	grid rowconfigure $w.ed 0 -weight 1
+	grid columnconfigure $w.ed 0 -weight 1
+
+	# radiobuttons
+	set cnt 0
+	 foreach b $etypes {
+		radiobutton $w.selects.b$cnt \
+		-text $b \
+		-variable etype \
+		-value $b \
+		-command "FilesType $varname"
+		pack $w.selects.b$cnt -side left
+		incr cnt
+	 }
+	# buttons
+	button $w.buttons.ok -text "Done" \
+	   -command "set ${varname}(ok) 1"
+	pack $w.buttons.ok -side left -expand true -padx 10
+	button $w.buttons.cancel -text "Cancel" \
+	   -command "set ${varname}(ok) 0"
+	pack $w.buttons.cancel -side left -expand true -padx 10
+
+	# init
+	for {set i 1} {$i <= $var(count)} {incr i} {
+	   $w.ed.list insert end $var($i,item)
+	}
+	$w.ed.list selection set $findex
+
+	bind $w <Double-1> "set ${varname}(ok) 1"
+	bind $w <Escape> "set ${varname}(ok) 0"
+	bind $w <Return> "set ${varname}(ok) 1"
+
+	bind $w <Up> "FilesListArrow $varname -1"
+	bind $w <Down> "FilesListArrow $varname 1"
+
+	bind $w <<ListboxSelect>> "FilesSelect $varname "
+
+	DialogCenter $w
+	DialogWait $w ${varname}(ok) $w.buttons.ok
+
+	DialogDismiss $w
+}
+
+proc FilesType { varname } {
+	upvar #0 $varname var
+	global $varname
+	global currdir
+	global spectradir
+	global etypeext
+	global etypesext
+	global etype
+	global etypes
+
+	set cnt 0
+	foreach e $etypes {
+	  if { $e == $etype } {
+		 set etypeext [lindex $etypesext $cnt]
+	  }
+	  incr cnt
+	}
+	ChooseFiles
+	$var(listbox) delete 0 end
+	for {set i 1} {$i <= $var(count)} {incr i} {
+	   $var(listbox) insert end $var($i,item)
+	}
+	$var(listbox) selection set 0
+	set ii [expr [$var(listbox) curselection]+1]
+	 SetWatchCursor
+	if { ${etypeext} == "q" } {
+			SelectView spectrum
+			LoadFile ${spectradir} $var($ii,value)
+			SelectView spectrum
+	 } else {
+			SelectView object
+			LoadFile ${currdir} $var($ii,value)
+			SelectView object
+	 }
+	 UnsetWatchCursor
+}
+
+proc FilesSelect { varname } {
+	upvar #0 $varname var
+	global $varname
+	global currdir
+	global spectradir
+	global etypeext
+
+	set ii [expr [$var(listbox) curselection]+1]
+	set var(value) $var($ii,value)
+	SetWatchCursor
+	if { ${etypeext} == "q" } {
+		SelectView spectrum
+		LoadFile ${spectradir} $var($ii,value)
+		SelectView spectrum
+	} else {
+		SelectView object
+		LoadFile ${currdir} $var($ii,value)
+		SelectView object
+	}
+	UnsetWatchCursor
+}
+
+proc FilesListArrow {varname dir} {
+	upvar #0 $varname var
+	global $varname
+	global spectradir
+	global currdir
+	global etypeext
+
+	set which [$var(listbox) curselection]
+	set end [$var(listbox) index end]
+
+	$var(listbox) selection clear 0 end
+	incr which $dir
+	if {$which < 0} {
+		set which 0
+	}
+	if {$which >= $end} {
+		set which [expr $end -1]
+	}
+	$var(listbox) selection set $which
+	set ii [ expr $which + 1 ]
+	set var(value) $var($ii,value)
+	SetWatchCursor
+	if { ${etypeext} == "q" } {
+		SelectView spectrum
+		LoadFile ${spectradir} $var($ii,value)
+		SelectView spectrum
+	} else {
+		SelectView object
+		LoadFile ${currdir} $var($ii,value)
+		SelectView object
+	}
+	UnsetWatchCursor
+}
+
+proc doGenerateImages {} {
+	global currdir
+	global currfile
+	global currfilename
+	global snrfilename
+	global spectrumfilename
+	global thumbfilename
+	global snrfitsfilename
+	global spectrumfitsfilename
+	global homeimagedir
+	global spectradir
+	global calibrationdir
+	global visualsdir
+	global configdir
+	global bindir
+	global viewing
+	global objectlist
+	global spectralorder
+	global qualifiers
+	global gzip
+    global mode
+	global tilt
+	global _flags
+
+	catch {
+		if { ! [file exists "${visualsdir}/${spectrumfitsfilename}" ] } {
+			if { [file exists "${spectradir}/${spectrumfilename}" ] } {
+				doTrace "${bindir}operaFITSDisplayImage --spectrum --count=1000 --order=${spectralorder} --input=${spectradir}/${spectrumfilename} --output=${visualsdir}/${spectrumfitsfilename} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip}" 
+				exec ${bindir}operaFITSDisplayImage --spectrum --count=1000 --order=${spectralorder} --input=${spectradir}/${spectrumfilename} --output=${visualsdir}/${spectrumfitsfilename} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} &
+			}
+		}
+	}
+	catch {
+		if { ! [file exists "${visualsdir}/${snrfitsfilename}" ] } {
+			if { [file exists "${spectradir}/${snrfilename}" ] } {
+				doTrace "${bindir}operaFITSDisplayImage --snr --mode=${mode} --tilt=${tilt} --input=${spectradir}/${snrfilename} --output=${visualsdir}/${snrfitsfilename} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip}" 
+				exec ${bindir}operaFITSDisplayImage --snr --mode=${mode} --tilt=${tilt} --input=${spectradir}/${snrfilename} --output=${visualsdir}/${snrfitsfilename} --geomfilename=${calibrationdir}/${qualifiers}.geom${gzip} --wavefilename=${configdir}wcal_ref.dat${gzip} &
+			}
+		}
+	}
+	catch {
+		set input1 [lindex ${objectlist} 3]
+		set input2 [lindex ${objectlist} 2]
+		set input3 [lindex ${objectlist} 1]
+		set input4 [lindex ${objectlist} 0]
+		if { ! [file exists "${visualsdir}/${thumbfilename}" ] } {
+			if { [file exists "${input4}" ] } {
+				doTrace "${bindir}operads9thumbs --input1=${input1} --input2=${input2} --input3=${input3} --input4=${input4} --output=${visualsdir}/${thumbfilename}"
+				exec ${bindir}operads9thumbs --input1=${input1} --input2=${input2} --input3=${input3} --input4=${input4} --output=${visualsdir}/${thumbfilename} &
+			}
+		}
+	}
+}
+
+proc updateImage {} {
+	global ds9
+	global viewframe
+	global current
+	global sessiondir
+	global currdir
+	global currfile
+	global currfilename
+	global snrfilename
+	global spectrumfilename
+	global thumbfilename
+	global snrfitsfilename
+	global spectrumfitsfilename
+	global currdate
+	global operadir
+	global adate
+	global fileisloading
+	global viewing
+	global started
+	global etime
+	global qldaemon
+	global homeimagedir
+	global spectradir
+	global calibrationdir
+	global visualsdir
+	global configdir
+	global bindir
+	global spectralorder
+	global qualifiers
+	global gzip
+
+	if { "$currfilename" == "current.fits" && $ds9(b1) == 0 && $fileisloading == 0 } {
+		catch {
+			#
+			# The object image
+			#
+			if { [file exists "${sessiondir}/${currfilename}"] } {
+				set currfile [file readlink "${sessiondir}/${currfilename}" ]
+				set homeimagedir [file dirname "${currfile}" ]
+				set currdir ${homeimagedir}
+				set adate [file tail ${currdir} ]
+				set spectradir "${operadir}/spectra/${adate}/"
+				set calibrationdir "${operadir}/calibrations/${adate}/"
+				set visualsdir "${operadir}/visuals/${adate}/"
+				cd $homeimagedir
+				doVerbose "updateImage: currfile=$currfile homeimagedir=$homeimagedir adate=$adate"
+				doVerbose "updateImage: spectradir=$spectradir calibrationdir=$calibrationdir visualsdir=$visualsdir"
+				set fdate {}
+				if { [file exists $currfile ] } {
+					set fdate [file mtime $currfile]
+				} else {
+					DisableEspadonsButtons
+					set started 0
+				}
+				if { $fdate != $currdate } {
+					DisableEspadonsButtons
+					set currdate $fdate
+					setEspadonsMode
+					doGenerateImages
+					if { $viewing(mode,stats) == 1} {
+						doStatistics
+						doPlotSpectra
+						EnableEspadonsButtons
+					}
+					if { $started == 0 } {
+						set started 1
+						set current(zoom) {0.3 0.05}
+						ChangeZoom
+						ChooseHome
+						$current(frame) zoom to fit
+						ChooseHome
+					} else {
+						if { $viewing(state,home) == 1 } {
+							ChooseHome
+						}
+						if { $viewing(state,thumb) == 1 } {
+							ChooseThumb
+						}
+						after 8000 {
+							if { $viewing(state,snr) == 1 } {
+								ChooseSNR
+							}
+							if { $viewing(state,spectrum) == 1 } {
+								ChooseSpectrum
+							}
+						}
+					}
+					UpdateInfoBoxCurrent
+					set etime 0
+				}
+			}
+		}
+		if { $qldaemon(viewinglog) } {
+			ViewQuickLookLog
+		}
+		
+		EnableEspadonsButtons
+		if { $viewing(mode,exposuremeter) == 1 } {
+			doExposureMeter
+		}
+		
+		after 1000 updateImage
+		
+	} else {	# a specific image
+		set homeimagedir [file dirname ${currfile} ]
+		set currfilename [file tail ${currfile} ]
+		set currdir ${homeimagedir}
+		set adate [file tail ${homeimagedir}]
+		set spectradir "${operadir}/spectra/${adate}/"
+		set calibrationdir "${operadir}/calibrations/${adate}/"
+		set visualsdir "${operadir}/visuals/${adate}/"
+		set started 1
+		set current(zoom) {0.3 0.05}
+		ChangeZoom
+		ChooseHome
+		$current(frame) zoom to fit
+		ChooseHome
+		UpdateInfoBoxCurrent
+		setEspadonsMode
+		setEspadonsMode
+		doGenerateImages
+		if { $viewing(mode,stats) == 1} {
+			doStatistics
+		}
+		EnableEspadonsButtons
+		doVerbose "updateImage: $currdir $currfilename"
+	}
+}
+
+proc EspadonsAboutBox {} {
+    global help
+
+    SimpleTextDialog about "ds9opera" 80 40 insert top "$help(aboutEspadons,message)"
+}
+
+#
+# set up the environment
+#
+for {set ar 0} {$ar < $argc} {incr ar} {
+	set aa [lindex $argv $ar]
+	switch -- $aa {
+		 -file { 
+			incr ar
+			set currfile [lindex $argv $ar]
+			if { ${currfile} == {} } {
+				puts "Error: no filename given."
+				return
+			}
+			if { ! [file exists ${currfile}] } {
+				puts "Error: ${currfile} does not exist."
+				return
+			}
+			set homeimagedir [file dirname ${currfile} ]
+			set currfilename [file tail ${currfile} ]
+			set currdir ${homeimagedir}
+			cd ${homeimagedir}
+			set quicklooking 0
+			doVerbose "opening currdir=$currdir currfilename=$currfilename"
+		  }
+		 -debug { 
+			set _debug 1
+			doVerbose "debug on"
+			set _flags "${_flags} -d "
+		  }
+		 -verbose { 
+			set _verbose 1
+			doVerbose "verbose on"
+			set _flags "${_flags} -v "
+		  }
+		 -trace { 
+			set _trace 1
+			doVerbose "trace on"
+			set _flags "${_flags} -t "
+		  }
+	}
+}
+
+# bind the special keys for Espadons
+
+bind . <KeyPress-f>       { ChooseFilesDialog }
+bind . <KeyPress-d>       { ChooseDirDialog }
+
+# Create all the Espadons controls
+
+CreateEspadonsButtons
+
+DisableEspadonsButtons
+
+CreateEspadonsMenuExtensions
+
+# create the spectrum view 
+CreateGotoFrame 1 base  
+
+# create the thumbs view 
+CreateGotoFrame 2 base 
+
+# create the snr view 
+CreateGotoFrame 3 base  
+
+# create the extra view 
+CreateGotoFrame 4 base  
+
+updateImage
+
+EnableEspadonsButtons
+
+EOF
+) >.${me}.tcl
+
+################################################################################################################
+# we actually start ds9 here
+################################################################################################################
+if [ "$file" != "" ]
+then
+	if (( trace ))
+	then
+		echo $prog -title "$title" -port 0 -source .${me}.tcl -scale histequ -zoom to .3 .05 -preserve pan yes -cmap b -view horzgraph yes -scale mode minmax $flags
+	fi
+	$prog -title "$title" -port 0 -source .${me}.tcl -scale histequ -zoom to .3 .05 -preserve pan yes -cmap b -view horzgraph yes -scale mode minmax $flags
+else
+	if (( debug ==1 ||  trace == 1 )) 
+	then
+	   echo $prog -title "$title" -port 0 -source .${me}.tcl -scale histequ -zoom to .3 .05 -preserve pan yes -cmap b -view horzgraph yes -scale mode minmax $flags
+			$prog -title "$title" -port 0 -source .${me}.tcl -scale histequ -zoom to .3 .05 -preserve pan yes -cmap b -view horzgraph yes -scale mode minmax $flags
+	else
+	   $prog -title "$title" -port 0 -source .${me}.tcl -scale histequ -zoom to .3 .05 -preserve pan yes -cmap b -view horzgraph yes -scale mode minmax $flags &> /dev/null &
+	fi
+fi
+  
+exit 0

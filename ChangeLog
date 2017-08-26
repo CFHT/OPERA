@@ -1,0 +1,2873 @@
+Aug 10 2011 -- Teeple
+	- fixed bscale and bzero for floats
+	- fixed espadonsimage class nasty crash bug and implemented espadons keyword header reading
+	- added Eder's operaImageStats library
+
+Aug 11 2011 -- Teeple
+	- fixed FITSImageSave to save 32 bit headers correctly
+	- added trimming of FITS keyword values
+	- updated espadonsimagetest to use new trimmed keyword function
+
+Aug 12 2011 -- Teeple
+	- added LMFit library
+	- fixed some Linux build issues to do with definition of PI missing
+	- some operaStats bug fixes
+	- fixed keyword value over zealous trimming bug
+	- fixed Linux build issue with missing library in Makefile.am
+	
+Aug 13 2011 -- Teeple
+	- added Eder's workaround for readfitsimage (tushort wired for short datatype)
+	- added operaException class
+	- added operaExceptions to operaFITSImage
+	
+Aug 16 2011 -- Teeple
+	-- added operaFit library
+	- implemented masterBias, masterFlat, masterComparison, masterFabPerot
+
+Aug 17 2011 -- Teeple
+	- finished masterBias, masterFlat, masterComparison, masterFabPerot -- put in fast image nmedian stacking
+	- fixed bug in operaException where full formatted error message was not returned
+
+Aug 18 2011 -- Teeple
+	- added tiled image reads in operaFITSImage for deep stacking (still in testing)
+	- bug fixes in operaEspadonsImage (no more seg fault)
+	
+Aug 30 2011 -- Teeple
+	- major bug fixes to opearFITSImage including correct handling of ushort
+	- added doxygen documentation hooks
+	- fixed bugs in operaReductionset -- it largely works now
+	- put in many exchelle spectrograph function in operaCCD
+	- added operaIMShift module (untested as yet)
+	- added operaGain module (untested as yet)
+	- integrated operaStats library
+	
+Aug 31 2011 -- Teeple
+	- fixed the major doxygen warnings and added in the scripts and harness
+	- added a dropbox on opera.cfht.hawaii.edu for drops
+
+Sep 2 2011 -- Teeple
+	- integrated Eder's Image, Stats libraries
+	- integrated Eder's version of operaGain
+	- fixed operaReduction to handle gap case
+	- much doxygen documentation including a main page
+	- we can start test on operaReductionset, operaMaster*, operaIMShift, operaGain
+
+Sep 4 2011 -- Teeple
+	- created badpixel masks for espadons
+	- debugging in harness for gain and imshift
+	
+Sep 6 2011 -- Teeple
+	- added the SET support for calibrations
+
+Sep 7 2011 -- Teeple
+	- fixed swapped orders in masterflats
+	- fixed masterbiases not saved
+
+Sep 9 2011 -- Teeple
+	- fixed a nasty header bug where 2 headers were created rather than one
+	- added operafitsverify which calls fitsverify if you have it installed
+	- uploaded doxgent docs to sourceforge web page
+	- many typo fixes from Nadine
+	- fixed masterflats so as few as 3 flats still are median combined
+	- started work on speeding up operaGain
+
+Sep 10 2011 -- Teeple
+	- fixed a lot of error logging issues
+	- fixed Chinese output
+	- fixed clean command
+
+Sep 12 2011 -- Teeple
+	- changed operaGain to accept subwindows (200 x speedup from over an hour to 20 sec.)
+	- realized that we would need subwindows anyway, because if we use NAXIS1 x NAXIS2
+	  then we are using the overscan, should use DETSEC instead.
+	- operaGain always returns nan for gain and noise so I think I broke something
+	  (help eder!)
+
+Sep 14 -- Teeple
+	- a VERY subtle but MAJOR change and a new interface to clone just the datasec pixels
+	- the subtle change is that clonepixels now clones nx*ny pixels STARTING at the beginning
+	of DATASEC startx starty, and not 0!!!!! BEWARE
+	- there are new interfaces to get the DATASEC values and a new DATASEC type
+	- open fits image now reads the DATASEC keyword to populate the class
+	- NOTE: Since the overscan in OLAPA-ab mode creates a 21 pixel wide band in the
+	center order which is now masked by the OLAPA-ab badpixelmask
+	- Created new badpixelmasks.fits BE SURE THEY ARE IN IN YOUR CONFIG DIRECTORY with
+	the new datasec and masked the trailing overscan from the OLAPA-ab map and mask
+	
+Sep 16 -- Teeple
+	- got operaGain returning real values - but they don't seem right... (negative and near zero)
+	- fixed clone pixel subwindows, which was badly broken
+	- the badpixel masks were inverted
+		
+Sep 19 -- Teeple
+	- moved DATASEC to esapdonsImage class since it is a non-standard header keyword
+	- as such any module doing whole image statistics on espadons images MUST use 
+	  the espadons image class and only compute using the datasec (i.e. not the overscan
+	  which contains garbage pixel values)
+	- integrated Eder's upgrades to operaGain - NOTE: I chose to retain the two amp
+	  stuff for now, because I do want to see if gain/noise is significantly different.
+	  operaGain is now returning good values in general, but in some cases the bins come
+	  back as empty - some tuning needed there.
+	- fixed a bug in operaReductionSet to return the correct buckets
+	- operaGain parameters moved to the parameter file
+	
+Sep 20 -- Teeple
+	- added the operaFITSSubImage class
+	- added the operaEspadonsSubImage class
+	- added getpixel(x,y) in operaFITSImage, operaEspadonsImage, operaFITSSubImage, operaEspadonsSubImage
+	  which does all those nasty row, column calculations for you. Good to use those for
+	  reliability. Eder, have a look, you will like them...
+	- integrated all of Eder's library doxygen documentation
+	- integrated Eder' single bias operaGain calculation implementation
+	- fixed masterflats bug
+	- fixed spli reduction list naming issue
+	- added the operator [] to the image classes. Kind of cute. Note the plethora of required bracketing.
+	  usage: float value = myfitsimage[{20, 200}]; returns the image pixel value at coords x=20 y=200
+
+Sep 21 -- Teeple
+	- a very interesting drop which includes image operators:
+		> < >= <= / * + - += -= *= /= []
+	- look at the new test file operaimageOperatorTest.cpp to see usage. e.g.:
+		operaFITSImage biasImage(bias);
+		operaFITSImage flat1Image(flat1);
+		operaFITSImage flat2Image(flat2);
+		operaFITSImage badpixImage(badpix);
+		operaFITSImage outputImage(output, biasImage.getnaxis1(), biasImage.getnaxis2(), tfloat, 0);
+		
+		flat1Image -= biasImage;					// remove the bias from the flats
+		flat2Image -= biasImage;					// remove the bias from the flats
+		flat1Image *= flat1Image < 35000.0;			// removed saturated pixels
+		flat2Image *= flat2Image < 35000.0;			// removed saturated pixels
+		outputImage = flat1Image - flat2Image;		// subtract the flats
+		outputImage /= flat1Image;					// divide by flat1
+		outputImage *= outputImage > 0.0;			// mask all negative pixels
+		outputImage *= badpixImage;					// zero the badpixels
+
+		// print some pixel values from the center of the image
+		for (unsigned j=2048; j<2056; j++) {
+			for (unsigned i=1024; i<1032; i++) {
+				imageCoordinates c = {i,j};
+				cout << setw(8) << setprecision(2) << outputImage[c] << ' ';
+			}
+			cout << endl;
+		}
+
+Sep 22 -- Teeple
+
+	-- Added the operators to operaSubImage
+	-- Added more <> operators
+
+Sep 26 -- Teeple
+	- work on espadons image classes	
+	- put operators in operaFITSImage, operaEspadonsImage and operaFITSSubImage classes
+	- added the % wildcard to operaReductionlist so that the entire header keyword need not match
+
+Sep 27 -- Teeple
+	- fixed nasty bug in operaReductionlist where the new % match failed
+	- added ImageIndexVector datatype, changed the semantics of where, now you can do:
+		operaFITSSubImage sub(outputImage, where((operaFITSImage *)(outputImage>=400.0 && outputImage<=800.0), &count)) ;
+
+Sep 28 - Teeple
+	- added trimming of extra calibrations, so that you get either morning or evening calibrations
+	  but not both, so operaGain works.
+	- added OPERA Class and Operator tutorial to doc
+
+Oct 3 - Teeple
+	- Eder's operaGain bug fix in operaCCD.c
+	- added gainlists as well as reductionlists (gainlists have only one set of cals,
+	  reductionlists have all)
+	- added where clause without count
+
+Oct 4 - Teeple
+	- worked on the CFHT-only option to use files from the archive:
+	  ./bin/opera ARCHIVE=2011/07/09-2011/07/10 reductionlist
+	  which returns all files taken in this date range. We need to
+	  check whether that includes setup files. which should be excluded.
+	  
+Oct 5 - Teeple/Martioli
+	- integration of all of Eder's library  changes
+	- added new library test tool
+	- operaGain bug fixes
+	- operaFITSImage operator bug fixes
+
+Oct 6 - Teeple
+	- added direct indexing of the opearFITSImage class e.g.:
+	outputImage[y][x] = 0.0; // zero the pixel value
+	cout << << (float)outputImage[y][x] << endl;
+	
+Oct 7 - Teeple
+	- removed imshift and mrqmin
+	- removed passing of noise subwindows to operaGain
+	- fixed many bugs in opera.cpp (pick wasn't working at all)
+	- made a test script in test/testscript.sh. It should help with 
+	  regressions
+
+Oct 10 - Teeple
+		- worked on basic operaGeometry structure and arg passing
+		- added isnan and isinf checks to operaGain
+		- added cals to the test script to get operaGeometry to be called
+		- changed headervalues to be prefixed with type as per Eder's sugg'n
+		- put a bit of structure in operaWavelengthcalibration
+		- added geometries target
+		- added library tests to test script
+
+Oct 11 - Teeple
+		- added matrix access to operaFITSImage and operaFITSSubimage and operaEspadonsImage
+		this is mainly so C libraries can use image[y][x] notation to access pixels
+		
+Oct 12 - Teeple
+	- added transpose() method, which transposes columns for rows. Since the orders lie
+	along columns, this makes it easier to follow along orders. So an Image that looked
+	like left, becomes right:
+ 
+	+-----------+		+-------------------------+
+	|           |		|                         |
+	|           |		|                         |
+	|           |		|                         |
+	|           |		|                         |
+	|           |		|                         |
+	|           |		+-------------------------+
+	|           |
+	|           |
+	|           |
+	|           |
+	+-----------+
+ 
+	This is implemented for both operaFITSSubImages and operaFITSImages.
+	Index as before, be sure to get the new matrix:
+		subImage.transpose();
+		Matrix matrix = subImage.getmatrix();
+		cout << matrix[y][x];	// now x increments along the orders
+	- added clean step to test script and added rmdir to clean target
+
+Oct 14 - Teeple
+	- fixed a large number of operaEspadonsImage bugs, no crashes now
+
+Oct 15 - Teeple
+	- changed tiling interface to use subimage, a much neater interface,
+	and gets around cfitsio writetiled crashes. See the tutorial for an
+	example of usage.
+	- added setup.sh to easily set your environment
+	
+Oct 16 - Teeple
+	- all of the seg faults are now fixed, the bug was in a tricky difference between
+	initialization in constructors using different compilers.
+	- to use setup.sh:
+		cd $HOME/opera-1.0
+		. ./setup.sh
+	
+Oct 17 - Teeple
+	-changed operaEspadonsImage to use operaFITSSubImage to store the datasec -
+	makes more sense.
+	- fixed a bad param to operaGain
+		
+	
+Oct 18 - Teeple
+	- changed reductionlist so the gainlists are also shown so you don't have to hunt around.
+	- fixed a double delete in operaGain
+		
+	
+Oct 20 - Teeple
+	- put in an optimization in the operator definitions such that one less clone is needed in
+	certain cases of binary operators.
+	- did some work on operaGeometry.
+	- added the Test Plan documentation
+		
+Oct 24 - Teeple
+	- operaGeometry finds 33 only orders... The simple algorithm won't do it,
+	have to change to a gaussian fit...
+		
+Oct 31 - Teeple
+	- fixed a bunch of reduction list redo bugs and gain not finding gain lists...
+		
+Nov 9 - Teeple
+	- fixed portability issues to old versions of fitsio
+	= added operalibFFT and a new dependency on FFTW3
+	- added operagetheader 
+	- added a single reduction target (for quicklook)
+	- added operasaturated
+	- added operaFITSProduct, to hold output format fits files
+	- removed the NR lrbrary code, made routine zero-based
+	- only LMFit is left to clean up
+	- removed medfit and replaced it with ladfit
+	- much testing of the libraries is needed
+	- bug in ladfit fixed, a & b were swapped in interface...
+	- fixed very tricky mode change sequence in reductionlists.
+	- added mpfit and testmpfit
+		
+Nov 11 - Teeple
+	- fixed read of float p.fits and s.fits for opeaFITSProduct class
+		
+Nov 15 - Teeple/ Martioli
+	- added the operaSpectralOrder, opeaInstrumentProfile and opeaSpectralElement class skeletons
+	- integrated findspectralorder into operageometry
+	- enhancements to oepraFITSProduct class
+	- gain error added
+		
+Nov 16 - Teeple
+	- extended the error decimal places in gain output so error shows up
+	- removed fixed length statiscs from ladfit implementation
+	- operageometry segfault fixed
+		
+Nov 17 - Teeple
+	- operaSpectralOrder, opeaInstrumentProfile and opeaSpectralElement classes filled out
+	- operageometry tries to get the polynomial fit for each order...
+	
+Nov 28 - Teeple / Martioli
+	- bug fixes to operaGeometry
+	- updates to the tools directory with some visualization tools
+	- added MPFit library interfaces and testmpfit
+
+Nov 30 - Teeple / Martioli
+	- operaGeometry order trace now hunts for the best order polynomial fit
+	- operaGain handles 2 amp mode
+
+Dec 2 - Teeple / Martioli
+	- added -p/--plot option and a visuals directory to plot or create png thumbnails
+	check out the new visuals/ directory that is created
+	- integrated noise calculations with Geometry fitting
+
+Dec 6 - Teeple / Martioli / Manset
+	- added algorithm as comment to operaPolarimetry
+	- added operaJD library / test tool from Eder
+	- added operaHelio heliocentric and barycentric library
+	- added the Lovis 2007 th/argon wavelength atlas
+	- added readSpectralOrders to spectralOrder classe
+	- added operaInstrumentProfile module
+
+Dec 8 - Teeple / Martioli
+	- added CMatrix operaFITSSubImage::operaFITSSubImageCloneCMatrix(unsigned x, unsigned y, unsigned nx, unsigned ny, unsigned pixelate = 1)
+	- and   CMatrix operaFITSSubImage::operaFITSSubImageCloneCMatrixPllgram(unsigned x1, unsigned y1, unsigned x2, unsigned y2, unsigned nx, unsigned ny, unsigned pixelate = 1)
+	  which create a CMatrix rectangular clone of and operaFITSImage or operaFITSSubImage
+	  with optional (default=1) pixelation. The second version converts fram a parallelogram.
+	  These will be useful in creating the spectral elements. The flux value of each pixel in a pixelated
+	  CMatrix is divided by the area.
+	- added operaMeasureInstrumentProfile.cpp in core from Eder
+
+Dec 9 - Teeple / Martioli
+	- integrated Eder's mathlib
+	- update operaPlotGeom to show orders on images
+	
+DEC 12 - Teeple
+	- Fixed opearesapadonsImage screwup in trying to read AMPLIST from EEV1 images
+	- aded minordertouse and maxordertouse to operaGeometry
+	- many fixes to reduction list generation for EEV1
+
+Dec 13 - Teeple
+	- added wavelength approximation plotting
+
+Dec 14 - Teeple / Martioli
+	- revamped rlists for efficiency
+	- replaced Lovis et al thorium argon atlas
+	- added plotting in opearPlotWave for the atlas lines
+	- updated operaSpectralOrder and operaSpecralElement libraries
+
+Dec 16 - Teeple / Martioli
+	- added Eder's operaExtractRawSum tool
+	- removed pngwriter dependency and added operaPNG to replace it
+	- NOTE: use of LIBPNG is enabled by default, to build without it:
+		INSTALL_OPERA-1.0 --nopng
+		
+Dec 19 - Teeple
+	- augmented operaFITSProduct to read/write text .s  text spectra
+	- changed operaPlot to read operaFITSProducts that may bde derived from .s text spectra
+	
+Dec 20 - Teeple
+	- updated operaWavelength claibration to read the uncalibrated thorium and find
+	  the lines of interest withing the current order, then the atlas is read and
+	  the lines of interested extracted. The last step to do is to find the cross correlation
+	  to update the wavelength polynomial. 
+	
+Dec 21 - Teeple
+	- changed operaExtractRawSum and operaSpectralOrder to output operaFITSProduct
+	rather than a .s text file.
+
+Dec 23 - Teeple / Martioli
+	- added Eder's superflats to master calibrations
+	- integrated Eder's extraction work
+
+Jan 5 2012 - Teeple / Martioli
+	- added the tool operaQueryImageInfo from Eder
+	- changed operaGain to output 4 decimal places
+		
+Jan 6 2012 - Teeple
+	- fixed a dependency issue causing master cals to not be ready at the right time...
+	
+Jan 9 2012 - Teeple
+	- many bug fixes to operaFITSImage class and operaProduct class to get wavelength calibration going
+	- rewrote CMatrix to fix bugs 
+
+Jan 10 2012 - Teeple
+	- rewrite of the CMatrix type, added much testing, and more compatibility with original defn
+
+Jan 11 2012 - Teeple
+	- added cross correlation to wavelength calibration
+	- operaCCD - fixed some memory leaks
+	- much work on plotting the wcal data so we can make sure it is working
+
+Jan 12 2012 - Teeple
+	- added origin row/col/pixelation to CMatrix
+	- moved startsWith to operaLibCommon.h
+	- cleaned up operaSpectralOrder, operaInstrumentProfile, operaSpectralElement
+	- cleaned up args to operaGeometry, operaWavelengthCalibration
+
+Jan 18 2012 - Teeple
+	- added wavelength solution overplot on to mastercalibration and geometry solution
+	- switched to thar_MM201006.dat for Thorium-Argon atlas since it goes to shorter wavelengths
+
+Jan 19 2012 - Teeple
+	- changed formt of .wcal output to match wcalref.dat
+	- added ACKNOWLEDGEMENTS file to root
+
+Jan 20 2012 - Teeple
+	- added operaSpectralOrderVector Class to encapsulate ordered vectors of SpectalOrders
+	- added read/write routines for operaSpectralOrder Vectors
+	- changed wcalref.dat to have a format consistent with geoemetry where npar is stored with each order
+
+Feb 1 2012 - Teeple / Matrtioli
+	- added operaMatrix library
+	- added operaSpectralOrderVector to handle serialization and deserialization of SpectralOrder
+	  vectors as well as merging spectrallOrder information from the various sources.
+	- MAJOR MAJOR MAJOR change to the operaSpectralOrder class to create nested classes for 
+	  geometry, wavelength, spectralelement and instrumentprofile. This is a first pass, Eder
+	  please take a look and further rationalize
+	- added Polynomial.h which adds a template class for double or float polynomials
+	- changed operaGeoemtry, operaWavelength, operaPixelSensitivityMap and operaMeasureInstrumentProfile
+	  operaExtracRawSum to use operaSpectralOrderVector class
+	- started on << <<= >> >>= operators for image shifting, do not use, not ready yet
+	
+Feb 2 2012 - Teeple
+	- updated the operaConvert1Ampto2Amp tool
+
+Feb 3 2012 - Teeple
+	- added operaFITSDeleteHeaderKey, operaFITSAddComment
+	- fixed operaFITSSetHeader so the existing header is overwritten if it already exists
+	- renamed core/operaGeometry to core/operaGeometryCalibration
+	- added libraries/operaGeometry and operaWavelength classes
+	- Eder: please look through for #ifdef EDER_FIXED_ME && fix
+	
+Feb 9 2012 - Teeple
+	- converted operaSpectralElement to not store a vector but rather recalculate
+	- last of the MAJOR changes to operaSpectralOrder, it compiles but doesn't run
+	- all the EDER_FIXED_ME are gone, but questions remain
+	- changed Polynomial class to just double, not a template, as it crashed at runtime in malloc
+	- fixed operaMatrix library to not call EXIT and use operaError.h
+	- operaGeometryCalibration works now, and uses operaSpectralOrderVector::writeOrders(...)
+
+Feb 13 2012 - Teeple
+	- bug fixes to readgeometry and readwavelength
+	
+Feb 14 2012 - Teeple
+	- operaWavelengthCalibration does not crash, is sort-of working	
+
+Feb 16 2012 - Teeple
+	- fixed messed up dependencies in calibration rules
+
+Feb 17 2012 - Teeple / Martioli
+	- major integration with Eder
+	- did the Polynomial matrix in operaLibCommon.h
+	- added tests for Polynomial matrix in operaMatrixTest.c
+	- both serial and parallel calibrations work now, 
+	  serial: mastercalibrations or serialcalibrations
+	  parallel: calibrations
+	  
+Feb 21 - Martioli
+	- integrated Eder's changes
+	- placeholder hook for operaMeasureInstrumentProfile in harness
+
+Feb 22 - Teeple / Martioli
+	- operaOptimalExtraction available 
+	- cCube in operaLibCommon.h
+	
+Feb 24 2012 - Teeple
+	- fixed a lot of headers that were including too much stuff and added prologs
+	- added test/operaAsmTest which shows assembly code for our C++ operators
+	  to get some idea of the efficiency of opera
+	  
+Feb 27 2012 - Teeple
+	- added operasetheader to set header values or delete a kweyword or add a comment
+	to a FITS image
+
+Feb 28 2012 - Teeple / Martioli
+	- added operacompress tool to compress a FITS image
+	- filled out the compression interface in operaFITSImage
+	- added compression argument to operaFITSProduct
+	- integrated Eder's instrument profile work
+	- added the order spacing polynomial
+
+Mar 1 2012 - Teeple / Martioli
+	- changed inline functions to static inline for llvm C compiler on MacOSX Lion,
+	make note of the different installation instructions.
+	- added ladfit.h
+	- added wavelength/flux view in operaSpectrum class
+	
+Mar 2 2012 - Teeple
+	- removed class operaSpectrum and operaSpectralElement, replacing them by operaSpectralElements
+	
+Mar 5 2012 - Teeple
+	- fixed some of the extraction rules
+	- changed optimalextraction to output .s raw spectrum
+	
+Mar 6 2012 - Teeple
+	- implemented reading / writing of profile information
+	- renamed the Makefiles anticipating special makefiles for particular instruments
+	- added SNR calculations and standard and optimal flux and variance to operaSpectralElements
+
+Mar 7 2012 - Teeple
+	- fixed crash in operaMeasureInstrumentProfile
+
+Mar 8 2012 - Teeple
+	- changed interface to operaOptimalExtraction so it wasn't re-opening files every order
+
+Mar 12 2012 - Teeple
+	- lots of Makefile.core fixes, added some helper scripts
+
+Mar 13 2012 - Teeple
+	- lots of Makefile.core, Makefile.util fixes, parallel reduction basically goes through harness now
+	- cleaned up some signed vs unsigned comparisons
+	- fixed profile writing bug
+
+Mar 15 2012 - Teeple
+	- added floatvector and doublevector classes
+	- added pout to operameasureInstrumentProfile
+
+Mar 16 2012 - Teeple
+	- cleaned up a lot of paths in the Makefiles
+
+Mar 19 2012 - Teeple
+	- harness work on the intensity and polarimetry processes
+
+Mar 20 2012 - Teeple
+	- added error vector and chisqr support to polynomial class
+	- updated operaGeometry with errors and chisqr
+
+Mar 21 2012 - Teeple
+	- more work on error vectors
+	- added operafind script to easily locate the definition / uses of a token (such as a variable)
+	- added operagnuplot which safely calls gnuplot if installed
+	- operaInstrumentProfileCalibration now generates gnuplots
+
+Mar 22 2012 - Teeple
+	- added operaLib with systemf and itos defined
+	- added operalinecount to see where we are:
+
+operalinecount
+include/: 402
+include/core/: 941
+include/libraries/: 7903
+include/tools/: 511
+src/core/: 6884
+src/libraries: 19247
+src/tools: 6908
+test/: 2807
+scripts/: 1719
+harness/: 7983
+Grandtotal: 55305
+
+Mar 23 2012 - Teeple / Martioli
+	- normalized line spectra in operaWavelengthCalibration for easier visualization
+	- geomtry calcs moved to operasepctralordervector
+
+Mar 27 2012 - Teeple 
+	- major cleanup to operaWavelengthCalibration
+	- geomtry calcs moved to operasepctralordervector
+
+Mar 30 2012 - Teeple 
+	- added gnuplot support for .s products
+
+Apr 2 2012 - Teeple 
+	- added --witherrors flag to geometrycalibrations, since it was not terminating
+	- removed datamatrix and errorsmatrix from instrumentprofile, use a 1D cube instead
+
+Apr 3 2012 - Teeple / Martioli
+	- integrated Eder's updates
+	- added spectrum type (Raw, Standard, Optimal, OperaOptimal) to spectral elements
+	- changed optimalextraction to extraction, with a parameter for which type
+	- filled out the rest of the FloatVector and DoubleVector operators
+
+Apr 4 2012 - Teeple / Martioli
+	- integrated a fixed operaInstrumentProfileCalibration
+	- changed wcal to use .s files
+
+Apr 9 2012 - Teeple /  Martioli
+	- debugging of operaSNR
+	- added operaGeometricShapes.cpp, operaExtractionAperture.cpp
+
+Apr 10 2012 - Teeple /  Martioli
+	- fixed eps plotting
+
+Apr 11 2012 - Teeple /  Martioli
+	- operaGeometricShapes.cpp, operaExtractionAperture.cpp updates
+	- -n flag (no execute)
+
+Apr 16 2012 - Teeple
+	- brought back medfit in operaFit.c
+	- added getting started guide
+	- some work on the polarimetry framework
+
+Apr 17 2012 - Teeple / Martioli
+	- added opearFluxVector class in support of polarimetry module
+	- added operaFluxVarianceTest
+	- fixed a bundle of bugs in operaFITSImage operators
+	- now distributing xcode project zip
+
+Apr 18 2012 - Teeple / Martioli
+	- added compression parameters for the VFITS product
+	- integrated Eder's optimalextraction updates
+
+Apr 19 2012 - Teeple
+	- some fixes to the xcode project so build works
+	- fixed operaPixelSensitivityMap so it only uses orders for which it has geometry information
+	- added operaSpectralLines into core, should probably be a tool...
+	
+Apr 20 2012 - Teeple / Martioli
+	- integrated Eders (massive) changes
+	
+Apr 23 2012 - Teeple / Martioli
+	- integrated Eders operaExtractSpectralLines changes
+	- started on operaWavelengthCalibration integration with spectral lines
+	
+Apr 24 2012 - Teeple
+	- changed gain to be a calibration file, note new usage pattern
+	- added GainBiasNoise class
+	- added --numberofamplifiers argument to modules accepting gain input
+
+Apr 25 2012 - Teeple
+	- work on operaGain operaBias
+	- added operabiasinjector tool for OLAPA-ab
+
+Apr 26 2012 - Teeple
+	- added lines target do do spectral lines for all modes/speeds...
+
+Apr 30 2012 - Teeple / Martioli
+	- updates to measureinstrumentprofilecalibration
+	- fixes for MAXLINESPERFEATURE
+	- workaround in geometry calibration for EEV1 badpixelmask
+
+May 1 2012 - Teeple / Martioli
+	- new interface in polynomial class
+	- fix to operaSPectralLines so it doesn't abort when no lines are found in an order
+	- speed improvement to operaInstrumentProfileCalibration
+	- added -I --interactive option to operaExtractSpectralLines
+	
+May 3 2012 - Teeple / Martioli / Andre
+	- added operaExtractApertureCalibration
+	- -t -d now echos a gdb trace
+	- operafluxvector now propagates variances
+
+May 4 2012 - Teeple / Martioli / Andre
+	- added operaPlotInstrumentProfile.cpp tool
+
+May 7 2012 - Teeple / Martioli / Andre / Megan
+	- changed all FITS calibration images to be compressed, including badpixelmasks
+	- added Eder's aperture work, integrated parmeters and module call
+
+May 9 2012 - Teeple / Martioli / Andre / Megan
+	- Eder implemented serialization of apertures
+	- Doug implemented deserialization of apertures
+	- added a lot of out-of-memory exceptions
+
+May 10 2012 - Teeple / Martioli / Andre / Megan / Manset
+	- added a lot of out-of-memory exceptions
+	- added directory name typo check
+	- added TIMESTAMP in opera-1.0 directory - the build time/date
+	- master calibration images have comments about what images created them
+	- added Nadine's new README
+	- removed some unnecessary modules
+	- deleted some master calibration header keywords as per Nadine's request
+	- fixed some spectrum plotting issues	
+
+May 11 2012 - Teeple / Martioli / Andre
+	- cleaned up plotting of spectra and master calibration images
+	- master calibration images pngs now look decent
+	- added Polarimetry class and hooked it in to spectralordervector 
+	  in preparation for Andre's work
+	- fixed X11 window popping up when not in interactive plotting mode
+	  (please take take not to do a "set terminal x11" when in batch mode)
+	- added operaPolarimetry class and updated operaPolar module
+
+
+May 14 2012 - Teeple / Martioli
+	- lots of plotting fixes esp. for wavelength calibration
+	- removed uncalibrated spectrum interface in wavelength calibration
+	- integrated Eder's change to operSpectralElements to use fluxvectors
+	- all on team should get sourceforge IDs so that we can start logging bugs
+	  in bugtrakr
+
+
+May 15 2012 - Teeple / Andre / Megan
+	- integrated Andre's polarimetry updates
+	- work on wavelength calibration plotting
+	- added Megan's new classes for operaMultiExtensionFITSCube operaMultiExtensionFITSImage
+	- integrated Eder's extraction updates
+
+May 16 2012 - Teeple / Martioli / Andre / Megan
+	- integrated Andre's fluxvector variance propagation updates
+	- added lazy open of FITS images (in prep for big wircam images)
+	  there is no interface or usage impact on espadons images
+	- added optional numeric arguments to -d -p -t -v, that will have
+	  meaning depending on the module. For example -p52 would be interpreted as
+	  "plot order 52". Do opera -h for details. All modules should change the optargs
+	  processing to accept optional numeric modifiers. i.e.
+	  
+		{"plot",	optional_argument, NULL, 'p'},       
+		{"verbose",	optional_argument, NULL, 'v'},
+		{"debug",	optional_argument, NULL, 'd'},
+		{"trace",	optional_argument, NULL, 't'},
+		{"help",	no_argument,       NULL, 'h'},
+		{0,0,0,0}};
+	
+	while((opt = getopt_long(argc, argv, "v::d::t::p::h", 
+
+	I changed most of the modules already, but be aware.
+
+May 17 2012 - Teeple / Martioli / Andre / Megan
+	- integrated Andre's fluxvector variance propagation updates
+	- cleaned up all warnings
+	- added the operaWIRCamImage and operaFITSCube classes to round out Megan's work
+
+May 18 2012 - Teeple / Martioli / Andre / Megan
+	- added test cases for operaMEFImage, operaMEFCube, operaWIRCamImage, operaFITSCube
+	- integration with Megan's updates
+	- work on wircamimage class
+
+May 19 2012 - Teeple / Andre / Megan
+	- integrated Megan's and Andre's updates (Please get the integrated code before proceeding)
+	- added detrend, subtractreference pixel and subtractsky to operaWIRCamImage class
+
+May 21 2012 - Teeple / Andre / Megan
+	- integrated Megan's and Andre's updates (Please get the integrated code before proceeding)
+	- opened up the operators for MEF and MEF Cubes and WIRCam images
+
+May 22 2012 - Teeple / Andre / Megan
+	- removed unnecessary operators
+	- added link to pthreads library in prep for threaded MEF operators
+	
+May 23 2012 - Teeple / Martioli / Megan
+	- intagrated Eder's massive updates to extraction
+	- integrated Megan's MEFFITSImage changes
+	- added ImageVector in preparation for masking operations
+	
+May 25 2012 - Teeple
+	- added Box geometric shape for guide windows
+	- added ImageVector class for use with where, indexing FITSImages
+	- fixes to operaFITSImage changes that were causing geometry to fail
+
+May 26 2012 - Teeple / Megan
+	- fixed memory problem in operaExtractionApertureCalibration.cpp
+	- integrated Megan's changes to MEFFITSImage, MEFFITSCube, FITSCube classes
+
+May 29 2012 - Teeple / Andre / Megan
+	- fixed geometry crash
+	- added examples of masterdark and mastertwilightflat methods in wircamImage
+	- integrated Andre's updates to polarimetry
+	- integrated Megan's updates to MEF FITS & Cube images
+	- added wirpreview tool
+
+May 30 2012 - Teeple / Andre / Megan / Eder
+	- more geometry fixes
+	- worked on filling out MEF Cubes
+	- integrated Andre's updates
+
+May 31 2012 - Teeple / Andre / Megan
+	- added operaStarOnly and operaStarPlusSky modules
+	- integrated operaStarOnly and operaStarPlusSky into harness
+	- integrated Andre's & Megan's updates
+	- added more method shells in the new image classes
+
+June 1 2012 - Teeple
+	- integrated operaStarOnly and operaStarPlusSky modules into the harness
+	with the new processing step of extraction.
+	- added write extraction beam elements (read is not done yet)
+
+June 2 2012 - Teeple / Andre / Megan
+	- integrated Megan's (copyextension) and Andres (stokesvector) latest updates
+
+June 5 2012 - Teeple / Andre / Megan
+	- integrated Megan's (copy) and Andres (stokesvector) latest updates
+	- writebeam done
+	- fixed operaApertureExtractionCalibration segfault - was actually in operaFITSImage!
+
+June 6 2012 - Teeple
+	- work on operaPolar to accept processed spectra
+
+
+June 7 2012 - Teeple / Megan
+	- added Megan's fixes for copyextensionheader
+	- aded operaPolarIntensity core module
+	- removed a lot of unnecessary header includes
+	- added operafindheader to locate which header a token is defined
+
+June 8 2012 - Teeple / Megan / Andre / Eder
+	- operaFITSImage fixes for MEF
+	- Megan's EF Save & SaveAs
+	- Eder's mega changes
+	- Andre's mueller matrix changes
+	- NOTE: I put a FITS Cube (non-MEF) in /data/uhane5/opea/testdata/Cube.fits for testing
+
+June 13 2012 - Teeple / Megan / Andre
+	- integrated Megan's and Andre's updates
+	- harness interface updates for operaSpectralLines
+
+June 14 2012 - Teeple / Megan / Andre
+	- integrated Megan's and Andre's updates
+	- fixed beam spectrum-realted bugs in operaSpectralOrderVector for operaPolar
+
+June 15 2012 - Teeple / Megan / Andre
+	- integrated Megan's and Andre's updates
+
+June 16 2012 - Teeple / Megan / Andre
+	- integrated Megan's and Andre's updates
+	- some work on serialization of polarimetry
+
+June 18 2012 - Teeple
+	- serialization/deserializaation  of polarimetry
+
+June 20 2012 - Teeple / Eder
+	- work on operaMEFFITSImage headers
+	- integration of Eder's wavelength calibration work
+	- simplfication of FITSImage constructors
+
+June 22 2012 - Teeple / Andre / Megan
+	- update to [] operator for MEF & Cubes
+	- Megan.s copyheader work
+	- Andre's addition of istemp to polar
+
+
+June 25 2012 - Teeple / Andre / Megan
+	- major operator overload in MEFFITSImage, MEFFITSCube and FITSCube
+	- added map: e.g. map(image, F_NAN, 0.0); -- make all NaNs to be zero in the image
+	- integrated Andre's updates for handling INFs
+
+June 26 2012 - Teeple / Eder /Andre / Megan
+	- updates to wavelength calibration and instrument profile
+	- work on operators in MEFFITSImage
+	- harness changes for extraction of mastercomparison
+
+June 27 2012 - Teeple / Eder /Andre / Megan
+	- big reconciliation of spectrum_t and spectralorder_t
+	- added crosscorrelation to spectrum read/write
+	- integrated Andre's updates
+
+June 28 2012 - Teeple / Eder /Andre / Megan
+	- BIG change to spectralelements - now there is just one fluxvector...
+	- added operaFluxCalibration.cpp for standard flux calculation
+
+June 29 2012 - Teeple / Andre / Megan
+
+	- Addded to WIRCamImage:
+		void calculateSkyBackground(operaWIRCamImage &image);
+		void calculateQERatio(operaWIRCamImage *images[], unsigned count);
+		void createSky(operaWIRCamImage *images[], unsigned count);
+		void correctSkyLevel(operaWIRCamImage *images[], unsigned count);
+	
+	- added operaSpectralOrder interfaces:
+		operaSpectralOrder_t getSpectrumType(void);
+		void setSpectrumType(operaSpectralOrder_t format);
+		void applyTelluricCorrection(void);	
+		void applyNormalization(void);	
+		
+	- added call to applyTelluricCorrection() in operaTelluricCorrection module
+		(Eder, if you can implement this in operaSpectralOrder, the modules do make the call)
+	
+	- added call to applyNormalization() in operaNormalization module
+		(Eder, if you can implement this in operaSpectralOrder, the modules do make the call)
+	
+	- implemented wavelength calibration in extractors: 
+		operaPolarIntensity, operaStarOnly, operaStarPlusSky
+		
+	- integrated Andre's updates to Mueller matrix
+
+	- integrated Megan's wircaminage operators and support for header updates on a per extension basis
+
+July 2 2012 - Teeple / Andre / Megan
+
+	- fixed operaFITSCube reads
+	- Andre's fluxvector fix is in
+
+July 5 2012 - Teeple / Andre / Megan
+
+	- added: typedef enum {ToDefault, ToINF, ToNAN, ToZero, ToOne} TendsTowards_t;
+	  which permits the definitions of the disposition of div operations in the presence of infinities
+	- major rework of GeometricShapes and ExtractionAperture classes to fix memory issues
+
+July 6 2012 - Teeple / Eder /Andre / Megan
+
+	- integrated the new TendsTowards changes by Andre (this is very neat)
+	- implemented a consistent --ordernumber scheme for all modules
+	  -999 means all orders, otherwise a single order. The def'n of ordernumber is in the
+	  parameters makefile
+	- integrated Eder's PixelSet class and some more memory fixes in extractionaperture
+
+July 10 2012 - Teeple / Eder / Andre / Megan
+
+	- got operaFITSCube working, now just saveExtension in MEFFITS and complete MEFFITSCube
+	- backed out memory fixes as they cause aperture not to work, so aperture is working again, 
+	  but with memory issues
+
+July 11 2012 - Teeple / Eder / Andre / Megan
+
+	- reintegrated operaGeometricShapes, apertureextraction still works...
+
+July 13 2012 - Teeple / Andre / Megan
+
+	- added operaFITSImageWriteVirtual/operaFITSImageReadVirtual to write/read a subImage to/from 
+	  a disk resident (large image) ... for deep stacking.
+	- integrated Andre's update to operaPolar
+	- bug fixes to MEFFITSImage
+	- integration of operaApertureExtraction, aperture extraction working with fewer memory leaks
+	- major memory work on extraction - now does all orders (rawsum)
+
+July 17 2012 - Teeple / Andre / Megan
+
+	- much bug fixing in geometric shapes and extractionaperture (still issues)
+	- many MEF and MEFCube bug fixes
+	- added the wircolorcompsite tool that creates colr compsite images from
+	  3 wircam multifilter images. Very cool...
+
+July 23 2012 - Teeple / Andre / Megan
+
+	- split out espadons/wircam modules, headers, harness -- BIG change in directory structure,
+	  be sure you get the new xcode project...
+	- added image[(unsigned short *)j][i] support so you can now index into ushort images directly
+	- many MEF FITS images fixes
+	- many memory leak fixes (thanks Andre!)
+
+July 24 2012 - Teeple / Eder
+
+	- More work on splitting off wircam stuff -- scripts are now split
+	- Added wirDetrend as an example of how to create a module within the
+	  context of opera.
+	- Eder fixed PixelSet so extraction should be good to go again
+	- added guest instrument subdirectories so it will be easier to add
+	  new guest instruments.
+	- more memory leak fixes.
+	
+July 26 2012 - Teeple
+
+	- Added incremental save of order data to spectralordervector
+
+July 27 2012 - Teeple / Megan / Andre/ Eder
+
+	- integrated Eder's normalization method
+	- integrated Andre's work on spectrum simulations
+	- integrated Megan's work on MEFCube and rationalized the [] operator
+	- more memory fixes
+	
+July 28 2012 - Megan / Andre
+
+	- integrated Andre's work on spectrum simulations
+	- integrated Megan's work on MEFCube and rationalized the [] operator - fixed & working!!!!
+
+July 30 2012 - Eder / Teeple
+
+	- Mucho memory fixes
+	- integrated Eder's Normalization work
+
+July 31 2012 - Eder / Teeple / Megan
+
+	- Fixed the broken spectrallines class (that  broke)
+	- integrated Megan's updates to MEF/MEFCube
+	- added Eder's SED (operaSpectralEnergyDistribution) library
+
+Aug 2 2012 - Teeple / Megan / Eder / Andre
+
+	- creation of normalized flats conditional on the CREATE_NORMALIZED_FLAT flag 
+	- deprecated cretion of spectral lines, as wavelength calibration uses the beam spectra
+	- added globaldefines header file and included in every module/library/tool - so please pick up
+	  and use this build for integrationn sanity, globaldefines just has two entries now
+	  PRINT_DEBUG and RANGE_CHECK. You use RANGE_CHECK thusly on all indexed operations
+	  including the [] operator:
+	  
+	  	operaFITSImage& operator[](unsigned i) {
+#ifdef RANGE_CHECK
+		if (i > this->naxis3) {
+			throw operaException("operaFITSCube: ", operaErrorLengthMismatch, __FILE__, __FUNCTION__, __LINE__);	
+		}
+#endif
+	  ...
+	- also I did a lot of work on the doxygen documentation, many changes so do please pick 
+	  up the latest build
+	- ine=tegrated Megan's and Andres's RANGE_CHECK work
+	- integrated Eder's BeamSED Normalization work
+
+Aug 2 2012 - Teeple 
+	- many range check checks added
+	
+Aug 6 2012 - Teeple 
+	- fixed memory leaks in instrument profile calibration
+
+Aug 7 2012 - Teeple / Megan
+	- fixed memory leaks flux vector, many more
+	- progress on lazy MEF reads
+
+Aug 8 2012 - Teeple / Eder / Megan Andre
+	- massive integration of everyone's changes -- please get distribution and check carefully!!!
+
+Aug 10 2012 - Teeple / Eder / Megan / Andre
+	- Andre's spectralordervector read of Libre-Esprit polar data
+	- Eder's fixes on spectrallines for the profile shift
+	- Megan's lazy fixes (lazy MEF read)
+	- harness fixes for polar
+	- reads Gemini images
+
+Aug 14 2012 - Teeple / Megan
+	- Many MEFF FITS image fixes, convertinplace API
+	- Many harness fixes for polarimetry
+	- added gzstream library to implement use of compressed io streams
+	
+Aug 15 2012 - Teeple
+	- added gzstream library to implement use of compressed io streams
+	- changed operaspectralordervector to read/write compressed streams
+	  (currently turned OFF (see gzip in Makefile.parameters and #define GZSTREAM in globaldefines.h)
+
+Aug 20 2012 - Eder / Teeple
+	- operafluxcalibration/operacreatefluxcalibration modules integrated
+	- added support for reading compressed o.fits input images (i.e. from archive)
+
+Aug 21 2012 - Megan / Andre / Teeple
+	- fixed harness bug so parallel calibrations work now - this showed up as the cals
+	  filenames missing the amplifier qualifier (both Eder and Andre reported seeing this
+	  and it happened only in the parallel case.
+	- integrated Andres update to polar/stokes vector
+	- integrated Megan's fixes for aggressive read in operaFITSCube and operaMEFFITSCube
+	- many bug fixes to operators in all FITS classes
+	
+Aug 22 2012 - Andre / Megan / Teeple
+	- integrated Andre's work on the Null spectra and additional difference emthods as per
+	  Dave harrington's suggestion.
+	- added espqlh tool and quicklook support
+	- integrated Megan's updates to wircam image class
+	
+Aug 23 2012 - Teeple
+	- added eveningcalibration target for quicklook - it just does geometry
+	  not wavelength, but that is all we need for quicklook
+	- fixed many bugs in the operaWIRCamImage class so aggressive read works again
+
+Aug 24 2012 - Teeple
+	- quicklook test script added
+	- fixes for quicklook
+
+Aug 27 2012 - Teeple
+	- testing of compression & added catz tool to cat zipped files
+
+Aug 28 2012 - Teeple
+	- switched to all intermediate byproducts being compressed by default.
+	  Intermediate products are about 1/3 of the size now.
+	- added ASL11 to WIRCamImge class definition for fast indexed access
+	- use catz to view the files (like "cat" but unzips) i.e. 
+		catz OLAPAa_pol_Slow.geom.gz
+	- fixed lazy reads -- a bug in cfitsio - movabs doesn't work...
+	- added nonlinearcorrection method to operaWIRCamImage and support for passing
+	  the polynomial coefficients in the wircam harness
+
+Aug 29 2012 - Teeple
+	- added nonlinear correction support
+	- propagated workaround for cfitsio movabs bug
+	
+Aug 30 2012 - Teeple
+	- I compressed the thorium reference spectrum, lines and polynomial
+	  files in the config directory. The thar_ file is 1/4 of the original size.
+	  Also made a small change in wavelengthcalibration to read igzstream rather
+	  than ifstream. The amount of compression we are getting on .e files
+	  is amazing - from 16 to 2 megabytes!
+	- Implemented variance calculation in extractrawsum tool so that we can use
+	  it in quicklook. operaExtraction is just too slow to keep up with the images
+	  coming in.
+
+Aug 31 2012 - Teeple
+	- fixed bugs in >= operator & where function.
+	- speed up 7x in wircam detrend - a full detrend is now 1 minute!
+
+Sep 1 2012 - Megan / Teeple
+	- integrated Megan's detrend code, including test and module, small
+	  speedup change in masking bad pixels
+	- removed weightmap from detrend module, it was trivial and a module
+	  should produce only one output. Weightmap creation will be its own
+	  module.
+	- general speedups in median collapse (used in masterdark creation
+	  and single image stacking), reference pixel map creation, and
+	  non-linear correction.
+	- quicklook is good and fast now, SNR for all order in a few seconds
+	- gzipped intermediate products and calibrations working well now
+
+Sep 4 2012 - Teeple
+	- added SOFA library for upcoming heliocentric calculations
+	- bug fixes for latter end of pipeline
+
+Sep 6 2012 - Teeple / Eder
+	- major extraction bug fixes from Eder! Thanks!
+	- standardbeamextraction crash bug fixed! (now the default)
+	- distribute and approve are implemented
+	- made median collapsing a MEF cube easier:
+	
+	operaMultiExtensionFITSCube inmefcubeimage("mefcube.fits", tfloat, READONLY, cNone);
+	inmefcubeimage.medianCollapse();								// collapse all slices into slice 1
+	operaMultiExtensionFITSImage collapsed(inmefcubeimage, 1);		// create a MEF from slice 1
+	collapsed.operaMultiExtensionFITSImageSaveAs("MEFCollapsed.fits");
+	collapsed.operaFITSImageClose();
+	
+	This process is used extensively in creating processed darks and twilight flats
+
+Sep 7 2012 - Teeple
+	- work on FITS product creation
+
+Sep 10 2012 - Teeple
+	- added PRINT_OUTOFBOUNDS flag to try to find existing seg faults on Linux 32 bit
+	- added test of SOFA JD to compare with existing library - success! See operaJDTest in test/
+	- fixed median collapse memory bug & speedup
+	- fixed wavelength calibration segfault
+
+Sep 12 2012 - Eder / Teeple
+	- integrated Eder's extraction changes
+	- fixed wavelengthcalibration 0 element crash
+	- optimal extraction is now working!
+	- Eder and I both get Kahilu Burgers with fries!!!
+	  (Well, almost - there is one bug left that Eder is working on)
+	- added new "parameters" target as a way of capturing 
+	  parameter sets for the FITS product
+	- added operaTelluricWavelengthCorrection,
+	  operaHeliocentricWavelengthCorrection modules
+	- removed operaTelluricCorrection module
+
+Sep 13 2012 - Eder / Teeple
+	- integrated Eder's extraction/library changes
+	- added interface to createproduct to handle saving the calibration data
+
+Sep 18 2012 - Eder / Teeple
+	- change interface to .s creation to simplify normalization/autowave/flux calibration
+	  and permit greater parallelism
+	- wavelength calibration now checks for an existing calibration and refines it if found,
+	  otherwise uses the initial guess in config dir
+
+Sep 21 2012 - Teeple
+	- big doxygen cleanup
+
+Sep 25 2012 - Teeple
+	- added final design doc to docs/ folder
+	- cleanup up some compiler warnings
+	- added extension capability to operagetheader and operasetheader -- Thanks Karun!
+
+Sep 26 2012 - Teeple
+	- OPERA builds completely without warnings
+	- cleaned up mistaken dependency on libpng in makefile.am in tools/
+	- quicklook tested on hukilau/naio - opera runs on the servers now
+	  that should speed up testing
+	- also installed on polena, halea and ula as user wircam - a good
+	  test of portability as the environments are so different. detrend
+	  takes 1 min 45 sec on polena - 3/4 of that time is file i/o.
+	  On a mac-mini it takes about 1 minute.
+
+Sep 27 2012 - Teeple
+	- added ds9opera tool and operaimagestats.cpp.
+
+Oct 2 2012 - Teeple / Martioli
+	- integrated HI-TRANS table into config/.
+	- integrated Eder's spectralOrder changes for Star+Sky
+	- much work on imagestats and ds9opera
+
+Oct 11 2012 - Teeple / Martioli
+	- added solar and standard star reference spectra for flux calibration.
+	- much work on quicklook and ds9opera
+
+Oct 15 2012 - Teeple / Martioli
+	- added fluxcalibration .fcal to config for pol Normal, so we can test 
+	  whether it gets applied now...
+	- fixed incorrect polar dependencies in harness
+	- updated StarOnly and PolarIntensity to handle normalization, 
+	  fluxCalibration and HeliocentricWavelength correction
+	- changed harness so that polar takes .s files (to get wavelength)
+
+Oct 16 2012 - Teeple
+	- fixed bugs in operaPolarimetry, operaStarOnly so calibrated spectra work now
+	- added the m.fits rules for extended FITS products
+	- modified operaCreateFITSProduct to handle extended products so i.fits, o.fits and
+	  m.fits are all created (though m.fits has fitsverify issues as yet)
+
+Oct 17 2012 - Teeple
+	- m.fits being created and fitsverify, still some cleanup
+
+Oct 18 2012 - Teeple
+	- m.fits, p.fits, i.fits being created and fitsverifies, and can ve viewed in ds9
+	  see new document in doc/
+
+Oct 23 2012 - Teeple / Martioli
+	- Memory bug fixes in operaWavelength.cpp, operaSpectralOrder.cpp, operaSpectralElements.cpp
+	- integrated Eder's fixes so wavelength calibration is fast now
+	- parallel execution on naio hukilau is starting to work
+	
+Oct 24 2012 - Teeple / Martioli
+	- Memory bug fixes in operaSpectralOrder -- you may NOT copy addresses into dynamically allocated objects!
+	- Memory leak in optimalbeamspectrum fixed (required see above), so that is the default again
+	 
+Oct 26 2012 - Teeple / Martioli
+	- Integration of Eder's fixes to order spacing calibration, geometry
+	- updates to geometry plotting routines & usage
+	- added new module operaOrderSpacingCalibration, and updated harness
+	- minor fixes to ds9opera
+
+Oct 29 2012 - Teeple
+	- fixed some harness bugs for cases when we have more than one observing set
+	- reduction on 5 machines working smoothly now.
+	- added -p option to staronly, starplussky, polarintensity
+	- minor fixes to ds9opera
+	- added backoff of flux calibration config data to pol_Normal
+	- cleaned up plot arguments in harness
+	- added operaEchelleDispersionCalibration module and .disp target to harness 
+	(still need to save/restore in operaSpectralOerderVector)
+	 
+Oct 30 2012 - Teeple
+	- save/restore of dispersion polynomial in operaSpectralOerderVector
+	- fixed harness bug for local execution
+	- added LaurentPolynomial class to support dispersion
+	- added dispersion to m.fits product extensions
+	- added distance and wavelength vectors to operaPolarimetry class
+
+Oct 31 2012 - Teeple / Martioli
+	- operaSpectrlOrderVector now stores wavelength with polar data
+	- operaPolarimetry class contains a wavelength vector
+	- integrated Eder's wotk on Laurent Polynomials
+	- added the analysis module operaBinPolarData and the new analysis target: polarbinning
+
+Nov 2 2012 - Teeple / Martioli
+	- updates to ds9opera for plotting spectra
+	- integration of dispersion polynomial save/restore
+	- update of heliocentric correction
+
+Nov 7 2012 - Teeple
+	- bug fixes in reading dispersion polynomial in operaSpectralOrderVector
+	- many fixes in operaCreateProducts (which creates the m.fits, o.fits, i.fits products)
+	- and the companion tool, which creates the text versions of spectra and calibrations
+	  from the above
+
+Nov 8 2012 - Teeple
+	- header file cleanup
+	- harness fixes to direct errors to the errlog
+	- operaCreateProduct in core, and operaExtractProducts in tools working now
+
+Nov 13 2012 - Teeple / Martioli
+	- added operaPolariemtryCorrection module to do normalization and 
+	  autowave correction specifically for polar data 
+	- integrated Eder's changes to wavelength calibration
+	- added Eder's operaSpectralTools library
+	- some harness changes for the action going on in autowave, helio, etc
+
+Nov 15 2012 - Teeple / Martioli
+	- major changes in harness to calculate rvel and auto byproducts
+
+Nov 16 2012 - Teeple / Martioli
+	- cleanup of star+sky, staronly, polarintensity, polarimetrycorrection modules
+	- m.fits stores .rvel, .auto, p.rvel, p.auto
+
+Nov 20 2012 - Teeple / Martioli
+	- cleanup of polarimetry path
+	- inclusion id .wcar and .wcal calibration targets
+	- flattening of operaSpectralOrderVector i/o 
+	-- you need to clean all before any reductions
+	- added operaRadialVelocity to analysis-espadons (removed from core-espadons)
+	- integrated Eer's TelluircCorrection changes
+
+Nov 21 2012 - Teeple
+	- added .es byproducts, made .s Libre-Esprit compatible
+	- cleaned up plotting calls in harness
+	- added radialvelocitysequence target to analysis
+
+Nov 23 2012 - Teeple
+	- cleanup of time series radialvelocity target and polar binning
+	- cleanup of "clean" targets
+
+Nov 27 2012 - Teeple / Martioli
+	- integrated Eder's instrument profile plotting fixes
+	- operaPolar wavelength fixes
+
+Nov 28 2012 - Teeple / Martioli
+	- integrated Eder's geometry refinement
+	- changed m.fits to have varying x as well as y dimensions to save space
+
+Nov 29 2012 - Teeple / Martioli
+	- integrated Eder's geometry refinement fixes
+	- Eder's aperture calibration plotting fixes
+	- fixed operaspectralorder save bugs
+
+Nov 30 2012 - Martioli
+	- Eder's geometry calibration fixes
+
+Dec 4 2012 - Martioli / Teeple
+	- Eder's mastercomparison changes for multiple exposure time comparisons
+	- SBIG data rotated
+
+Dec 5 2012 - Martioli / Teeple
+	- Eder's fixes for SBIG data
+	- generalized DATADIRS interface to reduce, clean, calibrate
+	- added operaRotate tool
+	- added operaCalculateSpectralResolution and harness targets
+	- added reduction date and version string to master calibrations
+	- fixed --pick=1 not adding header keyword values
+
+Dec 6 2012 - Martioli / Teeple
+	- Eder's fixes for wavelength plots
+	- moved the night lock and plotting files to byproductsdir
+
+Dec 7 2012 - Martioli
+	- Eder's optimal extraction fixes
+
+Dec 11 2012 - Martioli / Teeple
+	- Eder's massive plotting fixes
+	- added operaFITSImageVector template class which operates on vectors 
+	  of images (see include/libraries/operaFITSImageVector.h): 
+	  operaFITSImageVector<operaFITSImage>infitsimages(fitsimages, tfloat, READONLY);
+	  operaFITSImage *stack = infitsimages.stack();
+
+Dec 13 2012 - Martioli / Teeple
+	- Eder's geometry changes
+	- added ReadSpectralOrder(Filename, Type); to operaSpectralOrderVector
+	  which reads the m.fits product
+	  and creates a spectralordervector from it.
+	- changed extractproducts tool to use above interface.
+
+Dec 14 2012 - Teeple
+	- change to dependencies to trim the amount of output products
+
+Dec 15 2012 - Teeple
+	- many bug fixes associated with use of m.fits
+	- added an intreting tool "operaApplyTransform" which reads an
+	  m.fits archive and produces any of the calibrated/ flux calibrated /
+	  heliocentric / telluric corrected spectra
+
+Dec 17 2012 - Teeple
+	- many bug fixes associated with creation of m.fits. i.fits. p.fits
+
+Dec 18 2012 - Martioli / Teeple
+        - operaApplyTransform bug fiixes
+        - Eder's heliocentric radial velocity updates
+        - Eder's wcal updates
+
+Dec 20 2012 - Martioli / Teeple
+        - added iightweight thread support to operaIstrumentProfileCalibration
+          so all orders can be processed "simultaneously" in parallel
+
+Dec 22 2012 - Martioli / Teeple
+        - yep. still here... fixed the operaBias segfault in 2 amp mode
+
+Dec 23 2012 - Teeple
+        -  harness now queries number of cpus and passes that to operaInstrumentProfileCalibration
+           to set maxthreads, then the thread driver spawns maxthreads at a time to
+           load to the maximum cpus.
+
+Dec 26 2012 - Martioli
+        -  Eder's wavelength calibration fixes and paramters
+
+Dec 28 2012 - Martioli
+        -  Eder's spectral order class fix for || instrument profile calibration crash
+        - changed operaExtraction module to accept maxthreads
+
+Jan 11 2013 - Martioli
+	-  Eder's flux calibration updates and masterfluxcalibration module
+
+Jan 14 2013 - Teeple / Martioli
+	- set maxthreads to one until debugged
+	- re-enabled fluxcalibration application for testing
+	- recenterIPUsingSliceSymmetry is now mode dependent
+	- added operagetpolarsequence script to support independent fluxcals for
+	  each polar sequence number
+	- added rule for $(QUALIFIERS) masterfluxcalibration creation
+	- added rule for odometer fluxcalibration creation
+
+Jan 15 2013 - Teeple / Martioli
+	- added mymaxthreads to set thread maximum
+	- integrated update to insrtumentProfileCalibration to make plotting thread-safe
+
+Jan 16 2013 - Teeple / Martioli
+	- rationalized DATASEC_t
+	- added storage of datasec in gain/noise products for 2 amp mode support
+
+Jan 17 2013 - Teeple / Martioli
+	- latest updates to masterfluxcalibrations
+
+Jan 18 2013 - Teeple / Martioli
+	- harness updates for fluxcalibrations
+	- 2 amp support in extraction!!! Woohoo!
+	- crosscorrelation added to polar output
+	- polarbinning analysis module is now called from the harness,
+	  see test/testscript.sh for an example of how to call
+	- radial velocity sequence analysis module is now called from the harness,
+	  see test/testscript.sh for an example of how to call
+
+Jan 22 2013 - Teeple / Martioli
+	- Eder's polarimetry fixes
+	- moved wavelength out of polarimetry class to use operaSpectralElemets
+	- polar calculation method stored in intermediate files and m.fits
+	- renamed core-espadons/operaPolarimetry to operaPolarimetryCorrection,
+	  so as not to be confused with the library of that name.
+
+Jan 23 2013 - Teeple / Martioli
+	- major memory bug fix in Gaussian class.
+	- integrated Eder's polar binning updates
+
+Jan 24 2013 - Teeple / Martioli
+	- fixed length mismatch exception in operaSpectralEnergyDistribution
+
+Jan 25 2013 - Teeple / Martioli
+	- integrated Eder's radial velocity correction updates
+	- found one major cause of thread segfaults & fixed,
+	  reduces instrument profile calibration from over an hour
+	  to 5 minutes with threads = 8 on konane
+
+Jan 28 2013 - Teeple / Martioli
+	- exception fixes in wavelength calibration
+	- updated Gaussian class so reallocs are not done
+
+Jan 31 2013 - Teeple / Martioli
+	- integrated Eder's fixes for length mismatch in Gaussian, etc
+	- cleaned up Laurent Polynomial class
+    - fixed parameter name mismatch in harness call to operaPolar
+
+Feb 2 2013 - Teeple
+	- fixed memory overwrite crash in operaTelluricWavelengthCorrection
+    
+Feb 3 2013 - Teeple
+	- added default gain/noise to orderspacing and geometry calibrations for
+      cases where inadequate calibrations were taken.
+    
+Feb 4 2013 - Teeple / Martioli
+	- Many fixes and parameter tunings for sp1 mode.
+	- split Makefile.core into core and Makefile.le to clearly separate the
+	  Libre-Esprit products from the main opera core products.
+
+Feb 5 2013 - Teeple / Martioli
+	- fixed invalid length fluxvector exception in operaTelluriWavelengthCalibration.
+	- added LIBRE_ESPRIT_COMPATIBILITY flag to harness/espadons/Makefile.configuration,
+	  default = 1, set this to 0 if you do not want the .s, .sn, i.fits and p.fits products
+	  generated for upena compatibility.
+	- renamed Heliocentric velocity correction to Barycentric.
+    
+Feb 6 2013 - Teeple / Martioli
+	- fixed invalid length fluxvector exception in operaTelluriWavelengthCalibration.
+	- fixed make errors in various clean targets and removed directories as well as contents.
+
+Feb 7 2013 - Teeple / Martioli
+	- removed separate bias calculation step as it is done by the gain module.
+
+Feb 8 2013 - Teeple / Martioli
+	- bug fixing in m.fits product creation and recovery.
+
+Feb 11 2013 - Teeple / Martioli
+	- fixed createproduct "invalid input type" bug.
+	- fixed occasional negative SNR values
+
+Feb 12 2013 - Teeple / Martioli
+	- added check for directory locked so Nadine doesn't do a "clean"
+	  while I am processing...
+	- put in a workaround (carefully marked) in operaSpectralLines::detectSpectralFeatures,
+	  to be removed when the bug is fixed...
+	- set starplusskymode always to 0 for all modes when calling extraction on the thorium spectrum
+	- moved lock to $(outdir)
+	- added host machine to error trace to help track down machine differences.
+
+Feb 13 2013 - Teeple / Martioli
+	- added "setup" target for quick image stats during setup.
+	- included resolution calculation in harness for setup calibrations,
+	  calling the module operaCalculateSpectralResolution.
+
+Feb 14 2013 - Teeple / Martioli
+	- integrated Eder's operaTelluricWavelengthCorection.
+
+Feb 15 2013 - Teeple / Martioli
+	- parameter tuning from Eder.
+	- work on setup to get similar results as LE
+
+Feb 19 2013 - Teeple / Martioli
+	- work on setup and LE compatibility
+
+Feb 20 2013 - Teeple / Martioli
+	- upena/LE compatibility -- moved Makefile.le to Makefile.upena and
+	  folded in Makefile.distribute, so all the CFHT-specific targets
+	  are in one file.
+	- added ETC support class libraries, tools and core module sample
+		operaObservingConditions operaObjectInTheSky operaSpectrograph operaTelescope
+		operaInstrumentEnvironmentSetup
+
+Feb 21 2013 - Teeple
+	- numerous small fixes in ds9opera support, and harness parameter values
+	  to support reduction of the current espadons run
+
+Feb 25 2013 - Martioli
+	- Eder's ETC files integration
+
+Feb 27 2013 - Teeple
+	- added e.sn product for use by operCreateProduct, as the LE-compatible .sn
+	  does not contain enough information to create the i.fits and p.fits products
+
+Feb 28 2013 - Teeple
+	- CreateProduct bug fixes
+	- added (optional) rules for telescope setup, spectrograph setup,
+	  object in the sky, observing conditions
+
+Mar 5 2013 - Teeple / Martioli
+	- hooked in observing conditions and skyobject calls
+
+Mar 7 2013 - Teeple / Martioli
+	- added --ENABLE-WCS build flag to optionally link in libwcs.a
+
+Mar 8 2013 - Teeple / Martioli
+	- increased recording of decimal precision to 8 & scientific notation
+	- -p flag support in setup modules
+
+Mar 11 2013 - Teeple / Martioli
+	- lots of small bug fixes...
+	- removed "scientific" format from save of spectralorder data as it was causing
+	  the occasional 0.0, when it shouldn't, default precision set to 6
+
+Mar 13 2013 - Teeple / Martioli
+	- final cleanup of distribution, approval and emails process
+
+Mar 15 2013 - Teeple
+	- workaround in operaTelluricWavelengthCorrection for overly large slit sizes
+	- critical fix in the process allocation procedure that was dropping odometers
+
+Mar 18 2013 - Teeple
+	- added test/operacheckmfitsunpack.sh to help automate testing of p.fits, i.fits, m.fits products
+
+Mar 20 2013 - Teeple
+	- bug fixes to create/extractproducts
+
+Mar 22 2013 - Teeple
+	- added test/nancheck to check platform-specific handling of Nan and Inf
+	- m.fits creation / extraction is working except for Nans
+
+Mar 27 2013 - Teeple
+	- added template <class T>
+		 bool parsefloating(T& result, stringstream& ssin)
+	  which handles reading of nans and infs from stringstreams.
+	  Oddly C++ writes nans and infs to stringstreams, but can't
+	  read them...
+	- added operastringstream class which handles nans and infs,
+	  input and output, along with test case
+
+Mar 28 2013 - Teeple
+	- added Double and Float classes which are stringstream read/write safe
+	  for nans and infs:
+	  
+	#include "libraries/operastringstream.h"
+	Double mydouble = 0.0;
+	Float myfloat = 0.0;
+	stringstream ss (stringstream::in | stringstream::out);
+	ss << "nan inf";
+	ss >> mydouble >> myfloat;
+	cout "Double/Float: "<< mydouble.d << ' '  << myfloat.f;
+	Double/Float: nan inf
+
+Apr 2 2013 - Teeple
+	- added a test script and better support for plotting opera vs upena
+	  spectrum results.
+	  
+Apr 3 2013 - Teeple
+	- hooked in plotting support for LE-compatible products.
+
+Apr 5 2013 - Teeple
+	- much work in comparing visually LE vs opera products.
+	- installed on xubuntu to test portability (found and fixed
+	  some interesting issues) Works!
+	- added tarball distribution
+
+Apr 8 2013 - Teeple
+	- fixed wl resolution bug for LE-compatibillity polar products,
+	  normalized polar is not available...
+
+Apr 9 2013 - Teeple
+	- added capability to overlay thorium atlas lines on spectrum plots
+
+Apr 11 2013 - Teeple
+	- use of flux calibration turned off for now
+	- order SNR now calculated as mean of mid order +-10 SNR value 
+	- download button on sourceforge fixed
+	
+Apr 12 2013 - Teeple
+	- Added multiplot of Intensity, Polar, N1, N2 to polar plotting
+	- Added Q79 to flux calibration set (the moon)
+
+Apr 15 2013 - Teeple
+	- Fixed bug in operaPolarimetry class for ratio method, see line 1026 operaPolarimetry.cpp
+	- added new target %pn.$(gzip) to Makefile.upena, normalizes input spectra before
+	calculating pdegree of polarization, in order to create the pn and pnw LE
+	compatibility products.
+
+Apr 18 2013 - Teeple
+	- Added gnuplotting of .e.gz.
+	- added overplot of telluric spectrum.
+
+Apr 19 2013 - Teeple / Martioli
+	- added calibrated opera spectrum types as Makefile.upena targets, for easier comparison
+	with upena
+	- added --fluxcalibrate flag to make it easier to turn on/off
+	- added gnuplotting targets for wavelength/nomralized opera extended spectra
+	- added test script to show how to create comparison plots. see
+	howtogenerateOperaUpenaComparisonPlots.sh
+
+Apr 23 2013 - Teeple / Martioli
+	- change of instrument profile parameters to give better extraction results
+	- updates to SNR plotting to plot speccific orders
+
+Apr 24 2013 - Teeple / Martioli
+	- fixes to ladfit, that was, in some cases having a nasty side-effect of sorting the input
+	- measurecontinuum converted to all double
+
+Apr 25 2013 - Teeple / Martioli
+	- set geom FFTfilter to zero by default, as it was messing up geometry in 13AQ02-Feb28
+	- made operaGeometry class all double
+	- ratonalized geometry distance cacluation to one spot in the operaGeometry class
+
+Apr 26 2013 - Teeple
+	- work on operaPolarimetry class and operaPolar, a few minor bug fixes.
+	- fixed the Intensity in polar being 2x.
+
+May 1 2013 - Teeple
+	- added flat response flux calibration capability for upena compatibility products.
+
+May 2 2013 - Teeple / Martioli
+	- integrated Eder's aperture bug fix.
+	- fixed ladfit hang.
+
+May 7 2013 - Teeple / Martioli
+	- integrated Eder's aperture updates.
+	- brought ladfit back to May 01 release, as it was causing polar to be all zeroes.
+	- added gnuplot of images:
+		opera /data/espadons/11AQ14-Jul08/1315170o.fits.eps -I=1
+
+May 8 2013 - Teeple / Martioli
+	- integrated Eder's aperture width updates.
+	- added operaPlotOut which elucidates geometry and optionally 
+	wavelength polynomials for overplotting the .fits.eps target
+
+May 10 2013 - Teeple
+	- Put operaPlotWave and operaPlotGeom back in the mix, as they nicely show
+	geometry superimposed on an image.
+	- beefed up .fits.eps support, to plot images with geom.  Middle click is get flux
+	ESC is exit...
+	
+May 14 2013 - Teeple / Martioli
+	- Integrated Eder's optimalextraction fixes.
+	- fixed a nasty side-effect bug in operaMath.c PolyLengthTrapzd,
+	where the variable "s" must be static!
+
+May 15 2013 - Teeple / Martioli
+        - Eder's wcal parameter updates.
+
+May 17 2013 - Teeple
+	- updates to reporting for daily opera reduction / approval process.
+
+May 20 2013 - Teeple / Martioli / Megan
+	- fixed an ambiguous interface to setWavelengthFromCalibration().
+	- added Megan's wirCreateDefaultSky.cpp tool.
+	- fixed Fedora compile issues in operaLib.cpp
+	- fixed operareport false errors  masterfluxcals and master fabperot
+
+May 21 2013 - Teeple / Martioli / Megan
+	- added wirdarkanalysis.cpp tool
+	- added operachecksnr script to compare opera with upena snr logs
+	- fixed a bug in operaLib.cpp which was causing open_temp to fail, please recheck on Fedora
+	- changed aperture height to match LE (from 0.8):
+	sp1_apertureHeight		:= 0.6923
+	sp2_apertureHeight		:= 0.6923
+	pol_apertureHeight		:= 0.6923
+
+May 23 2013 - Teeple / Martioli / Megan
+	- integrated Eder's operaSpectralOrder class fixes
+	- updated Megan's dark analysis tool
+	- various bug fixes to the daily report email
+
+May 28 2013 - Teeple / Martioli / Megan
+	- integrated Eder's polarimetry fixes
+
+May 31 2013 - Teeple / Martioli / Megan
+	- fixed operaPolar beam swap typo
+	- added badpix mask to dark analysis interface
+
+Jun 3 2013 - Teeple
+	- added WHERE clause to reduction for easier testing
+	- added targets command for easier testing
+
+Jun 5 2013 - Teeple / Megan
+	- added recursive directory reduction lists
+	- many Megan dark analysis fixes
+
+Jun 6 2013 - Teeple / Megan
+	- Calibrated[raw|standard|optimal]beamsepctrum now stores both distd and wl
+	  makes for easier range plotting
+
+Jun 7 2013 - Teeple / Megan
+	- Calibrated[raw|standard|optimal]beamsepctrum now stores both distd and wl
+	  makes for easier range plotting
+	- Megan's dark amalysis plots updates
+
+Jun 17 2013 - Teeple / Martioli / Megan
+	- update to standard stars
+	- new target: standardstars
+	- new target: targets
+	- added scripts/wircam/wirdarkquery.sh
+	
+Jun 18 2013 - Teeple / Martioli / Megan
+	- fixed a bug where libsofa would not build in the right place
+	  if opera was not installed in the $HOME directory
+
+Jun 19 2013 - Teeple / Martioli / Megan
+	- fixed the prefix bug so execution works in non-$HOME directory
+
+Jun 20 2013 - Teeple / Martioli / Megan
+	- integrated Eder's extraction fixes for the Nan issue
+	- updated Megan's wircam analysis work
+	- added -v to opera -h so people don't get overwhelmed
+	- added parameters tp better control telluric correcions desired:
+		wanttelluriccorrection		:= 1
+		wantbarycentriccorrection	:= 1
+
+Jun 24 2013 - Teeple / Martioli / Megan
+	- added snr target so SNR values may be re-insrted if necessary
+		opera FILE=<odometer> NIGHT-<nightdir> snr
+
+Jun 26 2013 - Teeple / Martioli / Megan
+	- revamped smoothed peak SNR calculations in espqlh and imagestats
+	- fixed swapped args bug in tools/operaExtractrawSum.cpp
+
+Jul 01 2013 - Teeple
+	- added more logging to espqlh
+	
+Jul 02 2013 - Teeple
+	- clarified installation instructions
+
+Jul 03 2013 - Teeple / Martioli
+	- integrated Eder's master flux calibration changes
+
+Jul 09 2013 - Teeple / Martioli
+	- integrated Eder's master flux calibration integration into staronly, star+sky,olar, etc processing
+	- iu.e, in.e, etc are now built with LE_COMPATIBILITY off
+	- aperture tilt calculation fix from Eder
+
+Jul 16 2013 - Teeple / Martioli
+	- integrated Eder's createfluxcalibration fix in operaSpectralOrderVector
+
+Jul 19 2013 - Teeple / Martioli
+	- set extraction sigma clip to 500 to improve extraction results
+
+Jul 24 2013 - Teeple / Martioli
+	- Eder's updates to masterfluxcalibrations
+
+Aug 01 2013 - Teeple / Megan
+	- added histogram function to operaStats.c
+	- added wirAstrometry wirPhotometry wirMasterDark wirMasterTwilightFlat wirPickSkies wirSubtractSky
+	  template modules
+
+Aug 02 2013 - Teeple / Megan
+	- added operaMasterTwilightFlat, operaMasterDark wircam support
+
+Aug 05 2013 - Teeple / Megan
+	- added operaZeroPoints, operaPickTwilightFlats, operCreateSky
+	
+Aug 07 2013 - Teeple / Megan
+	- added operaTwilightFlat (does ladfit) whereas operaMasterTwilightFlat does median
+
+Aug 09 2013 - Teeple / Megan
+	- added % median operator
+	- added dimensionality checks in all FITS image operators
+	- added variance propagation to wircam image class
+
+Aug 14 2013 - Eder
+	- Eder's extraction improvements
+
+Aug 15 2013 - Teeple
+	- fix to wircamImage, if naxis3 is 1 then a cube is not created
+
+Aug 20 2013 - Teeple / Martioli
+	- extraction bug fixes, to fix crash and speed up extraction
+	- added chmod a+r to all archive files that are copied in the approve upena compatiblity step
+
+Aug 23 2013 - Teeple / Martioli
+	- call ladfit rather than ladfit_d in operaSpectralOrder class.
+	- fixed so "make" ; "make install" works, LIBRARIES are noinst_
+	- fixed aborted polar sequence handling
+	- Eder's fcal fixes.
+	- quicklook now shows accumulated SNR over polar sequence
+	- fixed ds9opera for quicklook summit operation
+
+Aug 26 2013 - Teeple / Martioli
+	- changed the default prefix to $HOME/opera-1.0 in configure.ac
+
+Aug 27 2013 - Teeple / Martioli
+	- removed the matrix from fitsimage classes for space, and added assignVariances
+	  to get pixel by pixel variances across image, used in image operators to
+	  propagate errors.
+	  
+Aug 29 2013 - Teeple / Martioli
+	- fixed spurious newlines in compatibility product output.
+
+Sep 3 2013 - Teeple
+	- ds9opera exposure meter bug fixes
+
+Sep 4 2013 - Teeple
+	- oes image test
+
+Sep 5 2013 - Teeple
+	- changed build to use libtool and to generate shared libraries, to reduce the module image size
+
+Sep 6 2013 - Teeple
+	- made operaFFT lib static as it would not bind with fftw3 (static) as a dylib
+
+Sep 11 2013 - Teeple / Martioli
+	- Eder's updates to polar binning
+
+Sep 16 2013 - Teeple
+	- added operaSpectralOrder interface getPeakSmoothedSNR
+	- changed getSNR to return smoothed central SNR
+	- environment workarounds in ds9opera
+	- added Play button to ds9opera
+	- changed getobscomment to not use stored procedure
+
+Sep 17 2013 - Teeple
+	- changed opera.cpp to check for $HOME/opera-1.0 and use as prefix
+	- work on smoothing SNR values
+
+Sep 20 2013 - Teeple
+	- added ccd bin option to quicklook
+
+Sep 24 2013 - Teeple
+	- removed empty lines between orders in LE-compatible products
+
+Oct 8 2013 - Teeple
+	- added the i.e.gz output, which adds new columns:
+		wavelength: wcar, wcal, tell, rvel
+		flux: normalizedFlux,fcalFlux,fcalNormalizedFlux
+	- fixed an interface bug that pops up with the newest gcc compilers,
+	  that fixes the fitsio compression error.
+	- added instructions to fix the "ltmain.sh not found configure error.
+	- moved thorium spectrum to calibration dir
+
+Oct 9 2013 - Teeple / Martioli
+	- changed the i.e.gz and i.p.gz output, which adds new columns:
+		wavelength: tell, rvel
+		flux: normalizedFlux,fcalFlux
+
+Oct 11 2013 - Teeple / Martioli
+	- added flat field spectrum 
+	- added operaCreateFlatFieldFluxCalibration
+
+Oct 12 2013 - Teeple / Martioli
+	- added flat field spectrum input to the .s , .spc, .pol modules
+	- moved reading LE Moon spectrum to operaSpectralOrdervector
+
+Oct 15 2013 - Teeple / Martioli
+	- fixed polarimetry rule issues
+
+Oct 16 2013 - Teeple
+	- work on Makefile.analysis for plotting .pol.eps and .spc.eps
+
+Oct 17 2013 - Teeple
+	- fixed seg fault in operaPolarIntensity (not checking hasWavelength())
+	- fixes for Debian build #include <unistd.h>
+
+Oct 19 2013 - Teeple
+        - updates to build on ubuntu
+
+Oct 19 2013 - Teeple
+	- updates to build on ubuntu, where libm is in an unexpected subdirectory or /usr/lib/
+	
+Oct 21 2013 - Teeple
+	- fix ff_* input file bug
+	- adjust .s line count to remove counting of nans
+
+Nov 4 2013 - Teeple
+	- bug fixes for non-existent directories
+
+Dec 17 2013 - Teeple
+	- fix for bad dependency that was thought to case a make recursion (Makefile.core line 475):
+	%i.tell$(gzip): # causes recursion... %.e$(gzip)
+	removed the comment....
+
+Dec 18 2013 - Teeple
+	- moved .spc and .pol targets to Makefile.core
+
+May 8 2014 - Teeple
+	- fixed a bug in operaCCD.c operaCCDDetectMissingOrders causing geometry to segfault. Checked bounds of nloword and nhiord.
+	- fixed bugs in operaMatrix.c - comparing pointers to ints
+	- fixed bugs in operaStitchOrder.cpp - non-terminating loops
+	- integrated Lison's changes from the March build.
+	- integrated Eder's build from April.
+	- *** NOTE This build is for integration testing only - the changes have been very extensive!
+
+May 9 2014 - Teeple
+	- fixed circular and missing dependencies in master flat field generation
+	- fixed bad arguments to extraction
+	- fixed memory issues in reductionlist generation
+	- fixed bad dependency bug in flatfield generation
+
+May 12 2014 - Teeple
+	- flat field intensity spectrum rule was changed to have a dependency on the
+	aperture rather than the profile, since the aperture is used. The profile
+	dependency is in the aperture rule.
+	- added Build Master Documentation in doc/
+
+May 14 2014 - Teeple
+	- operaApertureCalibration, added check for positive flux before indicating
+	that an order has an aperture.
+	- removed many compiler warnings thanks to Lison:
+		operaCCD.c:1565:17: warning: comparison of unsigned expression < 0 is
+		always false [-Wtautological-compare]
+			if(imin < 0) {imin = 0;}
+				~~~~ ^ ~
+			1 warning generated.
+		operaStats.c:374:29: warning: if statement has empty body [-Wempty-body]
+			if (arr[low] > arr[high]) ;
+                                          ^
+		operaStats.c:374:29: note: put the semicolon on a separate line to silence
+		this warning
+		1 warning generated.
+		operaConfigurationAccess.c:93:61: warning: the value of the size argument
+		in 'strncat' is too large, might lead to a buffer overflow
+		[-Wstrncat-size]
+                strncat(configurationfilename, configurationfilebasename,sizeof(configurationfilename));
+	- build problems arose on the Debian machines, seems to be a 32 bit vs 64 bit issue, linker
+	problems indicate that libraries are being built 32 bit.
+	- fixed problems above and the r2dn servers are working once more
+	
+May 15 2014 - Teeple
+         - intermediate build to fix a problem in operaQueryImageInfo.cpp in tools/ notfits was reported
+        by some compilers as not being used. In fact it is assigned, but then never tested anywhere.
+        Eder please have a look and see what that variable was intended to do.
+
+May 16 2014 - Martioli
+
+Updates on operaOrderSpacingCalibration:
+
+* Implemented robust sigma cut algorith to clean outliers. This is mainly because the first orders in Graces have wider separation between slices than the separation between orders. This was causing the program to mix up the slices between two adjacent orders. The sigma clipping solves the problem, since it was happening only for the first orders and they are now considered outliers. 
+
+The files affected and updated are:
+
+operaOrderSpacingCalibration.cpp
+operaSpectralOrderVector.cpp / .h
+
+These changes should not affect ESPaDOnS data. 
+
+An example for the module call where it has been tested is given below:
+
+/Users/edermartioli/opera-1.0//bin//operaOrderSpacingCalibration --inputGainFile=20140505.gain.gz --plotfilename=spcplot.eps --datafilename=spcplot.dat --scriptfilename=spcplot.gnu --orderspacingoutput=20140505.ordp.gz --masterbias=20140505_masterbias.fits.gz --masterflat=20140505_masterflat.fits.gz --badpixelmask=/Users/edermartioli/opera-1.0//config/badpix_olapa-a.fits.fz --subformat="8 2040 3 4600" --aperture=31 --numberOfsamples=30 --sampleCenterPosition=2300 -v
+-------
+
+* Several bug fixes in operaGeometryCalibraiton. 
+
+First fix was in the order separtion tolerance which was based only in the separation at reference order. It uses now the polynomial model to calculate what the tolerance should be. This was affecting GRACES data because the order separation becomes smaller than the aperture for redder orders. 
+
+Second fix was in the last loop where Geometry calculates the tracing polynomials. Previously, it was using the absolute order number obtained in the last sample analyzed. This was bad since blue orders are faint at both ends of the detector, but they are sufficiently bright in the middle. This is fixed.  
+
+Below is an example of usage of Geometry for GRACES:
+
+/Users/edermartioli/opera-1.0//bin//operaGeometryCalibration --inputGainFile=20140505.gain.gz --plotfilename=geomplot.eps --datafilename=geomplot.dat --scriptfilename=geomplot.gnu --outputGeomFile=20140505.geom.gz --masterbias=20140505_masterbias.fits.gz --masterflat=20140505_masterflat.fits.gz --badpixelmask=/Users/edermartioli/opera-1.0//config/badpix_olapa-a.fits.fz --subformat="8 2040 3 4600" --aperture=34 --detectionMethod=2 --FFTfilter=0 --nsamples=40 --maxorders=39 --minordertouse=17 --orderOfTracingPolynomial=3 --binsize=10 --colDispersion=1 --invertOrders=1 --recenterIPUsingSliceSymmetry=1 --totalNumberOfSlices=4 --inputOrderSpacing=20140505.ordp.gz  --referenceOrderSeparation=56.8 --referenceOrderSamplePosition=2300 --referenceOrderNumber=53
+
+The files affected and updated are:
+
+operaOrderGeometryCalibration.cpp
+-------
+operaInstrumentProfileCalibration.cpp, operaSpectralOrders.cpp
+
+
+/Users/edermartioli/opera-1.0//bin//operaInstrumentProfileCalibration --plotfilename=profplot.eps --datafilename=profplot.dat --scriptfilename=profplot.gnu --outputProf=20140505.prof.gz --geometryfilename=20140505.geom.gz --masterbias=20140505_masterbias.fits.gz --masterflat=20140505_masterflat.fits.gz --mastercomparison=20140505_mastercomp.fits.gz --badpixelmask=/Users/edermartioli/opera-1.0//config/badpix_olapa-a.fits.fz --ipDimensions="34 5 7 5" --binsize=300 --ordernumber=-999 --method=2 --tilt=-3.0 --gain=20140505.gain.gz --referenceLineWidth=2.5 --spectralElementHeight=1.0 --maxthreads=4 -v
+
+
+----------
+operaExtraction.cpp
+operaSpectralOrder.h, operaSpectralOrder.cpp, operaPolar.cpp, operaStarOnly.cpp, operaSpectralOrderVector.cpp
+
+Added option starplusskyInvertSkyFiber, since GRACES can use either fiber for sky. I have also fixed a bug that was not reading wavelength in when an empty input for rvel was given. 
+----------
+
+Shell script to reduce GRACES data:
+graces_reduction.sh
+
+The script should be called as follows:
+
+For star+sky in fast readout mode:
+/opera-1.0/scripts/graces/graces_reduction.sh 20140506 2 1
+
+For star-only in fast readout mode:
+/opera-1.0/scripts/graces/graces_reduction.sh 20140506 1 1
+
+
+Also the scripts below were a preparation for the graces scripts. These can 
+be useful for people who are starting to learn OPERA, since they show the 
+sequence of execution of modules in a linear way. So, I would suggest to 
+keep them in the main distribution. 
+
+calibration_ESPaDOnS.sh
+full_reduction_ESPaDOnS.sh
+reduction_ESPaDOnS.sh
+
+-------
+
+The module operaMasterComparison.cpp was updated in my previous distribution and it has not been updated to the Opera distribution .
+
+-------
+Geometry fails for May/06 GRACES data.
+
+A big fix was needed. The fix includes changes in the following files: 
+ 
+ operaCCD.c/h
+ operaStats.c/h
+
+I made a function to detect orders using the IP method that is more reliable 
+than the previous one. I haven't removed the previous function since it was
+working for CFHT. However I don't think it will cause any problem for CFHT data. 
+
+-----
+
+StarOnly->	# Final tilt = -2.43129 +/- 0.232844
+S+S ->		# Final tilt = -1.51752 +/- 0.0221108
+
+Added files:
+
+/opera-1.0/config/standardstars/feige66.dat
+/opera-1.0/config/standardstars/feige66_operaFluxCal.dat
+
+wavelengthMaskForRefContinuumDetection.txt
+wavelengthMaskForUncalContinuumDetection_SolarTypeStars.txt
+wavelengthMaskForUncalContinuumDetection.txt
+
+These files added to the config directory. 
+
+masterfluxcalibration_EEV1_pol_Fast1.fcal.gz
+masterfluxcalibration_EEV1_pol_Fast2.fcal.gz
+masterfluxcalibration_EEV1_pol_Fast3.fcal.gz
+masterfluxcalibration_EEV1_pol_Fast4.fcal.gz
+masterfluxcalibration_EEV1_pol_Normal1.fcal.gz
+masterfluxcalibration_EEV1_pol_Normal2.fcal.gz
+masterfluxcalibration_EEV1_pol_Normal3.fcal.gz
+masterfluxcalibration_EEV1_pol_Normal4.fcal.gz
+masterfluxcalibration_EEV1_pol_Slow1.fcal.gz
+masterfluxcalibration_EEV1_pol_Slow2.fcal.gz
+masterfluxcalibration_EEV1_pol_Slow3.fcal.gz
+masterfluxcalibration_EEV1_pol_Slow4.fcal.gz
+masterfluxcalibration_EEV1_sp1_Fast.fcal.gz
+masterfluxcalibration_EEV1_sp1_Normal.fcal.gz
+masterfluxcalibration_EEV1_sp1_Slow.fcal.gz
+masterfluxcalibration_EEV1_sp2_Fast.fcal.gz
+masterfluxcalibration_EEV1_sp2_Normal.fcal.gz
+masterfluxcalibration_EEV1_sp2_Slow.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Fast1.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Fast2.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Fast3.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Fast4.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Normal1.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Normal2.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Normal3.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Normal4.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Slow1.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Slow2.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Slow3.fcal.gz
+masterfluxcalibration_OLAPAa_pol_Slow4.fcal.gz
+masterfluxcalibration_OLAPAa_sp1_Fast.fcal.gz
+masterfluxcalibration_OLAPAa_sp1_Normal.fcal.gz
+masterfluxcalibration_OLAPAa_sp1_Slow.fcal.gz
+masterfluxcalibration_OLAPAa_sp2_Fast.fcal.gz
+masterfluxcalibration_OLAPAa_sp2_Normal.fcal.gz
+masterfluxcalibration_OLAPAa_sp2_Slow.fcal.gz
+masterpolarfluxcalibration_OLAPAa_pol.fcal.gz
+
+
+- removed masterflatfieldfluxcalibration from Makefile.calibration as it was never used.
+
+May 19 2014 - Teeple
+
+- trial silent release...
+- moved instrumentprofile paramters to the paramteres file:
+	DetectionThreshold		:= 0.2
+	#LocalMaxFilterWidth = 2.5*referenceLineWidth
+	LocalMaxFilterWidth		:= 3.25
+	#MinPeakDepth			:= 1.5*noise
+	MinPeakDepth			:= 1.5
+  so that other instruments such as graces may have separate paramters. The graces
+  parameters were causing espadons data to fail.
+
+May 20 2014 - Teeple
+
+- moved instrumentprofile parameters to the parameters file;
+	DetectionThreshold		:= 0.2
+	#LocalMaxFilterWidth = 2.5*referenceLineWidth
+	LocalMaxFilterWidth		:= 3.25
+	#MinPeakDepth			:= 1.5*noise
+	MinPeakDepth			:= 1.5
+  so that other instruments such as graces may have separate parameters. The graces
+  parameters were causing espadons calibration to fail, finding no lines for the profile.
+  
+- fixed extraction bug that caused a divide by zero exception:
+
+	double ycenter_plus, ycenter_minus;
+	if((-beta + sqrt(beta*beta - 4*alpha*cc)) != 0 && (beta*beta - 4*alpha*cc) >= 0) {
+		ycenter_plus = (2*alpha)/(-beta + sqrt(beta*beta - 4*alpha*cc));
+		ycenter_minus = (2*alpha)/(-beta - sqrt(beta*beta - 4*alpha*cc));
+	} else {
+		//throw operaException("operaSpectralOrder:",operaErrorDivideByZeroError, __FILE__, __FUNCTION__, __LINE__);
+		// DT May 20 2014 -- We are likely to run in to problems when indexing through MAXSPECTRALELEMENTSPERORDER
+		// so, just break rather than throwing an exception and thus aborting...
+		break;
+	}
+
+- fixed aperture extraction to not count orders with zero flux (this was re-entered into the code May 20)
+	// DT May 14/20 2014, if we have no beam flux, we have no aperture...
+	if (beamFluxFraction[k] > 0) {
+		spectralOrder->setExtractionApertures(k,aperture[k]);
+		spectralOrder->sethasExtractionApertures(true);           
+	} else {
+		spectralOrder->sethasExtractionApertures(false);           
+	}
+- LocalMaxFilterWidth	changed from 3.25 to 6.25
+
+- bugs fixed:
+
+operaTelluricWavelengthCorrection.h:56: warning: 'void printUsageSyntax(char*)' declared `static' but never defined
+
+Status: closed-fixed
+Group: Deferred to V2.0
+Created: Tue May 20, 2014 08:23 PM UTC by Nadine Manset
+Last Updated: Tue May 20, 2014 08:23 PM UTC
+Owner: Eder Martioli
+
+Installing as user manset on akua, version
+opera-1.0.1207 build date Tue May 20 09:59:26 HST 2014
+
+Actually 2 warnings there:
+operaTelluricCorrection.cpp:210:7: warning: no newline at end of file
+../../include/core-espadons/operaTelluricWavelengthCorrection.h:56: warning: 'void printUsageSyntax(char*)' declared `static' but never defined
+
+operaStarPlusSky.cpp:322: warning: unused variable 'numberOfprintouts'
+
+Status: closed-fixed
+Group: Deferred to V2.0
+Created: Tue May 20, 2014 08:21 PM UTC by Nadine Manset
+Last Updated: Tue May 20, 2014 08:21 PM UTC
+Owner: Eder Martioli
+
+Installing as user manset on skua, version
+opera-1.0.1207 build date Tue May 20 09:59:26 HST 2014
+
+Warning (might not be harmful):
+operaStarPlusSky.cpp: In function `int main(int, char**)':
+operaStarPlusSky.cpp:322: warning: unused variable 'numberOfprintouts'
+
+Eder,
+Quite often your source files don't have a newline at the end. Could you make sure you pick up the files I fixed after the integration, so the problem doesn't come back. It is not a serious problem, but e want to get rid of all compiler warnings. Some can be serious...
+Doug
+
+[bugs:#114] operaSpectrograph.cpp:827:2: warning: no newline at end of file
+
+operaSpectrograph.cpp:827:2: warning: no newline at end of file
+
+Status: closed-fixed
+Group: Deferred to V2.0
+Created: Tue May 20, 2014 08:16 PM UTC by Nadine Manset
+Last Updated: Tue May 20, 2014 08:16 PM UTC
+Owner: Eder Martioli
+
+Installing on akua as user manset, version
+opera-1.0.1207 build date Tue May 20 09:59:26 HST 2014
+
+There is a warning (might not be harmful):
+
+2 warnings, one is warning: converting of negative value -0x0000003e7&#39; tounsigned int'
+
+Status: closed-fixed
+Group: Deferred to V2.0
+Created: Tue May 20, 2014 08:24 PM UTC by Nadine Manset
+Last Updated: Tue May 20, 2014 08:24 PM UTC
+Owner: Eder Martioli
+
+Installing as user manset on akua, version
+opera-1.0.1207 build date Tue May 20 09:59:26 HST 2014
+
+Those warnings look more harmful:
+
+operaStitchOrders.cpp: In function int main(int, char**)': operaStitchOrders.cpp:317: warning: converting of negative value-0x0000003e7' to unsigned int' operaStitchOrders.cpp:349: warning: comparison between signed and unsigned integer expressions operaStitchOrders.cpp: In functionbool calculateWavelengthShiftByXCorrInRange(operaSpectralElements, operaSpectralElements, double, double, double, double, float, double, double&, double&)':
+operaStitchOrders.cpp:449: warning: converting to unsigned int' fromdouble'
+
+Installation fails on akua - operaQueryImageInfo.cpp:379: error: `notfits' was not declared in this scope
+
+Status: closed-fixed
+Group: Deferred to V2.0
+Created: Thu May 15, 2014 02:34 AM UTC by Nadine Manset
+Last Updated: Mon May 19, 2014 06:33 PM UTC
+Owner: Eder Martioli
+
+Installing opera-1.0.1195 build date Wed May 14 16:06:50 HST 2014
+on akua.
+
+Error message:
+operaQueryImageInfo.cpp: In function int main(int, char**)': operaQueryImageInfo.cpp:379: error:notfits' was not declared in this scope
+
+(I removed the variable as it was not used - DT)
+
+- segfault fix in operaMasterFluecalibration - attempy to spline fit 1 one element array.
+	#define MINELEMENTS 20
+	// DT May 20 2014 you can't do spline fitting without some reasonable number of elements... if(nElements==0) {
+	if(nElements < MINELEMENTS) {
+
+- removed deprecated call to masterflatfieldcalibrations in espadons/Makefile.core
+
+- fixed segfault in operaTelluricWavelengthCorrection.cpp
+		// DT May 20 2014 fixed segfault in case that i goes less than zero...
+        for(unsigned i=binsize-2; i>(unsigned)((float)binsize*(1.0 - continuumBinFraction)) && i >= 0; i--) {
+            if (residuals_tmp[sindex[i]] < nsigcut*abdevm) {
+                dytop = residuals_tmp[sindex[i]];
+                break;
+            }
+        }
+	line 470:
+	// DT May 20 2014 don't try to process order if there are not enough spectral elements
+	if (spectralOrder->getSpectralElements()->getnSpectralElements() < MINELEMENTS)
+		continue;
+
+May 21 2014 - Teeple
+
+- changed "break" to "continue" so further orders are processed in:
+	void operaSpectralOrder::measureContinuum(operaFluxVector &uncalibratedFlux,operaFluxVector &outputContinuum, operaSpectralEnergyDistribution &spectralEnergyDistribution, unsigned binsize, unsigned nsigcut, unsigned orderOfPolynomial, bool usePolynomial) {
+- fixed bugs in operaReductionSet for graces
+
+May 23 2014 - Teeple
+
+- fixed bug in operaConfigurationAccess where a NULL filename was causing
+  the path to be incorrect
+  
+May 28 2014 - Teeple
+
+- fixed segfault in extractionApertureCalibration reference to out of scope address:
+// DT May 28 2014 this is set in to the aperture and must be a pointer and must not be deleted
+Line *beamExtractionLine = new Line((float)tan(tiltAngle[orderIndex]*M_PI/180),height,beamWidth,beamMidPoint);
+
+July 30 2014 - Martioli
+
+- Major changes in Geometry to fix problems in detecting orders for GRACES data. These changes 
+propagated to the following files:
+
+- operaExtractionApertureCalibration.cpp
+- operaOrderSpacingCalibration.cpp
+- operaGeometryCalibration.cpp
+- operaSpectralOrderVector.cpp/h
+- operaSpectralOrder.cpp
+- operaCCD.c/h
+- graces_reduction.sh
+
+Oct 27 2014 - Usher
+
+- Changes to Makefile.am to support newer GCC
+- src/core-espadons/Makefile.am
+- test/Makefile.am
+- updated INSTALLATION notes
+- changed ssh to rsync in scripts/operainstallweb
+
+Nov 6 2014 - Usher
+
+Modules/libraries:
+  Modified: operaGeometryCalibration
+    - reverted back to method operaCCDDetectPeaksWithIP rather than method operaCCDDetectPeaksByXCorrWithIP for detecting orders in detectionMethod == 2. The latter was firstly implemented for GRACES but it's not as stable for Espadons.
+    - updated usage notes to reflect the removal of referenceOrderNumber and referenceOrderSeparation parameters.
+  Modified: operaPolarimetryCorrection - updated initialization of variable numberOfBeams when instatiating Orders from polarimetry spectra. This was causing division by flat-field to crash since it was trying to retrieve information from inexistent beams.
+  Modified: operaSpectralOrder - updated function calculateStarAndSkyElements, where the main spectralelment is taken as the star beam and not star-sky.
+  Modified: operaSpectralOrderVector - updated function correctFlatField to match changes to operaPolarimetryCorrection.
+
+Harness/pipeline:
+  Added: pipeline - directory containing Python scripts intended to replace the harness
+  Modified: harness/espadons/Makefile.calibration
+    - moved parameters from operaGeometryCalibration to operaOrderSpacingCalibration
+    - removed EchelleDispersionCalibration to match pipeline scripts
+  Modified: harness/espadons/Makefile.parameters - updated numbers to match pipeline results
+
+Build files:
+  Added: fullbuild.sh - a script to build and install the source tree from scratch, including running autotools
+  Added: fullclean.sh - a script to uninstall and clean up the source tree, including removing files copied/generated by autotools
+  Added: sofa/makefile - a wrapper makefile for sofa to prevent "make uninstall" from aborting when reaching SOFA's makefile
+  Modified: Makefile.am - use SOFA's wrapper makefile instead of the real SOFA makefile
+  Modified: setup.sh - use the present working directory instead of "$HOME/opera-1.0"
+  Added: autoconf/bootstrap.sh - runs autotools one by one
+  Removed: autoconf/autogen.sh - replaced by bootstrap.sh
+  Ran autoreconf to update autotools files
+  Modified: src/core-espadons/Makefile.am, test/Makefile.am - reverted changes since the official Mac gcc toolchain does not support the changed linker switches
+
+Other components:
+  Added: DefaultCalibration - directory containing fits files for calibration
+  Added: pipeline/OPERA-cookbook.pdf - document explaining how to use the pipeline
+  Modified: INSTALLATION - updated notes for more complete build info
+  Modified: README - added info on the pipeline scripts and cookbook, ran a spellcheck
+
+Nov 13 2014 - Usher
+
+Modules/libraries:
+  Modified: operaCreateProduct - removed line which was resetting the number of columns to 28 (Star+Sky mode) when input files were Libre-Esprit spectra (.s files).
+  Modified: operaGeometryCalibration - doubled size of fysample array since it was looping through twice as many points as before. Out of bounds writes to fysample were causing module crashes upon cleanup.
+  Modified: operaSpectralOrder - updated functions applyBarycentricWavelengthCorrection and setExtendedBarycentricWavelengthCorrection to take RV correction in km/s rather than m/s.
+
+Harness/pipeline:
+  Modified: harness/espadons/Makefile.calibration - re-added the %.disp make target (removed Nov 6), but left out the make recipe
+
+Build files:
+  Modified: src/libraries/Makefile.am - added necessary dependencies for each library and re-arranged linker order
+
+Nov 21 2014 - Usher
+
+Modules/libraries:
+  Modified: operaGain - fixed a case fall-through when switching on input arguments (probably zero effect on any reasonable input cases)
+  Modified: operaGenerateLEFormats - fixed min/max order input checks
+  Modified: operaSpectralOrderVector - disabled checks that would skip wavelengths when corresponding flux was NaN (under LibreEspritsp2Spectrum case in WriteSpectralOrders function)
+
+Harness/pipeline:
+  Modified: harness/espadons/Makefile.upena
+    - fixed wavelength type in rule generating inw.s/pnw.s files
+    - fixed typo in plot filename in rule generating inw.s file
+  Modified: harness/espadons/Makefile.parameters
+    - increased maximumflatsforgain from 12 to 20
+  Modified: pipeline/pyScripts/espadons.py
+    - increased maximages argument passed in to operaGain from 12 to 20
+
+Build files:
+  Modified: operaError.h, libraries/ladfit.h, libraries/LaurentPolynomial.h, libraries/operaFITSCube.h, libraries/operaFITSImage.h, libraries/operaFluxVector.h, libraries/operaImage.h, libraries/operaLibCommon.h, libraries/operaMultiExtensionFITSCube.h, libraries/operaMultiExtensionFITSImage.h, libraries/operaStats.h, libraries/Polynomial.h, libraries/operaMultiExtensionFITSCube.cpp
+    - replaced all instances of STATIC (which isn't a real keyword) with static
+  Modified: Makefile.am files in src/analysis-espadons, src/core-espadons, src/core-guest, src/core-wircam, src/libraries, src/tools, test
+    - removed compiler macros defining STATIC=static
+  Removed: old src/tools/operaCreateBaxpixMask.h (old duplicate file in wrong folder)
+
+Nov 25 2014 - Usher
+
+Modules/libraries:
+  Modified: operaCreateFluxCalibration - updated to write to correct output files rather than debug console
+  Modified: operaSpectralOrderVector - updated normalizeAndCalibrateFluxINTOExtendendSpectra function to use flux calibrations instead of raw flux
+
+Harness/pipeline:
+  Modified: pipeline/pyScripts/espadons.py - added implementation of flux calibration features
+  Modified: pipeline/pyScripts/opera.py, pipeline/pyScripts/espadonspipeline.py, pipeline/pyScripts/espadonspipelineGUI.py - updated for changes to espadons.py
+
+Other components:
+  Added: DefaultCalibration/Polar_slow.fcal.gz - flux calibration data obtained for Polar mode in slow readout from the night of 13AQ10-Jun30.
+  Modified: config/wavelengthMaskForUncalContinuumDetection.txt - updated the 3 ranges between 528.85 and 588.54
+  Modified: config/standardstars/operaStandardStars.dat - fixed spacing
+
+Dec 16 2014
+
+Modules/libraries:
+  Modified: operaCCD - updated functions with noise parameters to take gain in as well, and use noise/gain in calculations in place of noise
+  Modified: operaSpectralOrderVector - updated calls to operaCCD peak detection functions to pass in gain inside the fitOrderSpacingPolynomial and measureIPAlongRowsFromSamples methods
+  Modified: operaGeometryCalibration
+    - added command line option for graces, along with checks for running graces specific code (lines no longer needs to be commented out for Espadons compatibility)
+    - updated calls to operaCCD peak detection functions to pass in gain
+
+Harness/pipeline:
+  Modified: pipeline/pyScripts/espadons.py
+    - for StarOnly mode, changed values of REFERENCELINEWIDTH from 1.8 to 2.0 and recenterIPUsingSliceSymmetry from 0 to 1
+    - changed maximages back to 12
+  Modified: harness/espadons/Makefile.parameters
+    - changed values of recenterIPUsingSliceSymmetry_sp2 and referenceLineWidth to match espadons.py
+    - changed maximumflatsforgain back to 12
+
+Jan 15 2015
+
+Modules/libraries:
+  Modified: operaStarOnly - updated usage syntax and comments
+  Modified: operaCreateProduct - refactored and updated code producing i.fits and p.fits:
+    - moved code segments into separate functions
+    - siginificantly reduced code duplication (cpp file is 850+ lines shorter)
+    - fixed inconsistencies in some fits columns when using .es input files
+    - transposed the output .fits file (swapped x and y axes)
+  Modified: operaTelluricWavelengthCorrection - updated application of telluric correction
+
+Harness/pipeline:
+  Modified: pipeline/pyScripts/espadons.py - updated parameters for operaTelluricWavelengthCorrection
+  Modified: harness/espadons/Makefile.core - modified to match changes to espadons.py
+  Modified: harness/espadons/Makefile.parameters - modified to match changes to espadons.py
+
+Other components:
+  Modified: multiple files in src, include, harness, scripts, test directories
+    - replaced teeple@cfht.hawaii.edu with opera@cfht.hawaii.edu
+  Modified: scripts/operainstallweb - replaced email address list with opera email alias
+  Modified: DEPENDENCIES - updated instructions for required dependencies
+
+Jan 26 2015
+
+Modules/libraries:
+  Modified: operaWavelength - added function applyRadialVelocityCorrection
+  Modified: operaSpectralOrderVector - added function getSpectrumWithinTelluricMask
+  Modified: operaTelluricWavelengthCorrection
+    - many sections of code rewritten and cleaned up
+    - uses all orders together to calculate radial velocity shift
+    - uses HITRAN library
+    - uses input wavelength mask for the telluric spectrum
+    - added option to output object and telluric reference spectra
+    - modified input parameters
+
+Harness/pipeline:
+  Modified: pipeline/pyScripts/espadons.py - updated parameters for operaTelluricWavelengthCorrection
+  Modified: harness/espadons/Makefile.core - modified to match changes to espadons.py
+  Modified: harness/espadons/Makefile.parameters - modified to match changes to espadons.py
+
+Other components:
+  Added: config/wavelengthMaskForTelluricAbsorption.txt
+
+Jan 29 2015
+
+Modules/libraries:
+  Modified: operaTelluricWavelengthCorrection
+    - removed input parameter numberOfPointsAroundMaximum
+    - updated to calculate the error on radial velocity
+    - updated gaussian fit to be more robust. Removed maximum correlation tests; rejection is now based on only the input threshold.
+
+Harness/pipeline:
+  Modified: pipeline/pyScripts/espadons.py - updated parameters for operaTelluricWavelengthCorrection
+  Modified: harness/espadons/Makefile.core - modified to match changes to espadons.py
+  Modified: harness/espadons/Makefile.parameters - modified to match changes to espadons.py
+  Added: pipeline/pyScripts/espadons.py.rvtemp - duplicate of espadons.py with additional changes to operaRadialVelocity
+
+Other components:
+  Modified: DEPENDENCIES - further updated instructions for required dependencies after testing
+
+Feb 12 2015
+
+Modules/libraries:
+  Removed: wircam modules; moved to extras
+  Removed: test modules operaMEFCubeTest, operaMEFFITSImageTest, and operaWIRCamImageTest; moved to extras
+  Added: ArgumentHandler - library for passing command line arguments to modules
+  Modified: operaSpectralOrderVector - swapped columns for Star and Star+Sky under LibreEspritsp1Spectrum case in WriteSpectralOrders function
+  Modified: operaSpectralOrder - removed getLECompatibleSNR function
+  Modified: espqlh - removed LEcompatible argument and calculations
+
+Harness/pipeline:
+  Removed: all wircam harness files; moved to extras
+  Modified: harness/espadons/Makefile.parameters - updated sp1 values under geometry and removed second set of values under instrument profile
+  Modified: harness/espadons/Makefile.calibration - removed invalid plot arguments from operaStitchOrders
+
+Build files:
+  Updated Makefile.am files to remove wircam modules and add ArgumentHandler
+  
+Other components:
+  Removed: wircam and sitelle scripts; moved to extras
+  Removed: OperaBuildAndDistribution.pdf
+  Modified: DEPENDENCIES - updated gnuplot version
+
+Feb 19 2015
+
+Modules/libraries:
+  Modified: operaCreateProduct - replaced old argument passing with new ArgumentHandler
+  Modified: opera - replaced passing -v -t -p -d to module calls with full argument names
+
+Harness/pipeline:
+  Modified: harness/espadons/Makefile.calibration - fixed issue with commented out arguments causing error on OSX
+  Modified: harness/espadons/Makefile.core - updated arguments for operaCreateProduct
+  Modified: harness/espadons/Makefile.upena - updated arguments for operaCreateProduct
+
+Other components:
+  Modified: DEPENDENCIES, INSTALLATION, README - updated instructions
+
+Feb 24 2015
+
+Modules/libraries:
+  Added: operaCreateFlatResponse - for flux calibration with standard source
+  Modified: operaCreateProduct
+    - removed practically empty header file
+    - updated fits headers to include HRV keyword with RV correction
+  Modified: operaRadialVelocity - rewrote most of the module
+  Modified: operaSpectralTools - added function convolveSpectrumWithGaussianByResolution
+  Modified: operaSpectralOrderVector - added functions normalizeAndApplyFlatResponseINTOExtendendSpectra, calculateRawFluxQuantities, and readLibreEspritFlatResponseIntoSED
+  Modified: operaCCD - updated calculations in function operaCCDDetectPeaksByXCorrWithIP
+  Modified: operaPolarimetryCorrection, operaPolarIntensity, operaStarOnly - added flat response calibration
+  Modified: operaGeometryCalibration - modified sigma value for slit
+
+Harness/pipeline:
+  Removed: pipeline/pyScripts/espadons.py.rvtemp - no longer needed
+  Modified: pipeline/pyScripts/espadons.py
+    - integrated changes to operaRadialVelocity
+    - added variables for parameters for operaRadialVelocity and operaCreateFlatResponse
+    - added call for operaCreateFlatResponse module
+    - adjusted parameters to operaGeometryCalibration
+    - added added flatResponse parameter to spc creation modules and operaPolarimetryCorrection
+  Modified: harness/espadons/Makefile.parameters - updated to match changes to espadons.py
+  Modified: harness/espadons/Makefile.analysis - updated to match changes to to espadons.py (operaRadialVelocity)
+  Modified: harness/espadons/Makefile.calibration - seperated aperture variables for operaOrderSpacingCalibration and operaGeometryCalibration
+  Modified: harness/espadons/Makefile.upena - added rvel parameter to operaCreateProduct
+  Modified: harness/espadons/Makefile.core - updated to match changes to to espadons.py (flatResponse parameter)
+
+Build files:
+  Modified: core-espadons/Makefile.am - added operaCreateFlatResponse
+
+Other components:
+  Modified: config/wavelengthMaskForRefContinuumDetection.txt - removed last range and lengthened the preceeding range
+  Added: config/flat_resp.s, config/wavelengthMaskForRVxcorr.txt, config/syntethicSpectra/M_s5500g3.0z0.25t1.0_a0.00c0.00n0.00o0.00r0.00s0.00_VIS.spec.txt, config/syntethicSpectra/Teff5500.spec
+
+Mar 2 2015
+  - Changed operaGeometryCalibration parameters to find missing order on the blue side
+  - Changed minimum number of lines for InstrumentProfileCalibration from constant into a parameter
+  - Fixed calculations in BarycentricWavelengthCorrection
+  - Added HeliocentricWavelengthCorrection module, used in place of BarycentricWavelengthCorrection
+  - Created subclass of ArgumentHandler to handle plot, verbose, debug, and trace switches by default
+  - Changed harness to use specified extension rather than gzip
+  - Updated differences in python script, espadons harness, and graces harness to sync changes
+  - Updated DEPENDENCIES and AUTHORS
+
+Apr 8 2015
+  - Added two new modules for use with other spectrographs (operaRotateMirrorCrop, operaMedianCombine)
+  - Added ability to write output using the same order wavelength ranges as LE (operaGenerateLEFormats)
+  - Added ability to use FITS files as input/output when creating flat response files (operaCreateFlatResponse)
+  - Added ability to use FITS file as input flat response (operaSpectralOrderVector)
+  - Added ability to normalize when no wavelength mask is provided (operaSpectralOrderVector)
+  - Added ability to use .fits.gz input files with Makefile harness
+  - Added ability to use short names in Python harness (e.g. CALIB instead of CALIBRATIONS).
+  - Added table of order wavelength ranges used by LE to use with operaGenerateLEFormats
+  - Added flat response spectra for OLAPA and EEV1 detectors
+  - Added new flat response for OLAPA in FITS format generated by median combining flat responses from 8 exposures of 2 standards, HR7596 and HR8634, taken in Polar+Slow, on the night of 13AQ10-Jun30
+  - Fixed description for header keyword "HRV" in output FITS files (operaCreateProduct)
+  - Fixed argument parsing error when creating flat response files (operaCreateFlatResponse)
+  - Fixed code dealing with minorder/maxorder parameters (operaExtraction, operaPolarIntensity, operaPolarimetryCorrection, operaStarOnly, operaStarPlusSky, operaWavelengthCalibration, operaGenerateLEFormats)
+  - Fixed cases where spectral orders were not properly flagged as containing spectral elements (operaSpectralOrder)
+  - Fixed issue where an exception was thrown in a valid situation, specifically the creation of SpectralEnergyDistribution elements in a spectral order with zero beams (operaSpectralOrder)
+  - Fixed issue where operaStitchOrders was called twice by the Makefile harness
+  - Fixed call to operaTelluricWavelengthCorrection in the Makefile harness to use correct argument names when using polar files
+  - Fixed situation where extra files were not properly removed from spectra directory by the Makefile harness when plotting
+  - Fixed typo causing wrong parameter to be passed to operaInstrumentProfileCalibration by Python harness
+  - Fixed issue where using verbose mode with the Python harness caused conflicts with operaArgumentHandler in some modules
+  - Fixed issue where wavelengthCalibration was not converging for one of the orders by changing values of uncalibrated_linewidth parameter (harness parameters)
+  - Fixed issues with finding the center of orders in operaGeometryCalibration by changing recenterIPUsingSliceSymmetry to "0" for StarOnly mode (harness parameters)
+  - Fixed unusual crash in operaWavelengthCalibration by changing value of nsigclip from 2.5 to 2.25 to (crashed only on 14BQ04-Sep15 in a test run of 28 nights) (harness parameters)
+  - Updated parameter passing method for some modules (operaStitchOrders, operaBarycentricWavelengthCorrection, operaHeliocentricWavelengthCorrection, operaTelluricWavelengthCorrection)
+  - Updated the way WriteSpectralOrders determines minorder/maxorder by only accepting orders with the corresponding component (operaSpectralOrderVector)
+  - Updated names and usage of certain confusing parameters to increase clarity (operaInstrumentProfileCalibration)
+  - Updated library functions that are used repeatedly in mulitple modules to significantly improve performance (operaInstrumentProfile::getipDataFromPolyModel, operaSpectralOrder::calculateXCorrBetweenIPandImage) 
+  - Updated large sections of code to improve geometry calibration and increase reliability (operaGeometryCalibration, operaCCD)
+  - Updated IPtilt value to depend on mode when using Makefile harness, matching the Python harness
+  - Updated MinPeakDepth value to depends on speed in the Makefile harness
+  - Updated GRACES parameters in Makefile harness
+  - Updated Python harness to include GEOMETRY as one of the products in CALIBRATIONS
+  - Updated Python harness to include target to create LE FITS product
+  - Updated Python harness to removed masterfluxcalibration section, since flatresponse is now used by default
+  - Updated Python harness parameters to create flat response in FITS format
+  - Updated Python harness so users no longer need for users to touch .py files since datarootdir, pipelinehomedir and productrootdir variables are now command line arguments
+  - Updated Python harness to cleaned up outdated comments
+  - Updated parameters for operaInstrumentProfileCalibration (harness parameters)
+  - Updated wcal_ref.dat to add a "first guess" for order #22
+  - Updated each reference spectrum of standards (../config/standards/*_operaFluxCal.dat) to cover a wider wavelength range because the first order used now (#22) exceeds the previous range
+  - Updated wavelengthMaskForUncalContinuumDetection.txt and wavelengthMaskForRefContinuumDetection.txt to cover a wider range as well
+  - Updated installation instructions
+
+Apr 28 2015
+  - Added wavelength calibration parameters for DetectionThreshold and MinPeakDepth (operaWavelengthCalibration)
+  - Fixed issue where harness was using the wrong parameter names for plots in operaPolarimetryCorrection
+  - Fixed issue where harness was not passsing .rvel or .tell files to operaCreateProduct for all modes
+  - Fixed harness to say "Heliocentric" instead of "Barycentric"
+  - Fixed various order numbering problems caused by LE_order_wavelength.dat and wcal_ref.dat.gz files, as well as referenceOrderNumber and stitch_orderOfReference parameters
+  - Updated more modules to use operaArgumentHandler (operaBias, operaCalculateSpectraclResolution)
+  - Updated the way telluric wavelength corrections are applied so the .tell file contains a radial velocity shift instead of wavelength calibration coefficients (operaTelluricWavelengthCorrection, operaSpectralOrder, operaSpectralOrderVector, operaPolarIntensity, operaPolarimetryCorrection, operaStarOnly, operaStarPlusSky)
+  - Updated FITS output file to contain header keyword "TELLRV" (operaCreateProduct)
+  - Updated FITS output file to no longer contain comments with redundant column descriptions (operaCreateProduct)
+  - Updated telluric region mask (wavelengthMaskForTelluricAbsorption.txt)
+  - Updated harness to be able to use LE order wavelength ranges for generating LE polarimetry products
+  - Updated harness parameters in geometry calibration, instrumpent profile calibration, and polarimetry extraction
+  - Updated harness to set x/y-ranges for plots of LE products
+  - Updated GRACES harness with modifications similiar to the ones made for ESPaDOnS
+
+Jun 12 2015
+  - Added a Python harness for GRACES
+  - Added 'flatresp' command to the Makefile harness to create flat response images from standard stars
+  - Fixed Makefile harness putting duplicate calibration entries into opera.log during reductions (modules now output to operacal.log)
+  - Refactored, made fixes to, cleaned up, and improved consistency of code across many modules
+  - Updated many modules to use operaArgumentHandler library
+  - Fixed potential memory leaks in several places
+  - Made code more compliant with C++ standards, allowing OPERA to be built with stricter compilers or settings
+  - Updated calibratedextendedbeamspectrum format (.spc files) to add two addtional columns: <normalizedFlux variance> <fcalFlux variance>
+  - Updated extendedpolarimetry format (.pol files) to add two addtional columns: <normalized StokesI flux variance> <calibrated StokesI flux variance>
+  - Fixed issue where flux errors would not correctly propagate to each Libre-Esprit intensity format
+  - Fixed bug where intensity fits files had wrong number of columns in polar mode
+  - Updated Makefile harness to use Heliocentric instead of Barycentric wavelength correction for polarimetry
+  - Added a tilt plot for operaExtractionApertureCalibration and fixed related bugs (implemented in Python harness)
+  - Fixed x-label of output plot in operaOrderSpacingCalibration
+  - Updated the x-range of the SNR plot in Makefile.analysis
+  - Fixed Python harness to match change made to parameters for operaTelluricCorrection
+  - Updated Makefile harness to change instument profile calibration method
+  - Added new argument to operaWavelengthCalibration --inputLineSetFilename, which allows to input a set of lines identified by hand instead of an initial solution (--wlcal_initialguess)
+  - Added new argument to operaExtractionApertureCalibration --constantTilt to allow using a constant tilt angle for all orders
+  - Added new argument to operaExtendedSpectrumCreation --SkyOverStarFiberAreaRatio to compensate for different apertures
+  - Propagated changes for SkyOverStarFiberAreaRatio to the python harness (Makefile harness hasn't been updated for this)
+  - Fixed a bug in operaWavelengthCalibration that would occur when using --parseSolution (not used by Espadons)
+  - Modifications made to arguments for operaPolar and operaPolarimetryCorrection
+  - Updated Makefile harness parameter values for operaWavelengthCalibration, operaGeometryCalibration, and operaExtractionApertureCalibration
+  - Updated Python harness parameter values for operaOrderSpacingCalibration, operaGeometryCalibration, operaInstrumentProfileCalibration, operaExtractionApertureCalibration, and operaWavelengthCalibration
+
+Oct 7 2015
+ Libraries:
+  - Rewrote library function operaArrayIndexSort, fixing a bug which caused data to be incorrectly sorted.
+  - Fixed a bug in operaSpectralTools library function calculateUniformSample where the last point was sometimes left uninitialized.
+  - Modified operaSpectralOrder function calculateStarAndSkyElements to actually perform sky subtraction.
+  - Rewrote much of the operaFluxVector class to work in a more understandable way and fix issues with several calculations.
+  - Added Resize methods to operaFluxVector, operaSpectralElements, operaStokesVector and operaPolarimetry. Used these in place of previous resizing functionality which had unpredictable behavior.
+  - Added several core pieces of functionality, refactored code, and fixed many issues involving extended flux vectors, especially for individual beams.
+  - Updated many methods in various classes, along with some other library functions, to improve const correctness.
+  - Split normalizeAndApplyFlatResponseINTOExtendendSpectra into two independent methods. Rewrote and refactored both, and many of the methods they call, allowing them to work on each beam.
+  - Refactored, reorganized, cleaned up, and fixed bugs in file reading/writing functions in operaSpectralOrderVector and moved them into new operaIOFormats library, which should be more consistent and easier to maintain.
+  - Refactored functionality for reading in wavelength ranges, and trimming orders by wavelength ranges into operaSpectralOrder and operaSpectralOrderVector, and fixed several issues with data being scrambled.
+  - Increased MAXORDERS from 100 to 200 (was preventing data reduction for a different spectograph).
+ Modules:
+  - Rewrote operaStitchOrders to use radial velocity shifts instead of wavelength shifts. Changed arguments accordingly, and added a diagnostic plot.
+  - Rewrote operaTelluricWavelengthCorrection to improve clarity and fix issues. Implemented new correction method using telluric line matching, giving improved results. Implemented addtional plots.
+  - Rewrote operaCreateProduct to only convert from LE or spc/pol files. Added ability to trim orders. Determines mode from spectrumtype argument instead of checking fits keyword. Removed work-in-progress info from headers.
+  - Modified operaWavelengthCalibration to skip the last solution refinement step. Added missing output statements. Changed non-error messages to write to stdout instead of stderr. Added more information to data/plot files.
+  - Updated operaExtendedSpectrumCreation to add ability to read in wavelength ranges and trim orders, allowing the removal of noisy regions before normalization.
+  - Refactored and cleaned up operaCentricWavelengthCorrection. Updated to use the time halfway through the exposure rather than at the end. Fixed an issue where negative signs were lost if the hours/degrees equaled zero.
+  - Fixed several bugs and cleaned up code in operaGain. Updated to perform more stringent checks on its arguments.
+  - Updated operaInstrumentProfile to handle errors more gracefully when they should be non-fatal.
+  - Updated operaPixelSensitivityMap to use operaArgumentHandler.
+  - Cleaned up code in operaPolar, operaSNR, operaCalculateSpectralResolution, and operaPixelSensitivityMap.
+  - Made more arguments required in several modules.
+  - Commented out section of currently unused operaStatistics tool that required deprecated functions.
+ Formats:
+  - Corrected naming convention for Libre-Esprit files so that "w" (e.g. inw and iuw) means "without telluric wavelength correction."
+  - Replaced SNR format with a new format that includes both SNR per spectral bin and SNR per CCD pixel.
+  - Replaced old m.fits product with new format containing the same columns as the spc file.
+  - Changed decimal precision of distance in .p file to match precision in .e file.
+  - Added fcal/normalized flux/variance for each beam to spc format, and reorganized and relabeled columns for consistency.
+ Config:
+  - Modifed wavelength ranges in LE_order_wavelength.dat, and changed format to allow file to be read in by operaIOFormats.
+  - Updated wavelengthMaskForTelluricAbsorption.txt to remove very red region.
+  - Added GRACES flat response (obtained from commissioning data of Feige66 observed on Jun 03/04 2015).
+ Harness:
+  - Updated harness to trim orders to LE order wl ranges only during spc and pol creation.
+  - Skipping operaStitchOrders for now, since results seem better without it.
+  - Updated the way harness calculates exposure time for operaHeliocentricWavelengthCorrection for polarimetry.
+  - Fixed call to operaCreateProduct to use p.rvel and p.tell instead of i.rvel and i.tell when creating p.fits.
+  - Added arguments or fixed argument issues with operaStarPlusSky, operaExtractionApertureCalibration, operaTelluricWavelengthCorrection, and operaGain.
+  - Removed plot arguments from operaExtraction.
+  - Added error checks for missing rvel/tell files when they are expected.
+  - Reduced telluric radial velocity range and step size.
+  - Changed wavelength calibration damping factor for polar and S+S observing mode to have more Th-Ar lines.
+  - Updated operagetmode to take optional argument specifying the mode header keyword, and updated harness to use MODE_HEADERKEY parameter for determining the instrument mode.
+  - Updated Makefile.calibration for GRACES modifications for masterflat, masterbias, mastercomparison, images.
+  - Fixed a few bugs in GRACES Python harness and tuned parameters to make reduction more robust. Added simple command line tool to add object keyword to FITS file.
+  - Added harness directory for Narval.
+ Other:
+  - Fixed issue with linker options which would cause build to fail on some platforms.
+  - Moved unused modules and parts of the harness to extras directory.
+
+Dec 24 2015
+ Core libraries:
+  - Added operaVector class to provide an object oriented replacement to using double arrays. Provides vector calculations and other common functionality using the C++ standard library.
+  - Updated core library classes (operaFluxVector, operaSpectralElements, operaStokesVector, and operaPolarimetry) to:
+     - have more consistent and cleaner designs,
+     - use operaVector instead of arrays and pointers
+     - include updated Doxygen comments
+     - clean up include file trees
+  - Updated other libraries and modules to adapt to and simplify code using these changes.
+ Range trimming:
+  - Added operaIndexRange class, to represent a range of elements in operaVector.
+  - Added methods to trim data to an operaIndexRange for operaVector, operaFluxVector, operaStokesVector, operaSpectralElements, and operaPolarimetry.
+  - Added method to operaSpectralElements to get an operaIndexRange for the wavelengths between given bounds.
+  - Modified operaSpectralOrder method TrimOrderToWavelengthRange to use these new methods, and to use minwavelength and maxwavelength members instead of taking parameters, fixing a bug where the xcorr was incorrect.
+ Other library changes:
+  - Added operaSpectrum class to operaSpectralTools, which uses an operaVector and operaFluxVector to represent wavelength-flux pairs.
+  - Updated certain methods in operaSpectralOrderVector to use operaVector and operaSpectrum instead of using arrays.
+  - Updated operaSpectralOrder to seperate the calculation of fluxSNR from getting the calculated values.
+  - Added a fitSpectrum function to operaSpectralTools, and updated operaMasterFluxCalibration to use fitSpectrum.
+  - Updated frequently used functions in operaFit library to take const parameters.
+  - Fixed const correctness on a couple of methods in operaWavelength library.
+  - Updated calculateDeltaRadialVelocityInKPS function in operaSpectralTools to not take unused spectralResolution parameter.
+  - Moved operaSpectrumSimulation library to extras.
+ Heliocentric wavelength correction:
+  - Added operaDateTime library to perform date and time conversions.
+  - Added simple operaMJD command line tool to convert input time formats to modified Julian date.
+  - Updated espadons harness to select most accurate FITS header value available for the start time of the exposure and get MJD parameter from that time.
+  - Rewrote operaHeliocentricWavelengthCorrection to use new calculation methods based on IRAF and the IDL Astronomy Library.
+  - Fixed bug with sexigesimal to decimal calculations with negative sign.
+  - Removed operaBarycentricWavelengthCorrection and operaCentricWavelengthCorrection.
+  - Removed SOFA library from OPERA and moved operaHelio and operaJD libraries to extras.
+ Telluric wavelength correction (operaTelluricWavelengthCorrection):
+  - Added new parameters (LocalMaxFilterWidth, MinPeakDepth, DetectionThreshold, nsigclip) to replace constant values.
+  - Removed ability to read and use KPNO telluric spectrum for comparison.
+  - Updated telluric line matching to use radialVelocityRange parameter.
+  - Updated to use operaVector, operaFluxVector, and operaSpectrum instead of using arrays or vectors.
+  - Switched variables for results to double precision.
+  - Cleaned up/reorganized code.
+ Data text formats:
+  - Modified order of Stokes I columns in .pol files for consistency with columns in .spc files.
+  - Modified all formats to use a more consistent method for writing their headers.
+  - Added a way for modules to read and write custom formats using the same layout as existing formats.
+  - Added new custom rvel and tell formats with several additional values written by their respective modules.
+  - Removed old rvel and tell formats, and updated existing modules to read new rvel and tell files.
+  - Added a new spectral resolution (sres) data file output for operaWavelengthCalibration.
+ FITS products:
+  - Added q.fits product (extended polarimetry) output to harness.
+  - Removed unecessary references to operaFITSProduct from other libraries.
+  - Rewrote many parts of the operaFITSProduct library, removing unused functionality.
+  - Moved code that wrote column names depending on the format from operaFITSProduct to operaCreateProduct.
+  - Updated operaCreateProduct to put correct column names in m.fits, q.fits, and polar intensity i.fits headers.
+  - Updated operaCreateProduct to insert values from the SNR, rvel, tell, and sres files into the FITS header.
+  - Removed wavelengthrange option from operaCreateProduct, and cleaned up other bits of the module.
+ Other changes:
+  - Updated harness to allow input images to be read in by modules from other locations than DATADIR (path in rlst file is used), and to allow distribution of intensity outputs.
+  - Fixed a bunch of the descriptions/output by the harness during the LE format creation.
+  - Corrected error types in operaSpectralOrder::normalizeSpectralElementsByConstant to be division by zero instead of length mismatch.
+  - Fixed a bunch of compiler warnings.
+  - Updated operaExtraction to include new argument biasConstantToAdd.
+  - Updated operagetmode to work with mode values for GRACES, and moved the script outside of the espadons folder.
+  - Added starplusskyInvertSkyFiber parameter to harness which is passed to operaExtraction during science data extraction.
+
+Feb 17 2016
+  - Updated the ArgumentHandler library to have a more flexible and robust design.
+  - Added several functions to operaSpectralTools and operaSpectralOrderVector libraries for increased utility.
+  - Separated vector calculation functions from operaVector library into new operaVectorOperations.
+  - Fixed bug that occured when reading in gain and disp formats, and improved range checking in GainBiasNoise library.
+  - Updated harness and scripts to allow parallel reductions to work properly, and improve error handling. Harness now produces intensity products before polarimetry products, and by default reduces 4 exposures at a time.
+  - Added functionality to remove continuum polarization, and to output the result along with the unmodified polarization values. Removal calculations currently disabled pending further testing.
+  - Updated operaTelluricWavelengthCorrection: Can read raw lines or HITRAN atlas. Ignores duplicate spectral lines from merged orders. Improved checks for mutiple nearby line matches. Makes better use of data being sorted.
+  - Doubled the result of the StokesI calculation.
+  - Updated the measureContinuum method in operaSpectralOrder library to give less curved edges, since it was introducing features on the spectra during normalization.
+  - Updated createBeamsAndBackgrounds method in operaSpectralOrder library to still work when the number of beams is zero.
+  - Updated FITS product headers for improved clarity and to fix a bug.
+  - Updated analysis modules: added new modules operaRadialVelocityFromSelectedLines and operaStackObjectSpectra, and updated existing module operaRadialVelocity.
+  - Updated python harness to incorporate a variety of changes, including implementing new analysis modules.
+  - Updated harness parameters for instrument profile, extraction, and telluric correction.
+  - Added new wavelength masks for continuum detection and telluric line detection.
+
+Mar 29 2016
+  - Updated operaVector, operaFluxVector, and operaVectorOperations to add missing functionality, remove unnecessary methods, and improve comments.
+  - Updated operaSpectralElements to add missing getters and setters, and removed unnecessary methods.
+  - Refactored polarization calculation methods in operaPolarimetry, and fixed a bug that occured when calculating polarization from the degree of polarization.
+  - Modified includes so rather than operaSpectralTools using operaSpectralOrder, operaSpectralOrder uses operaSpectralTools which then uses operaSpectralElements.
+  - Removed detectSpectralLinesInSpectralOrder function from operaSpectralTools and replaced it with detectSpectralLines method in operaSpectralOrder.
+  - Updated and added classes and functions in operaSpectralTools to simplify storing and processing multiple flux vectors, and to improve performance.
+  - Added methods to operaSpectralOrder to simplify iterating through beams. Refactored operaSpectralOrder and operaSpectralOrderVector using these methods.
+  - Refactored, cleaned up, and fixed many parts of operaSpectralOrder and operaSpectralOrderVector with unclear behavior and inconsistent design.
+  - Updated variance calculation in fitSEDFcalAndThroughputToFlatResp to use var(1/flatResp) instead of just 1/flatResp.
+  - Updated operaFit library to use Horner's method for faster polynomial evaluation, and to make parameters more flexible for operaMPFitPolynomial function.
+  - Updated fitSpectrumToPolynomial function to filter out NaN flux values, and to disregard flux error values. Removed obsolete parameter portionToUseForFit.
+  - Updated operaPolarimetryCorrection to re-enabled continuum polarization since it no longer freezes.
+  - Updated harness to be able to turn continuum polarization removal in LE products on or off via the RemoveContinuumPolarization parameter.
+  - Updated operaArgumentHandler class to make verbose, debug, trace, and plot flags static so they can be accessed by library methods.
+  - Added tilt parameter to operaExtractionApertureCalibration to specify a fixed tilt for all orders when constantTilt is enabled.
+  - Updated harness for CFHT operations to improve reducing from archive and distribution.
+  - Fixed several errors in comments.
+
+Jul 20 2016
+  - Added ChiSqr function for operaVector.
+  - Added DMatrix and DCube classes for matrix and cube data of type double.
+  - Refactored and simplified operaInstrumentProfile. Modified profile fitting methods to filter out all NaNs.
+  - Refactored flux extraction methods in operaSpectralOrder.
+  - Refactored optimal extraction methods, fixed incorrect variance calculations, and fixed an issue where filtering out pixels would distort the image profile.
+  - Refactored operaExtractionApertureCalibration module. Fixed an error in tilt calculations. Fixed a bug which could cause a segfault.
+  - Fixed operaRotateMirrorCrop to use FITS compression type value, preventing a crash with newer versions of cfitsio. Fixed a bug with image file suffixes.
+  - Updated GRACES Python pipeline.
+
+Nov 30 2016
+ Optimal Extraction:
+   Motivation - After the changes made to the calculations in optimal extraction, two problems emerged. The first was an increase in the noise level of the flux.
+   The second problem was large artifacts appearing in the flux, especially when cosmic rays were prevalent. The underlying issue for this second problem was that
+   the pixel rejection scheme was filtering too aggresively in both directions in the case of outliers, causing many good subpixels to be lost with the bad ones,
+   skewing the flux towards any remaining pixels with flux values in between the worst one and the good ones. The primary reason for the first issue was a noisier
+   extracted flat-field spectrum, which was caused by the revised image profile being worsened with each iteration.
+   - Updated algorithm to not filter out subpixels if the measured flux is lower than the expected flux.
+   - Updated algorithm to only filter remaining subpixels with the largest residuals each iteration, rather than all subpixels with residuals past a fixed cutoff.
+   - Replaced parameter sigmaclip (fixed cutoff) with sigmaClipRange (divisor range from max residual) and minSigmaClip (limit to never filter below).
+   - Removed image profile refinement step.
+   - Increased number of iterations for object spectra to compensate for other changes, and decreased number of iterations for extracting flat-field spectra.
+   - Now even fewer flux artifacts/cosmic rays appear than did in the "clean" version, and noise levels are closer to expected values as well.
+ Spectral Energy Distribution (SED):
+   Motivation - The SED class was used by operaSpectralOrder in a such a way where some methods needed to be called in a specific order for resource allocation.
+   This led to effects such as making it impossible to apply a flat response or flux normalization without first applying a flat field correction.
+   - Refactored and simplified the design of operaSpectralEnergyDistribution class.
+   - Updated operaSpectralOrder to create SED objects during initialization, making operations that use the SED more independent of each other.
+   - Removed checks for a pre-existing SED in places it no longer needs to be a requirement.
+   - Simplified several pieces of code using SEDs in the flux calibration modules.
+ Extraction Aperture:
+   Motivation - When using a line aperture less than 1 pixel wide together with 1,1 pixel sampling, the method used for determining which subpixels fell within the
+   aperture (looking at the center of each subpixel) could frequently fail to find a subpixel in the y-range at many or all of subpixel x-positions. Since the
+   subpixels for each aperture are determined as a single pattern once, and then that pattern is shifted to each photocenter, this could mean no flux would be
+   found across the entire order. A simple, albiet imperfect, solution is to shift the aperture line to try to hit the section of the pixel with the highest flux.
+   - Refactored and simplified PixelSet class.
+   - Refactored operaGeometricShapes library and updated the shape classes to use a more consistent design.
+   - Refactored operaExtractionAperture class and turned it into a template class which can be used with any shape.
+   - Fixed multiple error conditions that could occur when calculating overlapping ranges between operaInstrumentProfile and operaExtractionAperture.
+   - Updated Optimal Extraction to work when beam apertures do not each have equal pixel counts.
+   - Refactored operaExtractionApertureCalibration module, and added more error checking.
+   - Added switch applyOffset in operaExtractionApertureCalibration to use the y-intercept of the IP line fit for the line aperture.
+   - Fixed a bug that occurs when stitching apertures not centered at y=0.
+   - Updated operaExtraction to normalize the flux for each beam using to the average number of pixels in each beam aperture.
+   - Added parameter aperapplyoffset to harness to enable the applyOffset switch.
+ Instrument Profile:
+   Motivation - The resource allocation scheme for operaInstrumentProfile was complicated, and led to the same object being reused for entirely different purposes.
+   This issue partially stemmed from classes used for components (e.g. Matrix and PolynomialMatrix) not using a simple allocation scheme either.
+   - Added a class template Vector based on existing operaVector class. Replaced operaVector using this template, and added Vector<float> implementation.
+   - Templatized operaVectorOperations.
+   - Renamed identifiers with misleadingly generic names like Matrix and Cube to prevent name conflicts.
+   - Added Matrix and Cube class templates to operaMatrix library, and replaced DMatrix and DCube using these templates.
+   - Refactored Polynomial class, and added evaluation operator to allow use as a functor.
+   - Replaced the formula used for evaluation in Polynomial class with the formula from PolynomialEval class. Replaced PolynomialEval with Polynomial.
+   - Removed PolynomialMatrix and CCube code from operaLibCommon. Added PolynomialMatrix as a typedef for Matrix<Polynomial> in operaInstrumentProfile.
+   - Refactored operaInstrumentProfile class.
+ Other module changes:
+   operaGain - Added an error check for gain values significantly lower than 1 (under 0.95, specfically). This occuring typically points to an input file problem.
+   operaStitchOrders - Moved module to extras. Also fixed an issue in the harness where creating the wcal from wcar would fail on Mac platforms.
+   operaHeliocentricWavelengthCorrection - Updated to use a leapsecond list (config/leapseconds.dat) to convert UTC to TT. Fixed MJD keyword selection in harness.
+   operaTelluricWavelengthCorrection:
+     - Updated to skip over orders that are outside of the wavelength range of lines used in the Telluric atlas.
+     - Fixed an issue where duplicate object lines weren't ignored correctly.
+     - Improved parameter requirements and outputs, tying each parameter more strictly to the method it is used with, adding parameter duplicateLineThreshold.
+     - Added a missing optional parameter (minNumberOfMatchedLines) to the harness.
+     - Added skyOverStarFiberAreaRatio and starplusskyInvertSkyFiber parameter for StarPlusSky mode.
+     - Replaced the telluric atlas.
+   operaExtendedSpectrumCreation - Modified to make inputFlatFluxCalibration an optional argument.
+   operaPolarimetryCorrection - Modified to add up individual exposure times in the harness instead of multiplying the first exposure time by 4 inside the module.
+   operaGenerateLEFormats - Set RemoveContinuumPolarization to 1 in the harness.
+   operaExtraction, operaTelluricWavelengthCorrection, operaStarPlusSky - Updated to correctly use skyOverStarFiberAreaRatio parameter.
+   operaSNR - Updated harness to make SNR plots match with Upena.
+ Other library changes:
+  - Combined duplicate continuum measuring functionality in operaSpectralOrder and operaSpectralEnergyDistribution and into a new function in operaSpectralTools.
+  - Modified operaSpectralOrder and operaSpectralOrderVector to make method names and parameter lists more consistent, updated comments, and cleaned up code.
+  - Added MedianQuick function (destructive median) for operaVector.
+  - Updated ladfit functions for const-correctness. Added LinearFit function based on ladfit algorithm, along with overload to calculate errors.
+  - Modified fitSpectrumToPolynomial in operaSpectralTools to take in and return operaVectors instead of operaFluxVectors.
+  - Added method to operaSpectralOrderVector to get a min and max order number from a wavelength range, with optional min and max order limits.
+  - Simplified the code to set wavelengths from calibrations.
+  - Added skyOverStarFiberAreaRatio parameter to calculateStarAndSkyElements and correctFlatField functions.
+  - Added cmath includes and/or removed math.h includes in operaMatrix, Polynonmial, and operaSpectralOrder to resolve minor calculation discrepancies.
+  - Removed some unused functions from operaStats.h, and cleaned up whitespace.
+  - Cleaned up various unnecessary includes, fixed compiler warnings and other miscellaneous code cleanup.
+
+Apr 13 2017
+ Documentation:
+  - Added an offline copy of the OPERA documentation wiki pages.
+  - Removed README, DEPENDENCIES, INSTALLATION, the pipeline cookbook, and most files from doc (a few moved to extras instead).
+ Features and fixes:
+  - Implemented extraction option rejectBadpixInRawExtraction which filters out outlier pixels during raw extraction.
+  - Updated operaGain to changed minimum gain threshold from hardcoded value to optional parameter, and added this parameter to Espadons harness.
+  - Updated operaTelluricWavelengthCorrection to clarify argument descriptions, add linesdatafilename output file, and added output messages.
+  - Updated output text files so the specified number of orders accurately represents the contents of the file.
+  - Fixed a crash that occurred when setting beam SEDs from a continuum sample that was created without using the beams.
+  - Updated continuum mesauring function to throw an error message when not enough points are used to bin the continuum.
+  - Updated argurment descriptions.
+  - Implemented ability to search for and repair a shift in the numbering of orders compared to initial wavelength soltuons.
+  - Changes to clean up operaWavelengthCalibration code slightly modified the results of the module, and fixed small bugs.
+  - Added Python pipelines for MUSICOS and OES instruments, and updated the GRACES and ESPaDOnS pipelines.
+ Behind the scenes code changes:
+  - Updated Vector to work with more standard library functions, and added functions to condtionally filter out elements.
+  - Added functions to calculate the Mean Square and RMS of a Vector.
+  - Added Vector<unsigned> implementation.
+  - Updated operaFluxVector to add constructor taking in two operaVectors.
+  - Updated operaLMFitPolynomial to take in const parameters.
+  - Updated Gaussian, operaSpectralFeature, and operaSpectralLines classes to make methods const correct.
+  - Updated Polynomial class to add operaVector getters/setters, and to make parenthesis operator and printEquation method const.
+  - Refactored methods used for optimal extraction.
+  - Added method to operaSpectralOrder to reassign order number.
+  - Added methods to operaSpectralOrderVector to shift order numbers for all orders, and replaced main array with vector.
+  - Removed unused file floatingvector.h
+  - Refactored and simplified operaWavelength class.
+  - Updated several functions and classes and in operaSpectralTools to refactor, add flexibility, simplify, and optimize.
+  - Added operaSpectralLineList class to operaSpectralTools, along with various functions to process spectral lines.
+  - Refactored line detection methods in operaSpectralOrder and operaSpectralOrderVector.
+  - Modified operaTelluricWavelengthCorrection to use operaSpectralLineList.
+  - Heavily refactored operaWavelengthCalibration.
+  - Refactored and simiplfied operaCreateFlatResponse.
+  - Refactored parts common to all Python pipelines into new pyLib.
+
+May 19 2017
+  - Fixed bug where wavelength calibration was incorrect when an order shift was detected.
+  - Moved re-numbering of shifted orders from operaWavelengthCalibration to operaExtendedSpectrumCreation.
+  - Updated GRACES Python harness to allow other header values (ARC, COMP, COMPARISON) for comparison images.
+  - Fixed bug in Python harness with INVERTSKYFIBERFLAG.
+
+Jun 29 2017
+  - Updated GRACES and ESPaDOnS Python harnesses to implement 2-amp mode.

@@ -1,0 +1,1 @@
+operaCreateFluxCalibration --inputCalibratedSpectrum=HR1544_operaFluxCal.dat --inputInstrumentSpectrum=/Users/edermartioli/opera/spectra/GalileanMoons/1515004iu.s --outputFluxCalibrationFile=output.fcal --inputApertureFile=/Users/edermartioli/opera/calibrations/GalileanMoons/OLAPAa_pol_Normal.aper --binsize=100 -N --minorder=23 --maxorder=60

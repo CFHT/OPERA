@@ -1,0 +1,1544 @@
+#########################################################################################
+#
+# Makefile name: Makefile.calibration.wircam
+# Version: 1.0
+# Description: wircam calibration targets
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of  the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_calibration_wircam
+#/// \brief this makefile contains core calibration targets.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile 
+#///
+#########################################################################################
+
+calibrations: directoriescreated
+ifdef CRUNID
+	@start=$$SECONDS; \
+	echo "$(pref) Start of calibrations for $(CRUNID) $(RUNID)..." ; \
+	if [[ -e $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ]] ; then \
+		echo "$(epref) `cat $(IIWI_LOCK_DIR)/Lock_$(CRUNID)`" ; \
+		exit; \
+	else \
+		echo "$(CRUNID) locked by `whoami`" >$(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+	fi ; \
+	username=`whoami` ; \
+	rundate=` echo $(RUNDATETIME) | sed -e 's:-: :'` ; \
+	$(bindir)/wirenvdb "insert into run (semester,startdatetime,rundatetime,crunid,username,status,commandline,comment,errors,iiwi_version) values ('$(SEMESTER)',convert(datetime,'$$rundate'),convert(datetime,'$$rundate'),'$(CRUNID)','$$username','Calibration started.','$(COMMANDLINE)','$(COMMENT)',0,$(IIWI_MAJOR))" ; \
+	$(bindir)/wirenvdb "delete from error where crunid='$(CRUNID)'" ; \
+	$(MAKE) -f $(ROOTDIR)/Makefile.cal ROOTDIR=$(ROOTDIR) NIGHT=$(NIGHT) RUNID=$(RUNID) CRUNID=$(CRUNID) QRUNID=$(QRUNID) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" PASS=1 --jobs --no-print-directory cals 2>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log ; \
+	echo "$(pref) Enabling masterdarks and mastertwilight flats for reduction." ; \
+	$(bindir)wirenvdb "update calibration set _use = 1 where type='MASTERDARK' and crunid='$(CRUNID)'" ; \
+	$(bindir)wirenvdb "update calibration set _use = 1 where type='MASTERFLAT' and crunid='$(CRUNID)'" ; \
+	echo "$(pref) Creating bad pixel mask for $(CRUNID)." ; \
+	$(bindir)/iiwi21 $(CRUNID) badpixelmask ; \
+	echo "$(pref) Creating zeropoints for $(CRUNID)." ; \
+	$(bindir)/iiwi21 $(CRUNID) zeropoints ; \
+	rm -f $(IIWI_LOCK_DIR)/Lock_$(CRUNID) ; \
+	bdate=`date "+%Y/%m/%d %X%p"` ; \
+	errorCount=`$(bindir)/wirenvdb "select count(*) from error where severity='ERROR'"` ; \
+	warningCount=`$(bindir)/wirenvdb "select count(*) from error where severity='WARNING'"` ; \
+	if (( errorCount > 0 )) ; then \
+		$(bindir)/wirenvdb "update run set status = 'Calibration failed with $$count errors.', enddatetime = convert(datetime, '$$bdate'), errors = $$errorCount where startdatetime = convert(datetime,'$${rundate}')" ; \
+		echo "$(epref) $$errorCount errors, $$warningCount warnings encountered in calibration $(CRUNID) $(deltat)" ; \
+	else \
+		$(bindir)/wirenvdb "update run set status = 'Calibration completed, time = $(deltat).', enddatetime = convert(datetime, '$$bdate') where startdatetime = convert(datetime,'$${rundate}')" ; \
+	fi ; \
+	echo "$(pref) ~~~ Total calibration time for $(CRUNID) $(deltat)" 
+else
+	@echo "$(pref) Please specify a CRUNID for calibration."
+endif
+
+#########################################################################################
+#
+# Calibrations - consist of masterdomeflats, mastertwilightflats, masterdarks, 
+#                and zeropoints
+#
+#########################################################################################
+
+cals: masterdarks mastertwilightflats
+
+#########################################################################################
+# ZEROPOINTS
+# Here we query the database for the current crunid standard star images for each filter.
+# These are gathered up and the zeropoint_$(FILTER)_$(CRUNID).zpt target is called.
+#
+zeropoints: 
+ifdef CRUNID
+	@start=$$SECONDS; \
+	((maxstandards=40)) ; \
+	rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoints_$(CRUNID).txt ; \
+	semester=`echo $(CRUNID) | sed -e 's/\(...\).../\1/'` ; \
+	filtersdone="" ; \
+	for q in Q87 Q89 ; do \
+		sources="" ; \
+		targets="" ; \
+		runid=$${semester}$${q} ; \
+		filters=`$(bindir)/wirenvdb "select distinct filter from exposure where etype='OBJECT' and crunid='$(CRUNID)' and runid='$${semester}$${q}' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+		echo "$(pref) Found filters $$filters" ; \
+		filterlist="" ; \
+		for filter in $$filters  ; \
+		do \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.red.lst ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.raw.lst ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.match.lst ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.lst ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.txt ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.zpt ; \
+			rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.std ; \
+			$(ECHO) $(MAKE) -f $(IIWI_MAKE_DIR)Makefile -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) CRUNID=$(CRUNID) RUNID=$${runid} VERSION=$(VERSION) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" directoriescreated --jobs=$(jobs) --no-print-directory ; \
+			objectclause="( object = 'FS6' or object = 'FS12' or object = 'FS14' or object = 'FS19' or object = 'FS20' or object = 'FS27' or object = 'FS29' or object = 'FS32' or object = 'FS34' or object = 'GD153' or object = 'G191B2B' or object = 'FS33' or object = 'GD71' or object = 'HZ43' )" ; \
+			files=`$(bindir)/wirenvdb "select filename from exposure where etype='OBJECT' and filter='$${filter}' and crunid='$(CRUNID)' and runid='$${semester}$${q}' and $$objectclause and _use>0"` ; \
+			if [[ "$$files" != "" ]] ; then \
+				((count=0)) ; \
+				for file in $$files ; \
+				do \
+					pname=`echo "$(IIWI_ROOT_DIR)/reductions/$(CRUNID)/$${runid}/$$file" | sed -e 's:o.fits:p.fits:'` ; \
+					mname=`echo "$(IIWI_ROOT_DIR)/reductions/$(CRUNID)/$${runid}/$$file" | sed -e 's:o.fits:.matchedcat:'` ; \
+					echo "$$file"  >>$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.raw.lst ; \
+					echo "$$pname" >>$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.red.lst ; \
+					echo "$$mname" >>$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.match.lst ; \
+					echo "$$file"  >>$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.lst ; \
+					((count++)) ; \
+					if (( count >= maxstandards )) ; then \
+						break; \
+					fi ; \
+				done ; \
+				sources=`$(bindir)/wirappend @$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.raw.lst "$$sources"` ; \
+				filterlist=`$(bindir)/wirappend $$filter "$$filterlist"` ; \
+				filtersdone=`$(bindir)/wirappend $$filter "$$filtersdone"` ; \
+				targets=`$(bindir)/wirappend zeropoint_$(CRUNID)_$${filter}.zpt "$$targets"` ; \
+				if (( count > 0 )) ; then \
+					echo "$(pref) Photometry for $${count} standard stars must be done for filter $${filter} $(CRUNID) before proceeding to the zeropoints..." ; \
+					$(ECHO) $(MAKE) -f $(IIWI_MAKE_DIR)Makefile -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) OBJECTS="@$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.lst" DEST="p.fits" CRUNID=$(CRUNID) RUNID=$${runid} VERSION=$(VERSION) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) PASS=1 FLAGS="$(FLAGS)" pass1 --jobs=$(jobs) --no-print-directory 2>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log; \
+					echo "$(pref) Photometry for the $${count} standards complete for filter $${filter} $(CRUNID) before proceding to the zeropoints..." ; \
+				fi ; \
+			fi ; \
+		done ; \
+		if [[ "$$targets" == "" ]] ; then \
+			echo "$(pref) No images to create zeropoints for semester $(SEMESTER) for $(CRUNID) $${runid}."; \
+		else \
+			echo "$(pref) Creating zeropoints for $(CRUNID) $${runid}, semester $(SEMESTER) from $${count} standard stars." ; \
+			$(ECHO) $(MAKE) -f $(IIWI_MAKE_DIR)Makefile.cal -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) FILTERS="$${filterlist}" TARGETS="$${targets}" SOURCES="$${sources}" CRUNID=$(CRUNID) RUNID=$${runid} SEMESTER=$${semester} VERSION=$(VERSION) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs=$(jobs) --no-print-directory 2>$(IIWI_LOG_DIR)/error.log | tee -a $(IIWI_LOG_DIR)/process.log; \
+			if [[ ! -e $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoints_$(CRUNID).txt ]] ; then \
+				echo "crunid filter zp zp_err zp_wonlc zp_ext1 zp_ext1_err zp_ext2 zp_ext2_err zp_ext3 zp_ext3_err zp_ext4 zp_ext4_err colterm gain" >$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoints_$(CRUNID).txt ; \
+			fi ;\
+			for filter in $${filterlist} ; do \
+				if [[ -s $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.zpt ]] ; then \
+					cat $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.zpt >>$(IIWI_CALS_ZEROPOINTS_DIR)/zeropoints_$(CRUNID).txt ; \
+				fi ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.red.lst ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.raw.lst ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.match.lst ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.lst ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.zpt ; \
+				$(ECHO) rm -f $(IIWI_CALS_ZEROPOINTS_DIR)/zeropoint_$(CRUNID)_$${filter}.std ; \
+			done ; \
+		fi ; \
+	done ; \
+	echo "$(pref) zeropoint creation time for $(CRUNID) filters $$filtersdone $(deltat)"
+else
+	@echo "$(pref) Please specify a CRUNID for the zeropoints."
+endif
+
+#########################################################################################
+# iiwi_measurestandard, $
+#	crunid=crunid, $
+#	runid=runid, $
+#	filter=filter, $
+#	measurementsfilename=measurementsfilename, $
+#	rawlist=rawlist, $
+#	reductionlist=reductionlist, $
+#	forcesex=forcesex ,$
+#	path_temporaryshort=path_temporaryshort, $
+#	path_byproducts=path_byproducts, $
+#	path_config=path_config, $
+#	param_iiwiversion=param_iiwiversion, $
+#	param_procdate=param_procdate, $
+#	readin=readin, $
+#	verbose=verbose, $
+#	debug=debug
+#
+# This will look for the standard stars listed in wircam_standardstarstruc.pro
+# (where RA,DEC, NAME, etc is given) and associates its flux measurement on each
+# processed image found in reductionlist p.fits files and produce a standards star
+# measurement file in zeropoints_$(FILTER)_$(CRUNID).std.
+#
+#******** NOTE that this needs p.fits to already be 16 bit to work!!!!
+#
+
+%.std: .FORCE
+	@start=$$SECONDS; \
+	echo "$(pref) Starting zeropoint standard star measurement for filter $(FILTER) $(CRUNID)."; \
+	sources="$(SOURCES)" ; \
+	if [[ "$${sources}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		sources=`echo $${sources} | sed -e 's:\@::'`; \
+	fi ; \
+	base_name=$$(basename $*) ; \
+	log_name="$${base_name}.log" ; \
+	semester="$(SEMESTER)" ; \
+	rawlist=`cat $$sources | tr '\n' ' ' ` ; \
+	redlist=`cat $$(dirname $$sources)/$$(basename $$sources .raw.lst).red.lst | tr '\n' ' ' ` ; \
+	matchlist=`cat $$(dirname $$sources)/$$(basename $$sources .raw.lst).match.lst | tr '\n' ' ' ` ; \
+	rm -f $(IIWI_BYPRODUCTS_DIR)/$${base_name}.std ; \
+	$(bindir)/wirtrace $(TRACE) "echo -e \"$(CRUNID)\n$(RUNID)\n$(FILTER)\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std\n$$rawlist\n$$redlist\n$$matchlist\n$(IIWI_TMP_DIR)\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_CONFIG_DIR)\" | $(bindir)/iiwi_measurestandard param_iiwiversion='$(IIWI_VERSION)' param_procdate='$(PROCDATE)' --readin $(FLAGS)" ; \
+	echo -e "$(CRUNID)\n$(RUNID)\n$(FILTER)\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std\n$$rawlist\n$$redlist\n$$matchlist\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_TMP_DIR)\n$(IIWI_CONFIG_DIR)" | $(bindir)/iiwi_measurestandard param_iiwiversion='$(IIWI_VERSION)' param_procdate='$(PROCDATE)' --readin $(FLAGS)  1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name}; \
+	echo "$(pref) Zeropoint standard star measurement complete for $(CRUNID) filter $(FILTER) $(deltat)."
+
+#########################################################################################
+# iiwi_analyzestandard, $
+#	crunid=crunid, $
+#	measurementfile=measurementfile, $
+#	path_temporaryshort=path_temporaryshort, $
+#	path_byproducts=path_byproducts, $
+#	param_iiwiversion=param_iiwiversion, $
+#	param_procdate=param_procdate, $
+#	readin=readin, $
+#	verbose=verbose, $
+#	debug=debug
+#
+# This produces graphs in ~/iiwi_web.
+# 
+# Wircam_analyzestandard reads in the available "standardstars_($FILTER)_$(CRUNID).std" files,
+# computes averages, deviations and outputs graphs and histograms (.jpg).
+# It produces the .zpt output file which is then used to populate the zeropoints table in the db
+#
+
+%.zpt: %.std .FORCE
+	@start=$$SECONDS; \
+	base_name=$$(basename $*) ; \
+	log_name="$${base_name}.log" ; \
+	if [[ -e $(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std ]] ; then \
+		echo "$(pref) Creating zeropoint standard star plot for $(FILTER) $(CRUNID) ."; \
+		$(bindir)/wirtrace $(TRACE) "echo -e \"$(CRUNID)\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.zpt\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std\n$(IIWI_TMP_DIR)\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_REDUCTION_DIR)\n$(IIWI_WEB_DIR)\" | $(bindir)/iiwi_analyzestandard --readin $(FLAGS) param_iiwiversion='$(IIWI_VERSION)'" ; \
+		echo -e "$(CRUNID)\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.zpt\n$(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std\n$(IIWI_TMP_DIR)\n$(IIWI_BYPRODUCTS_DIR)\n$(IIWI_REDUCTION_DIR)\n$(IIWI_WEB_DIR)" | $(bindir)/iiwi_analyzestandard --readin $(FLAGS) param_iiwiversion='$(IIWI_VERSION)' 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+		if [[ -e $(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.zpt ]] ; then \
+			echo "$(pref) Updating zeropoint database table for $(FILTER) $(CRUNID)."; \
+			zp=(`cat $(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.zpt`) ; \
+			crunid=$${zp[0]}; filter=`echo $${zp[1]} | tr '[:lower:]' '[:upper:]'`; zp_base=$${zp[2]} ; zp_err=$${zp[3]} ; zp_wonlc=$${zp[4]} ; zp_ext1=$${zp[5]} ; zp_ext1_err=$${zp[6]} ; zp_ext2=$${zp[7]} ; zp_ext2_err=$${zp[8]} ; zp_ext3=$${zp[9]} ; zp_ext3_err=$${zp[10]} ; zp_ext4=$${zp[11]} ; zp_ext4_err=$${zp[12]} ; colterm=$${zp[13]} ; gain=$${zp[14]} ; \
+			if [[ "$${crunid}" != "" ]] ;  then \
+				$(bindir)wirenvdb "delete from zeropoint where crunid = '$${crunid}' and filter = '$${filter}'" ; \
+				$(bindir)wirenvdb "insert into zeropoint (crunid,filter,zp,zp_err,zp_wonlc,zp_ext1,zp_ext1_err,zp_ext2,zp_ext2_err,zp_ext3,zp_ext3_err,zp_ext4,zp_ext4_err,colterm,gain) values ('$$crunid','$$filter',$$zp_base,$$zp_err,$$zp_wonlc,$$zp_ext1,$$zp_ext1_err,$$zp_ext2,$$zp_ext2_err,$$zp_ext3,$$zp_ext3_err,$$zp_ext4,$$zp_ext4_err,$$colterm,$$gain)" ; \
+				echo "$(pref) Zeropoint plots for $(FILTER) $(CRUNID) complete $(deltat)." ; \
+			else \
+				echo "$(wpref) iiwi_analyzestandard failed for filter $(FILTER) crunid $(CRUNID)." ; \
+			fi ; \
+		else \
+			echo "$(wpref) No zeropoint values for $(FILTER) $(CRUNID) could be created from the $*.std list." ; \
+		fi ; \
+	else \
+		echo "$(epref) Zeropoint values for $(FILTER) $(CRUNID) could not be created, $(IIWI_CALS_ZEROPOINTS_DIR)/$${base_name}.std is missing $(deltat)." ; \
+	fi
+
+#########################################################################################
+# Create the master dark
+#
+masterdarks: processeddarks .FORCE
+ifdef CRUNID
+	@start=$$SECONDS; \
+	$(bindir)wirenvdb "delete from calibration where crunid='$(CRUNID)' and type='MASTERDARK'" ; \
+	etimes=`$(bindir)wirenvdb "select distinct etime from calibration where crunid='$(CRUNID)' and type='PROCESS_DARK'" | tr '\n' ' '` ; \
+	targets="" ; \
+	sources="" ; \
+	zeroedetimes="" ; \
+	for etime in $${etimes} ; \
+	do \
+		zeroedetime=`echo $$etime | awk '{printf("%03d", $$1)}'` ; \
+		zeroedetimes=`$(bindir)/wirappend $$zeroedetime "$$zeroedetimes"` ; \
+		targets=`$(bindir)/wirappend masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).fits "$$targets"` ; \
+		sources=`$(bindir)/wirappend @$(IIWI_BYPRODUCTS_DIR)/masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).lst "$$sources"` ; \
+		files=`$(bindir)wirenvdb "select distinct filename from calibration where crunid='$(CRUNID)' and type='PROCESS_DARK' and etime = $$etime" | tr '\n' ' '` ; \
+		paths="" ; \
+		for file in $$files ; do \
+			paths=`$(bindir)/wirappend $(IIWI_CALS_DARKS_DIR)/$$file "$$paths"` ; \
+		done ; \
+		echo $$paths | tr ' ' '\n' >$(IIWI_BYPRODUCTS_DIR)/masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).lst ; \
+	done ; \
+	if [[ "$$targets" == "" ]] ; then \
+		echo "$(pref) No Processed darks to create a Master Dark for $(CRUNID)." | tee -a $(IIWI_LOG_DIR)/masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).log ; \
+		$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).fits', 'masterdark_$${zeroedetime}s_$(CRUNID)_v$(VERSION).log','WARNING','$(CRUNID)','$(RUNID)','No Processed darks to create a Master Dark.')" ; \
+	else \
+		echo "$(pref) Creating Master Darks for $(CRUNID)." ; \
+		$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) ETIMES="$$zeroedetimes" TARGETS="$$targets" SOURCES="$$sources" VERSION=$(VERSION) CRUNID=$(CRUNID) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs --no-print-directory ; \
+		echo "$(pref) Removing Processed Darks for $(CRUNID)." ; \
+		rm -f $(IIWI_CALS_DARKS_DIR)/dark* ; \
+		wirenvdb "delete from calibration where type='PROCESS_DARK' and crunid='$(CRUNID)'" ; \
+		echo "$(pref) master dark time for $(CRUNID) $(deltat)" ; \
+	fi
+else
+	@echo "$(pref) Please specify a CRUNID for the masterdark."
+endif
+
+#########################################################################################
+# Create the master twilightflats
+#
+mastertwilightflats: processedtwilightflats
+ifdef CRUNID
+	@start=$$SECONDS; \
+	$(bindir)wirenvdb "delete from calibration where type='MASTERFLAT' and crunid='$(CRUNID)'" ; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		filters=$(FILTER) ; \
+	else \
+		filters=`$(bindir)/wirenvdb "select distinct filter from calibration where type='PROCESS_FLAT' and crunid='$(CRUNID)'" | sort | uniq | tr '\n' ' '` ; \
+	fi ; \
+	targets="" ; \
+	filterlist="" ; \
+	for filter in $$filters  ; \
+	do \
+		targets=`$(bindir)/wirappend mastertwilightflat_$${filter}_$(CRUNID)_v$(VERSION).fits "$$targets"`; \
+		filterlist=`$(bindir)/wirappend $$filter "$$filterlist"` ; \
+		rm -f $(IIWI_WEB_DIR)/twilightflats/mastertwilightflats_$${filter}* ; \
+		rm -f $(IIWI_CALS_TWIFLATS_DIR)mastertwilightflat_$${filter}_$(CRUNID)_v$(VERSION).fits ; \
+	done ; \
+	if [[ "$$targets" != "" ]] ; \
+	then \
+		$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) FILTERS="$${filterlist}" TARGETS="$$targets" CRUNID=$(CRUNID) VERSION=$(VERSION) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs --no-print-directory ; \
+		rm -f $(IIWI_CALS_TWIFLATS_DIR)/twilight* ; \
+		wirenvdb "delete from calibration where type = 'PROCESS_FLAT' and crunid='$(CRUNID)'" ; \
+		echo "$(pref) master twilightflat time for $(CRUNID) $(deltat)" ; \
+	fi
+else
+	@echo "$(pref) Please specify a CRUNID for the mastertwilightflat."
+endif
+
+#########################################################################################
+# Create the processed darks
+#
+# Algorithm: The etimes for darks are rounded to the second, and the processed darks 
+# then may be constructed from multiple darks, say at 3.0, 3.5 and 3.9 seconds, for example
+# The first loop combines all the fractional etimes
+# The second loop then queries all sources with etimes >= the floor and < floor + 1.0
+#
+
+processeddarks: directoriescreated cleandarks
+ifdef CRUNID
+	@start=$$SECONDS; \
+	echo "$(pref) Creating processed darks for $(CRUNID)" ; \
+	darks=`$(bindir)wirenvdb "select distinct filename from exposure where crunid='$(CRUNID)' and object='Darks' and _use > 0" | tr '\n' ' '` ; \
+	sources="" ; \
+	etimes="" ; \
+	((count=0)) ; \
+	forged_date="" ; \
+	forged_dates="" ; \
+	for dark in $$darks ; \
+	do \
+		etime=`$(bindir)wirenvdb "select distinct etime from exposure where filename = '$$dark'"` ; \
+		zeroedetime=`echo $$etime | awk '{printf("%03d", $$etime)}'` ; \
+		file=`$(archivebindir)arlocate $$dark` ; \
+		base_name=$$(basename $$dark) ; \
+		log_name="$${base_name}.log" ; \
+		if [[ "$$file" == "not.on.disk" ]]  ; \
+		then \
+			echo "$(epref) $$dark is not on any archive disk, processed dark creation aborted..."  | tee -a $(IIWI_LOG_DIR)/$$log_name ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('$$dark', '$$log_name','WARNING','$(CRUNID)','$(RUNID)','$$dark is not on any archive disk, processed dark creation aborted.')" ; \
+		else \
+			if [[ "$$file" != "" ]] ; then \
+				forged_date=`fhget $$file HSTTIME | awk '{printf("%s%s%sHST%s",$$6,$$2,$$3,$$4)}' | sed -e 's/://g' -e 's:Jan:01:' -e 's:Feb:02:' -e 's:Mar:03:' -e 's:Apr:04:' -e 's:May:05:' -e 's:Jun:06:' -e 's:Jul:07:' -e 's:Aug:08:' -e 's:Sep:09:' -e 's:Oct:10:' -e 's:Nov:11:' -e 's:Dec:12:'`  ; \
+				targets=`$(bindir)/wirappend dark_$${forged_date}_$${zeroedetime}_v$(VERSION).fits "$$targets"` ; \
+				sources=`$(bindir)/wirappend $$file "$$sources"` ; \
+				etimes=`$(bindir)/wirappend $$zeroedetime "$$etimes"` ; \
+				forged_dates=`$(bindir)/wirappend $${forged_date} "$${forged_dates}"` ; \
+				((count++)) ; \
+			fi ; \
+		fi ; \
+	done ; \
+	$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal  -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) TARGETS="$${targets}" SOURCES="$$sources" ETIMES="$$etimes" FORGED_DATES="$${forged_dates}" VERSION=$(VERSION) CRUNID=$(CRUNID) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs --no-print-directory ; \
+	echo "$(pref) processed darks time for $(CRUNID) $(deltat)"
+else
+	@echo "$(pref) Please specify a CRUNID for the processeddarks."
+endif
+
+#########################################################################################
+# Create the processed twilightflats
+#
+# Each processed twilight flat is a single sequence. A sequence is determined by the
+# algorithm in iiwi_trimflat.tcl, which must be run, and checked in the iiwi2 user interface
+# twilight flats table, which shows the sequence graph and allows the astro to override.
+# Only then can the twilight flat calibration be done. Note that there may be two or more
+# sequences for a filter taken on the same day - perhaps one in the morning and one in the
+# evening.
+#
+
+processedtwilightflats: plottwilightflats
+ifdef CRUNID
+	@start=$$SECONDS; \
+	$(bindir)wirenvdb "delete from calibration where type='PROCESS_FLAT' and crunid='$(CRUNID)'" ; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		filters=$(FILTER) ; \
+	else \
+		filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	fi ; \
+	targets="" ; \
+	sources="" ; \
+	filterlist="" ; \
+	forged_date="" ; \
+	forged_dates="" ; \
+	for filter in $$filters  ; \
+	do \
+		amdates=`$(bindir)/iiwi_trimflatlist.tcl AM $(CRUNID) ALL 2>>/dev/null` ; \
+		for date in $$amdates ; \
+		do \
+			flats=`$(bindir)/wirenvdb "select filename from exposure where object='TwilightFlats' and filter='$${filter}' and crunid='$(CRUNID)' and convert(varchar,dateadd(hour,14,mydatetime),105) = '$${date}' and convert(varchar,dateadd(hour,14,mydatetime),108) between '04:00:00' and '08:00:00' and _use>0"` ; \
+			if [[ "$$flats" != "" ]] ; then \
+				file=`$(bindir)/wirgetword 1 $$flats` ; \
+				file=`$(archivebindir)arlocate $$file` ; \
+				date=`fhget $$file HSTTIME | awk '{printf("%s%s%sHST%s",$$6,$$2,$$3,$$4)}' | sed -e 's/://g' -e 's:Jan:01:' -e 's:Feb:02:' -e 's:Mar:03:' -e 's:Apr:04:' -e 's:May:05:' -e 's:Jun:06:' -e 's:Jul:07:' -e 's:Aug:08:' -e 's:Sep:09:' -e 's:Oct:10:' -e 's:Nov:11:' -e 's:Dec:12:'`  ; \
+				filterid=`$(bindir)/iiwi_getfilterid "'$$file'" 2>/dev/null`; \
+				forged_date="$${filterid}_$${date}" ; \
+				flatlist="" ; \
+				((count=0)) ; \
+				for flat in $$flats ; \
+				do \
+					file=`$(archivebindir)arlocate $$flat` ; \
+					if [[ "$$file" == "not.on.disk" ]]  ; \
+					then \
+						echo "$(epref) $$file is not on any archive disk, processed dark creation aborted..."  ; \
+						exit 1 ; \
+					fi ; \
+					flatlist=`$(bindir)/wirappend $$file "$$flatlist"` ; \
+					((count++)) ; \
+				done ; \
+				if (( count > 0 )) ; then \
+					echo $$flatlist | tr ' ' '\n' >$(IIWI_TMP_DIR)/twilightflat_$(CRUNID)_AM_$${date}_$${filter}_v$(VERSION).lst ; \
+					targets=`$(bindir)/wirappend twilightflat_$${filter}_$${forged_date}_v$(VERSION).fits "$${targets}"` ; \
+					forged_dates=`$(bindir)/wirappend $${forged_date} "$${forged_dates}"` ; \
+					sources="$$sources @$(IIWI_TMP_DIR)/twilightflat_$(CRUNID)_AM_$${date}_$${filter}_v$(VERSION).lst" ; \
+					filterlist=`$(bindir)/wirappend $$filter "$$filterlist"` ; \
+				fi ; \
+				echo "$(pref) $$count AM twilightflats found for $${date} $${filter} crunid $(CRUNID)" ; \
+			fi ; \
+		done ; \
+		pmdates=`$(bindir)/iiwi_trimflatlist.tcl PM $(CRUNID) ALL 2>>/dev/null` ; \
+		for date in $$pmdates ; \
+		do \
+			flats=`$(bindir)/wirenvdb "select filename from exposure where object='TwilightFlats' and filter='$${filter}' and crunid='$(CRUNID)' and convert(varchar,dateadd(hour,14,mydatetime),105) = '$${date}' and convert(varchar,dateadd(hour,14,mydatetime),108) between '16:00:00' and '20:00:00' and _use>0"` ; \
+			if [[ "$$flats" != "" ]] ; then \
+				file=`$(bindir)/wirgetword 1 $$flats` ; \
+				file=`$(archivebindir)arlocate $$file` ; \
+				date=`fhget $$file HSTTIME | awk '{printf("%s%s%sHST%s",$$6,$$2,$$3,$$4)}' | sed -e 's/://g' -e 's:Jan:01:' -e 's:Feb:02:' -e 's:Mar:03:' -e 's:Apr:04:' -e 's:May:05:' -e 's:Jun:06:' -e 's:Jul:07:' -e 's:Aug:08:' -e 's:Sep:09:' -e 's:Oct:10:' -e 's:Nov:11:' -e 's:Dec:12:'`  ; \
+				filterid=`$(bindir)/iiwi_getfilterid "'$$file'" 2>/dev/null`; \
+				forged_date="$${filterid}_$${date}" ; \
+				flatlist="" ; \
+				((count=0)) ; \
+				for flat in $$flats ; \
+				do \
+					file=`$(archivebindir)arlocate $$flat` ; \
+					if [[ "$$file" == "not.on.disk" ]]  ; \
+					then \
+						echo "$(epref) $$file is not on any archive disk, processed dark creation aborted..."  ; \
+						exit 1 ; \
+					fi ; \
+					flatlist=`$(bindir)/wirappend $$file "$$flatlist"` ; \
+					((count++)) ; \
+				done ; \
+				if (( count > 0 )) ; then \
+					echo $$flatlist | tr ' ' '\n' >$(IIWI_TMP_DIR)/twilightflat_$(CRUNID)_PM_$${date}_$${filter}_v$(VERSION).lst ; \
+					targets=`$(bindir)/wirappend twilightflat_$${filter}_$${forged_date}_v$(VERSION).fits "$$targets"` ; \
+					forged_dates=`$(bindir)/wirappend $${forged_date} "$${forged_dates}"` ; \
+					sources=`$(bindir)/wirappend @$(IIWI_TMP_DIR)/twilightflat_$(CRUNID)_PM_$${date}_$${filter}_v$(VERSION).lst "$$sources"` ; \
+					filterlist=`$(bindir)/wirappend $$filter "$$filterlist"` ; \
+				fi ; \
+				echo "$(pref) $$count PM twilightflats found for $${date} $${filter} crunid $(CRUNID)" ; \
+			fi ; \
+		done ; \
+	done ; \
+	echo "$(pref) Starting processed twilightflats for crunid $(CRUNID)" ; \
+	$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal -C $(ROOTDIR) ROOTDIR=$(ROOTDIR) TARGETS="$$targets" SOURCES="$$sources" FILTERS="$$filterlist" FORGED_DATES="$${forged_dates}" VERSION=$(VERSION) CRUNID=$(CRUNID) ECHO=$(ECHO) RECHO=$(RECHO) TRACE=$(TRACE) FLAGS="$(FLAGS)" parc --jobs --no-print-directory ; \
+	echo "$(pref) processed twilightflats time for $(CRUNID) $(deltat)"
+else
+	@echo "$(pref) Please specify a CRUNID for the processedtwilightflats."
+endif
+
+#########################################################################################
+# Plot the twilightflats
+#
+plottwilightflats: directoriescreated
+ifdef CRUNID
+	@start=$$SECONDS; \
+	$(bindir)wirenvdb "delete from calibration where type='TWILIGHTPLOT' and crunid='$(CRUNID)'" ; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		filterlist=$(FILTER) ; \
+	else \
+		filterlist=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '`   ; \
+	fi ; \
+	for filter in $$filterlist  ; \
+	do \
+		$(bindir)wirenvdb "update exposure set _use=1 where _use = 0 and object='TwilightFlats' and crunid='$(CRUNID)' and filter='$$filter'" ; \
+		amdates=`$(bindir)/iiwi_trimflatlist.tcl AM $(CRUNID) $$filter 2>>/dev/null` ; \
+		for date in $$amdates ; \
+		do \
+			rm -f $(IIWI_LOG_DIR)/twilightflat_$${date}_AM_$${filter}.log 2>/dev/null ; \
+			rm -f $(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$${date}_AM_$${filter}.jpg 2>/dev/null ; \
+			rm -f $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$${date}_AM_$${filter}.dat 2>/dev/null ; \
+			$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal ROOTDIR=$(ROOTDIR) twilightflat_$(CRUNID)_$${date}_AM_$${filter}.jpg REPROCESS=$(REPROCESS) DATE=$$date AMPM=AM FILTER=$$filter VERSION=$(VERSION) FLATS="$${flats}" CRUNID=$(CRUNID) --jobs --no-print-directory  ; \
+		done ; \
+		pmdates=`$(bindir)/iiwi_trimflatlist.tcl PM $(CRUNID) $$filter 2>>/dev/null` ; \
+		for date in $$pmdates ; \
+		do \
+			rm -f $(IIWI_LOG_DIR)/twilightflat_$${date}_PM_$${filter}.log 2>/dev/null ; \
+			rm -f $(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$${date}_PM_$${filter}.jpg 2>/dev/null ; \
+			rm -f $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$${date}_PM_$${filter}.dat 2>/dev/null ; \
+			$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal ROOTDIR=$(ROOTDIR) twilightflat_$(CRUNID)_$${date}_PM_$${filter}.jpg REPROCESS=$(REPROCESS) DATE=$$date AMPM=PM FILTER=$$filter VERSION=$(VERSION) FLATS="$${flats}" CRUNID=$(CRUNID) --jobs --no-print-directory ; \
+		done ; \
+	done ; \
+	amdates=`$(bindir)/iiwi_trimflatlist.tcl AM $(CRUNID) ALL 2>>/dev/null` ; \
+	for date in $$amdates ; \
+	do \
+		rm -f $(IIWI_LOG_DIR)/twilightflat_$${date}_AM_.log 2>/dev/null ; \
+		rm -f $(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$${date}_AM_.jpg 2>/dev/null ; \
+		rm -f $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$${date}_AM_.dat 2>/dev/null ; \
+		$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal ROOTDIR=$(ROOTDIR) twilightflat_$(CRUNID)_$${date}_AM_.jpg REPROCESS=$(REPROCESS)  DATE=$$date AMPM=AM VERSION=$(VERSION) CRUNID=$(CRUNID) --jobs --no-print-directory ; \
+	done ; \
+	pmdates=`$(bindir)/iiwi_trimflatlist.tcl PM $(CRUNID) ALL 2>>/dev/null` ; \
+	for date in $$pmdates ; \
+	do \
+		rm -f $(IIWI_LOG_DIR)/twilightflat_$${date}_PM_.log 2>/dev/null ; \
+		rm -f $(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$${date}_PM_.jpg 2>/dev/null ; \
+		rm -f $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$${date}_PM_.dat 2>/dev/null ; \
+		$(ECHO) $(MAKE) -f $(ROOTDIR)/Makefile.cal ROOTDIR=$(ROOTDIR) twilightflat_$(CRUNID)_$${date}_PM_.jpg REPROCESS=$(REPROCESS) DATE=$$date AMPM=PM VERSION=$(VERSION) CRUNID=$(CRUNID) --jobs --no-print-directory ; \
+	done ; \
+	echo "$(pref) twilightflat plot time for $(CRUNID) $(deltat)"
+else
+	@echo "$(pref) Please specify a CRUNID for the plotting twilightflats."
+endif
+
+#########################################################################################
+# determine whether a twilight flat for the current filter
+# will be saturated, low flux, or OK and advise user
+#
+autoflats: 
+	@start=$$SECONDS; \
+	$(SetupForFlatsAndDarks) ; \
+	guideperiod=100 ; \
+	filter=`ssGet i/wircam/filter/status/filter | tr '[A-Z]' '[a-z]'` ; \
+	t=$(ETIME) ; \
+	maxflux=30000 ; \
+	fudge=`$(bindir)/wirGetFudgeForFilter $$filter` ; \
+	clicmd @detcom.guide period $$guideperiod ; \
+	clicmd @gwindow center; \
+	clicmd @detcom.gon ; \
+	clicmd @detcom.guide -u5 -S10 ; \
+	((trying=1)) ; \
+	((samples=5)) ; \
+	while (( trying )) ; do \
+		((i=0)) ; \
+		flux="" ; \
+		while (( i < samples )) ; \
+		do \
+	 		sleep 1 ; \
+			f=`clicap detcom.guide -G3 | awk '{print $$1}'` ; \
+			if [[ "$$f" != "" ]] ; then \
+				f=`echo $$f "/" 25000 | bc` ; \
+				if (( f < 0 )) ; \
+				then \
+					((f=f+65535)) ; \
+				fi ; \
+	 			flux="$$flux $$f " ; \
+				((i++)) ; \
+			fi ; \
+		done ; \
+		guideflux=`echo "$$flux" | sed -e 's/  / /g' -e 's/^ //' -e 's/ $$//' | tr ' ' '\n' | uniq | sort -g | tr '\n' ' ' | awk '{print $$3}'` ; \
+		echo "Median guide flux over $$i samples with a guide period of $${guideperiod}ms is $$guideflux ADU."; \
+		scienceflux=`echo $$fudge "*" $$t "*" $$guideflux "*" 1000 "/" $$guideperiod "/" 8 | bc` ; \
+		if (( scienceflux > maxflux )) ; \
+		then \
+			echo "$(wpref) Saturation ($$scienceflux > $${maxflux}ADU) expected with an etime of $$t seconds, filter $$filter."; \
+			trythis=`$(bindir)/wirFilterPredictor saturated $$scienceflux $$filter` ; \
+			if [[ "$$trythis" != "" ]] ; then \
+				fil=`echo $$trythis | awk '{print $$1}'` ; \
+				flu=`echo $$trythis | awk '{print $$2}'` ; \
+				echo "logonly: You might try filter $${fil}, it is expected to give $${flu}ADU."; \
+			fi ; \
+		else \
+			minflux=`$(bindir)/wirenvdb "select minadu from flatparameters where lower(filter)='$$filter'"` ; \
+			if (( scienceflux < minflux )) ; then \
+				echo "$(wpref) Low flux expected ($${scienceflux} < $${minflux}ADU) with an etime of $$t seconds, filter $$filter."; \
+				trythis=`$(bindir)/wirFilterPredictor low $$scienceflux $$filter` ; \
+				if [[ "$$trythis" != "" ]] ; then \
+					fil=`echo $$trythis | awk '{print $$1}'` ; \
+					flu=`echo $$trythis | awk '{print $$2}'` ; \
+					echo "logonly: You might try filter $${fil} it is expected to give $${flu}ADU."; \
+				fi ; \
+			else \
+				echo "Adequate flux expected at $${scienceflux} ADU with an etime of $$t seconds, filter $$filter."; \
+				((trying=0)) ; \
+			fi ; \
+		fi ; \
+		((trying=0)) ; \
+	done ; \
+	clicmd @detcom.guide off ; \
+	clicmd @detcom.guide park ; \
+	clicmd @detcom.guide -u4
+
+#########################################################################################
+# show completion stats for twilight flats
+#
+flatlist: 
+ifdef CRUNID
+	@filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		filters=$(FILTER); \
+	fi ; \
+	for filter in $$filters  ; \
+	do \
+		total=`$(bindir)/wirenvdb "select count(*) from calibration where crunid='$(CRUNID)' and type='TWILIGHTPLOT' and filter='$${filter}'"` ; \
+		count=`$(bindir)/wirenvdb "select count(*) from calibration where crunid='$(CRUNID)' and type='TWILIGHTPLOT' and filter='$${filter}' and _use > 0"` ; \
+		res=(`$(bindir)/wirenvdb "select minnum,minadu,maxadu from flatparameters where filter='$${filter}'"`) ; \
+		minnum=$${res[0]}; minadu=$${res[1]}; maxadu=$${res[2]}; \
+		minsequences=3 ; \
+		if (( count < minsequences )) ; \
+		then \
+			printf "$(wpref) Filter %5s has $$count/$$minsequences valid flat sequences ($$total taken in total) of $$minnum flats/sequence with ADU >= $$minadu and <= $$maxadu \n" $${filter}; \
+		else \
+			printf "$(pref) Filter %5s has $$count/$$minsequences valid flat sequences ($$total taken in total) of $$minnum flats/sequence with ADU >= $$minadu and <= $$maxadu \n" $${filter}; \
+		fi ; \
+	done ; \
+	for filter in $$filters  ; \
+	do \
+		jpgs=`wirenvdb "select filename from calibration where crunid='$(CRUNID)' and filter='$${filter}' and type='TWILIGHTPLOT' and _use > 0"` ; \
+		for jpg in $${jpgs} ; do \
+			adate=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$3}'` ; \
+			ampm=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$4}'` ; \
+			startt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | head -1 | awk '{print $$5}'` ;\
+			endt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | tail -1 | awk '{print $$5}'` ;\
+			echo "$(pref) A successful flat sequence for filter $${filter} on $${adate} started at $${startt}$${ampm} and ended at $${endt}$${ampm} " ; \
+		done; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+#########################################################################################
+# show completion stats for all crunid twilight flats
+#
+twilightflatlist:
+	$(bindir)/iiwi_masterflatstarttimes | sed -e "s|^|$(pref) |"
+
+# kml for crunid
+#
+kml:
+	@$(bindir)/wirgensemesterkml $(CRUNID)
+	
+#########################################################################################
+# show completion stats in html
+#
+# 
+statshtml: 
+ifdef CRUNID
+	@echo "<HTML><BODY>" ; \
+	echo "<H1><CENTER><FONT COLOR=DarkGray>Iiwi $(IIWI_VERSION) Calibration Report $(CRUNID) </FONT></CENTER></H1>" ; \
+	echo "<P ALIGN=CENTER><TABLE bgcolor=PowderBlue border=2>" ; \
+	echo "<THEAD bgcolor=#CCFFCC>" ; \
+	echo "<TH colspan=7>Calibrations to Date</TH>" ; \
+	echo "</THEAD>" ; \
+	filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		filters=$(FILTER); \
+	fi ; \
+	((count=0)) ;\
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Flats Taken to Date</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD align=center><b>Filter</b></TD>" ; \
+	echo "<TD align=center><b>Good Count</b></TD>" ; \
+	echo "<TD align=center><b>Total Count</b></TD>" ; \
+	echo "<TD align=center><b>Minimum Count</b></TD>" ; \
+	echo "<TD align=center><b>Min Flats/Sequence</b></TD>" ; \
+	echo "<TD align=center><b>Min ADU</b></TD>" ; \
+	echo "<TD align=center><b>Max ADU</b></TD>" ; \
+	echo "</TR>" ; \
+	for filter in $$filters  ; \
+	do \
+		total=`$(bindir)/wirenvdb "select count(*) from calibration where crunid='$(CRUNID)' and type='TWILIGHTPLOT' and filter='$${filter}'"` ; \
+		count=`$(bindir)/wirenvdb "select count(*) from calibration where crunid='$(CRUNID)' and type='TWILIGHTPLOT' and filter='$${filter}' and _use > 0"` ; \
+		res=(`$(bindir)/wirenvdb "select minnum,minadu,maxadu from flatparameters where filter='$${filter}'"`) ; \
+		minnum=$${res[0]}; minadu=$${res[1]}; maxadu=$${res[2]}; \
+		minsequences=3 ; \
+		if (( count < minsequences )) ; \
+		then \
+			echo "<TR bgcolor=LightPink>" ; \
+		else \
+			echo "<TR bgcolor=PaleGreen>" ; \
+		fi ; \
+		echo "<TD align=center>$${filter}</TD><TD align=center>$${count}</TD><TD align=center>$$total</TD><TD align=center>$$minsequences</TD><TD align=center>$$minnum</TD><TD align=center>$$minadu</TD><TD align=center>$$maxadu</TD>"; \
+		echo "</TR>" ; \
+		((count++)) ; \
+	done ; \
+	filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	if [[ "$${filters}" != "" ]] ; then \
+		echo "<TR bgcolor=BurlyWood>" ; \
+		echo "<TD colspan=7 align=center><b>Filters Used So Far This Run</b></TD>" ; \
+		echo "</TR>" ; \
+		echo "<TR>" ; \
+		echo "<TD colspan=7 align=center>$${filters}</TD>" ; \
+		echo "</TR>" ; \
+		filters=`$(bindir)/wirgetfilters` ; \
+		echo "<TD colspan=7 align=center><b>FiltersMounted</b></TD>" ; \
+		echo "</TR>" ; \
+		echo "<TR>" ; \
+		echo "<TD colspan=7 align=center>$${filters}</TD>" ; \
+		echo "</TR>" ; \
+	fi ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Successful Flat Sequence Times</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD align=center><b>Filter</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>Date</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>Start Time</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>End Time</b></TD>" ; \
+	echo "</TR>" ; \
+	for filter in $$filters  ; \
+	do \
+		jpgs=`wirenvdb "select filename from calibration where crunid='$(CRUNID)' and filter='$${filter}' and type='TWILIGHTPLOT' and _use > 0"` ; \
+		for jpg in $${jpgs} ; do \
+			echo "<TR bgcolor=PaleGreen>" ; \
+			adate=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$3}'` ; \
+			ampm=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$4}'` ; \
+			startt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | head -1 | awk '{print $$5}'` ;\
+			endt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | tail -1 | awk '{print $$5}'` ;\
+			echo "<TD align=center>$${filter}</TD><TD colspan=2 align=center>$${adate}</TD><TD colspan=2 align=center>$${startt}$${ampm}</TD><TD colspan=2 align=center>$${endt}$${ampm} </TD>" ; \
+			echo "</TR>" ; \
+		done; \
+	done ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Failed Flat Sequence Times</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD align=center><b>Filter</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>Date</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>Start Time</b></TD>" ; \
+	echo "<TD colspan=2 align=center><b>End Time</b></TD>" ; \
+	echo "</TR>" ; \
+	for filter in $$filters  ; \
+	do \
+		jpgs=`wirenvdb "select filename from calibration where crunid='$(CRUNID)' and filter='$${filter}' and type='TWILIGHTPLOT' and _use = 0"` ; \
+		for jpg in $${jpgs} ; do \
+			echo "<TR bgcolor=LightPink>" ; \
+			adate=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$3}'` ; \
+			ampm=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$4}'` ; \
+			startt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | head -1 | awk '{print $$5}'` ;\
+			endt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | tail -1 | awk '{print $$5}'` ;\
+			errs=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Error | tr '\n' '|' | sed -e 's:|:<br>:'` ; \
+			echo "<TD align=center>$${filter}</TD><TD colspan=2 align=center>$${adate}</TD><TD colspan=2 align=center>$${startt}$${ampm}</TD><TD colspan=2 align=center>$${endt}$${ampm} </TD>" ; \
+			echo "</TR>" ; \
+			echo "<TR bgcolor=LightPink>" ; \
+			echo "<TD colspan=7>$${errs}</TD>" ; \
+			echo "</TR>" ; \
+			((count++)) ; \
+		done; \
+	done ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Twilight Flat Plots</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD align=center><b>Filter</b></TD>" ; \
+	echo "<TD align=center><b>Date of Sequence</b></TD>" ; \
+	echo "<TD align=center><b>Start Time</b></TD>" ; \
+	echo "<TD align=center><b>End Time</b></TD>" ; \
+	echo "<TD align=center colspan=3><b>Plot</b></TD>" ; \
+	echo "</TR>" ; \
+	for filter in $$filters all ; \
+	do \
+		jpgs=`wirenvdb "select filename from calibration where crunid='$(CRUNID)' and filter='$${filter}' and type='TWILIGHTPLOT' and _use > 0"` ; \
+		for jpg in $${jpgs} ; do \
+			if (( count%2 )) ; \
+			then \
+				echo "<TR bgcolor=Linen>" ; \
+			else \
+				echo "<TR bgcolor=LightCyan>" ; \
+			fi ; \
+			adate=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$3}'` ; \
+			ampm=`echo $${jpg} | sed -e 's:_: :g' | awk '{print $$4}'` ; \
+			startt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | head -1 | awk '{print $$5}'` ;\
+			endt=`cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$${adate}_$${ampm}_$${filter}.log | grep Adding | tail -1 | awk '{print $$5}'` ;\
+			echo "<TD align=center>$${filter} </TD><TD align=center>$${adate} </TD><TD align=center>$${startt}$${ampm} </TD><TD align=center>$${endt}$${ampm}</TD>" ; \
+			echo "<TD colspan=3><img src=http://www.cfht.hawaii.edu/images/iiwi2/$${jpg}></img></TD>" ; \
+			echo "</TR>" ; \
+			((count++)) ; \
+		done; \
+	done ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Darks Etimes Taken to Date</b></TD>" ; \
+	echo "</TR>" ; \
+	if (( count%2 )) ; \
+	then \
+		echo "<TR bgcolor=Linen>" ; \
+	else \
+		echo "<TR bgcolor=LightCyan>" ; \
+	fi ; \
+	etimes=`$(bindir)/wirenvdb "select distinct convert(int,floor(etime+0.5)) from exposure where crunid='$(CRUNID)' and (etype='OBJECT' or etype='FLAT') and _use > 0" | tr '\n' ' '` ; \
+	echo "<TD align=center colspan=7><b>$$etimes</b></TD>" ; \
+	echo "</TR>" ; \
+	((count++)) ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Focus Exposures to Date</b></TD>" ; \
+	echo "</TR>" ; \
+	echo "<TR>" ; \
+	echo "<TD align=center><b>Filter</b></TD>" ; \
+	echo "<TD colspan=3 align=center><b>Taken</b></TD>" ; \
+	echo "<TD colspan=3 align=center><b>Required</b></TD>" ; \
+	echo "</TR>" ; \
+	for filter in $$filters  ; \
+	do \
+		counts=`$(bindir)/wirenvdb "select count(*) from exposure where crunid='$(CRUNID)' and etype='FOCUS' and filter='$${filter}' and _use > 0"` ; \
+		if (( counts < 3 )) ; \
+		then \
+			echo "<TR bgcolor=LightPink>" ; \
+			echo "<TD align=center>$${filter}</TD><TD colspan=3 align=center>$$counts</TD><TD colspan=3 align=center>3</TD>" ; \
+		else \
+			echo "<TR bgcolor=PaleGreen>" ; \
+			echo "<TD align=center>$${filter}</TD><TD colspan=3 align=center>$$counts</TD><TD colspan=3 align=center>3</TD>" ; \
+		fi ; \
+		echo "</TR>" ; \
+	done ; \
+	echo "<TR bgcolor=BurlyWood>" ; \
+	echo "<TD colspan=7 align=center><b>Historical Master Twilight Flat Start Times</b></TD>" ; \
+	echo "</TR>" ; \
+	filters=`$(bindir)/wirenvdb "select distinct filter from calibration where type='MASTERFLAT'"` ; \
+	for filter in $${filters} ; \
+	do \
+		masterflats=`$(bindir)/wirenvdb "select filename from calibration where filter='$$filter' and type='MASTERFLAT' order by crunid"` ; \
+		echo "<TR bgcolor=PaleGreen>" ; \
+		echo "<TD colspan=7 align=center> Filter $${filter} </TD>" ; \
+		echo "</TR>" ; \
+		for m in $${masterflats} ; \
+		do \
+			if (( count%2 )) ; \
+			then \
+				echo "<TR bgcolor=Linen>" ; \
+			else \
+				echo "<TR bgcolor=LightCyan>" ; \
+			fi ; \
+			if [[ -e $(IIWI_CALS_TWILIGHTFLATS_DIR)/$${m} ]] ; \
+			then \
+				echo "<TD colspan=4> $${m} </TD>" ; \
+				echo "<TD colspan=3> `fhget $(IIWI_CALS_TWILIGHTFLATS_DIR)/$${m} HSTTIME` </TD>" ; \
+				((count++)) ; \
+			fi ; \
+			echo "</TR>" ; \
+		done ; \
+	done ; \
+	echo "</TABLE></P>" ; \
+	echo "</BODY></HTML>"
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+wazzup: 
+ifdef CRUNID
+	@if [[ "$(FILTER)" != "" ]] ; then \
+		filters=`echo $(FILTER) | sed -e 's:FILTER=::'`; \
+	else \
+		filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+	fi ; \
+	for filter in $$filters  ; \
+	do \
+		cat $(IIWI_ROOT_DIR)logs/$(CRUNID)/twilightflat_$(DATE)*_$${filter}.log 2>/dev/null | while read line ; \
+		do \
+			echo "$(pref) $$line" ; \
+		done; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+#########################################################################################
+# show  stats for darks
+#
+darklist: 
+ifdef CRUNID
+	@etimes=`$(bindir)/wirenvdb "select distinct convert(int,floor(etime+0.5)) from exposure where crunid='$(CRUNID)' and (etype='OBJECT' or etype='FLAT') and _use > 0" | tr '\n' ' '` ; \
+	echo "$(pref) Darks have been taken for the etimes: $$etimes"
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+#########################################################################################
+# show  stats for runids
+#
+runidlist: 
+ifdef CRUNID
+	@runids=`$(bindir)/wirenvdb "select distinct runid from exposure where crunid='$(CRUNID)' and (etype='OBJECT' or etype='FLAT') and _use > 0" | tr '\n' ' '` ; \
+	echo "$(pref) $${runids} runids have been taken so far in $(CRUNID)" ; \
+	for runid in $${runids} ; do \
+		i=`$(bindir)/wirenvdb "select count(*) from exposure where runid = '$${runid}' and crunid='$(CRUNID)' and etype='OBJECT' and _use > 0" | tr '\n' ' '` ; \
+		echo "$(pref) $${i} images have been taken so far in $${runid} $(CRUNID)" ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+#########################################################################################
+# show  stats for filters
+#
+filterlist: 
+ifdef CRUNID
+	@filters=`$(bindir)/wirenvdb "select distinct filter from exposure where crunid='$(CRUNID)' and (etype='OBJECT' or etype='FLAT')  and filter!='FakeBlank' and _use > 0" | tr '\n' ' '` ; \
+	echo "$(pref) $${filters} filters have used so far in $(CRUNID)" ; \
+	filters=`$(bindir)/wirgetfilters` ; \
+	echo "$(pref) $${filters} filters are mounted at the moment."
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+#########################################################################################
+# show  stats for foci
+#
+focuslist: 
+ifdef CRUNID
+	@filters=`$(bindir)/wirgetfilters` ; \
+	for filter in $$filters  ; \
+	do \
+		count=`$(bindir)/wirenvdb "select count(*) from exposure where crunid='$(CRUNID)' and etype='FOCUS' and filter='$${filter}' and _use > 0"` ; \
+		if (( count < 3 )) ; \
+		then \
+			printf "$(wpref) Filter %5s has $$count/3 focus exposures\n" $${filter}; \
+		else \
+			printf "$(pref) Filter %5s has $$count/3 focus exposures\n" $${filter}; \
+		fi ; \
+	done
+else
+	@echo "$(pref) Please specify a CRUNID."
+endif
+
+#########################################################################################
+# Generate a bad pixel mask
+#
+# pro iiwi_badpix, $
+#	 badpixname=badpixname, $
+#	 hotpixname=hotpixname, $
+#	 deadpixname=deadpixname, $
+#	 flatname=flatname, $
+#	 darkname=darkname, $
+#	 seconddarkname=seconddarkname, $
+#	 hotpix_threshold=hotpix_threshold, $
+#	 flat_lowest=flat_lowest, $
+#	 flat_highest=flat_highest,$
+#	 badamplist=badamplist, $
+#	 readin=readin, $
+#	 verbose=verbose, $
+#	 debug=debug
+# PRO iiwi_createbadpixelmask, $
+#	 badpixname=badpixname, $
+#	 maskedname=maskedname, $
+#	 regionlist=regionlist, $
+#	 readin=readin, $
+#	 verbose=verbose, $
+#	 debug=debug
+
+#########################################################################################
+# Generate a bad pixel mask
+#
+# pro iiwi_badpix, $
+#	 badpixname=badpixname, $
+#	 hotpixname=hotpixname, $
+#	 deadpixname=deadpixname, $
+#	 flatname=flatname, $
+#	 darkname=darkname, $
+#	 seconddarkname=seconddarkname, $
+#	 hotpix_threshold=hotpix_threshold, $
+#	 flat_lowest=flat_lowest, $
+#	 flat_highest=flat_highest,$
+#	 badamplist=badamplist, $
+#	 readin=readin, $
+#	 verbose=verbose, $
+#	 debug=debug
+# PRO iiwi_createbadpixelmask, $
+#	 badpixname=badpixname, $
+#	 maskedname=maskedname, $
+#	 regionlist=regionlist, $
+#	 readin=readin, $
+#	 verbose=verbose, $
+#	 debug=debug
+
+badpixelmask: directoriescreated
+ifdef CRUNID
+	@start=$$SECONDS; \
+	log_name="badpix.log" ; \
+	etime=20 ;\
+	$(GetMasterDark) ; \
+	masterdark="$(IIWI_CALS_DARKS_DIR)$${name_dark}" ; \
+	filter='J'; \
+	name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERFLAT' and filter='$${filter}' and crunid='$(CRUNID)' and _use > 0"` ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		filter='H'; \
+		name_flat=`${bindir}/wirenvdb "select distinct filename from calibration where type='MASTERFLAT' and filter='$${filter}' and crunid='$(CRUNID)' and _use > 0"` ; \
+	fi ; \
+	if [[ "$$name_flat" == "" ]] ; then \
+		$(GetMasterFlat) ; \
+	fi ; \
+	masterflat="$(IIWI_CALS_TWIFLATS_DIR)$${name_flat}" ; \
+	forged_date=`fhget $$masterflat HSTTIME | awk '{printf("%s%s%sHST%s",$$6,$$2,$$3,$$4)}' | sed -e 's/://g' -e 's:Jan:01:' -e 's:Feb:02:' -e 's:Mar:03:' -e 's:Apr:04:' -e 's:May:05:' -e 's:Jun:06:' -e 's:Jul:07:' -e 's:Aug:08:' -e 's:Sep:09:' -e 's:Oct:10:' -e 's:Nov:11:' -e 's:Dec:12:'`  ; \
+	echo "$(pref) Creating bad pixel mask badpix16_$${forged_date}_v$(VERSION).fits from dark: $$masterdark and flat: $$masterflat..." ; \
+	$(bindir)wirtrace $(TRACE) "$(bindir)/iiwi_badpix --badpixname='$(IIWI_CALS_BADPIX_DIR)badpix_noregions_$${forged_date}_v$(VERSION).fits' --hotpixname='$(IIWI_CALS_BADPIX_DIR)hotpix_$${forged_date}_v$(VERSION).fits' --deadpixname='$(IIWI_CALS_BADPIX_DIR)deadpix_$${forged_date}_v$(VERSION).fits' --flatname='$${masterflat}' --darkname='$${masterdark}' --tmpdir='$(IIWI_TMP_DIR)' $(FLAGS) " ; \
+	$(bindir)/iiwi_badpix --badpixname="'$(IIWI_CALS_BADPIX_DIR)badpix_noregions_$${forged_date}_v$(VERSION).fits'" --hotpixname="'$(IIWI_CALS_BADPIX_DIR)hotpix_$${forged_date}_v$(VERSION).fits'" --deadpixname="'$(IIWI_CALS_BADPIX_DIR)deadpix_$${forged_date}_v$(VERSION).fits'" --flatname="'$${masterflat}'" --darkname="'$${masterdark}'" --tmpdir='$(IIWI_TMP_DIR)' $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+	$(bindir)/iiwi_badpixto16bits --BADPIX_NAME="'$(IIWI_CALS_BADPIX_DIR)badpix_noregions_$${forged_date}_v$(VERSION).fits'" BADPIX16bits_NAME="'$(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits'" 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+	fitsverify -q -e $(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits ; \
+	if (( $$? != 0 )) ; then \
+		echo "$(epref) fitsverify of $(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits failed." ; \
+	else \
+		echo "$(pref) Bad pixel mask badpix16_noregions_$${forged_date}_v$(VERSION).fits created $(deltat)." ; \
+	fi ; \
+	echo "$(pref) Adding region masks to bad pixel mask badpix16_$${forged_date}_v$(VERSION).fits from dark: $$dark and flat: $$flat..." ; \
+	regionlist="`ls $(IIWI_CONFIG_DIR)*.reg | tr '\n' ' '`" ; \
+	if [[ "$${regionlist}" == "" ]] ; then \
+		echo "$(epref) No region files could be found in $(IIWI_CONFIG_DIR)." ; \
+		exit 1 ; \
+	fi ; \
+	echo "$(pref) *******************************************************************" ; \
+	echo "$(pref) Now starting the process of masking out the following regions:" ; \
+	echo "$(pref) $${regionlist}" ; \
+	echo "$(pref) in the $(IIWI_CONFIG_DIR) directory." ; \
+	echo "$(pref) You may edit these regions or create new regions in ds9." ; \
+	echo "$(pref) All if the regions found in the directory above will be used to" ; \
+	echo "$(pref) create the final mask. If you create a new region re-run the bad pixel" ; \
+	echo "$(pref) mask creation process once more to have that new region also applied." ; \
+	echo "$(pref) Please read instructions at this URL:" ; \
+	echo "$(pref) http://www.cfht.hawaii.edu/~chyan/wircam/badpix/badpix.html" ; \
+	echo "$(pref) *******************************************************************" ; \
+	$(bindir)wirtrace $(TRACE) "echo $${regionlist} | $(bindir)/iiwi_createbadpixelmask --badpixname='$(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits' --maskedname='$(IIWI_CALS_BADPIX_DIR)badpix16_$${forged_date}_v$(VERSION).fits' --tmpdir='$(IIWI_TMP_DIR)' --readin $(FLAGS)" ; \
+	echo $${regionlist} | $(bindir)/iiwi_createbadpixelmask --badpixname="'$(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits'" --maskedname="'$(IIWI_CALS_BADPIX_DIR)badpix16_$${forged_date}_v$(VERSION).fits'" --tmpdir='$(IIWI_TMP_DIR)' --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/$${log_name} 2>>$(IIWI_LOG_DIR)/$${log_name} ; \
+	fitsverify -q -e $(IIWI_CALS_BADPIX_DIR)badpix16_$${forged_date}_v$(VERSION).fits ; \
+	if (( $$? != 0 )) ; then \
+		echo "$(epref) fitsverify of $(IIWI_CALS_BADPIX_DIR)badpix16_$${forged_date}_v$(VERSION).fits failed."  ; \
+	else \
+		echo "$(pref) Adding bad pixel mask badpix16_$${forged_date}_v$(VERSION).fits to calibration database table..." ; \
+		$(bindir)/wirenvdb "update calibration set _use = 0 where crunid='$(CRUNID)'and type = 'BADPIX'" ; \
+		$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','NONE','BADPIX',0,'badpix16_$${forged_date}_v$(VERSION).fits',$(VERSION),1)" ; \
+		echo "$(pref) Bad pixel mask badpix16_$${forged_date}_v$(VERSION).fits created $(deltat)." ; \
+		rm -f $(IIWI_CALS_BADPIX_DIR)badpix16_noregions_$${forged_date}_v$(VERSION).fits; \
+	fi
+else
+	@echo "$(pref) Please specify a CRUNID for bad pixel mask creation."
+endif
+
+#########################################################################################
+
+
+########################################################################################
+# calibration processing
+#
+# - Raw darks come in cubes of 15 slices for <120 sec, 7 slices for >120 sec. A
+#   dark cube is obtained at the end of every night for each science exposure
+# time used that night. Darks are not filter dependent. They apply to all
+# filters.
+# 
+# - Raw dome flats come in 2 cubes of 15 slices each. One cube is with the dome
+#   light on, the second cube is with the dome lamp off. In the Ks filter,
+# actually 2 sets are obtained. Usually, only one dome flat sequence is obtained
+# at the beginning of the observing run. On a few occasions in the past, more
+# than one sequence was done. In the future, we may want to do more than one
+# sequence.
+# 
+# - Raw twilight flats come as a series of single slices obtained through a given
+#   filter, during evening and/or morning twilight. They are obtained as the sky
+# level changes and the flux they contain varies from very low (when the sky is
+# dark) to very high or even saturated as the sky brightens. Often times, slices
+# at the begining and end of a sequence need to be rejected either becasue they
+# are saturated or because the count level is too low.
+# 
+# 
+# Processing of calibration is done with IDL scripts:
+# 
+# - iiwi_dark		(to create Processed Darks)
+# - iiwi_domeflat	(to create Processed Dome Flats)
+# - iiwi_twilightflat 	(to create Processed Twilight Flats)
+# - iiwi_darkmaster	(to create Master Darks)
+# - iiwi_flatmaster	(to create Master Twilight/Dome Flats)
+# 
+# There is a conceptual difference between "Processed" calibrations and "Master"
+# calibrations. "Master" calibrations are what is used in the science processing
+# of object exposures. They are very high signal-to-noise ratio calibrations
+# obtained by averaging all of the single "Processed" calibrations. "Processed"
+# calibration are the result of processing a single cube or sequence of
+# calibration data. Usually (at least for darks and twilight flats) many
+# "Processed" files will be produced during an observing run. In the case of dome
+# flats, the two concepts blend becasue we usually only have one set of
+# "Processed" dome flats in making the "Master" dome flat. We nevertheless
+# create "Master" dome flats from the single "Processed" dome flats.
+#
+#########################################################################################
+
+
+#########################################################################################
+# create a processed flat
+#
+# iiwi_twilightflat.pro
+# ---------------------
+# 
+# RAW_TWILIGHT_LIST	A list of single twilight flat names obtained
+# sequentially during twilight.
+# 
+# 	Example:
+# 	RAW_TWILIGHT_LIST=['/thefullpath/1234567f.fits','/thefullpath/1234568f.fits','/thefullpath/1234569f.fits',...between ~7 and 30 files]
+# 
+# PROCESSED_TWILIGHT_NAME	The name of the "Processed" twilight flat. A single FITS
+# file name that results from processing the input files.
+# 
+# 	Example:
+# 	PROCESSED_TWILIGHT_NAME='/thefullcalibrationpath/twilightflat_8203A_20060908HST131241_CH4On.fits'
+# 
+# 
+# How is the PROCESSED_TWILIGHT_NAME forged?
+# 
+# domeflat	Calibration title
+# 
+# Filter ID	It's a 5-character string. The first four are the filter ID and
+# 		A or B depending in which filter wheel that filter is positionned.
+# 
+# 		***Note to Doug*** I have an IDL script that gets what you need:
+# 		filtid = wircam_getfilterid(raw_dome_filename_forheader)
+# 
+# Observing date	A YYYYMMDDHSTHHMMSS string in HST time obtained from the raw
+# 		FITS header of the first image in the list, keyword DATE.
+# 
+# Filter Name	The FILTER keyword in the of the first image in the list. String case untouched.
+# 
+# Version	The iiwi version number with 2 decimal points, decimal point
+# 		dropped, preceded with v. 
+# target: twilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits FLATS="..."
+
+twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).fits: 
+	@start=$$SECONDS; \
+	echo "$(pref) Creating processed flat twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).fits for filter $(FILTER)..." ; \
+	flats="$(SOURCES)" ; \
+	if [[ "$${flats}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filelist=`echo $${flats} | sed -e 's:\@::'`; \
+		flats="`cat $$filelist`" ; \
+	fi ; \
+	$(bindir)wirtrace $(TRACE) "echo  \"$${flats}\" | $(bindir)/iiwi_twilightflat --finalname=$(IIWI_CALS_TWIFLATS_DIR)twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits --weightname=$(IIWI_CALS_TWIFLATS_DIR)/weight_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits --filter=$(FILTER) " ; \
+	echo  "$${flats}" | $(bindir)/iiwi_twilightflat --finalname=$(IIWI_CALS_TWIFLATS_DIR)twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits --weightname=$(IIWI_CALS_WEIGHT_DIR)/weight_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits --filter=$(FILTER) 1>>$(IIWI_LOG_DIR)/twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).log 2>>$(IIWI_LOG_DIR)/twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).log; \
+	fitsverify -q -e $(IIWI_CALS_TWIFLATS_DIR)twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits ; \
+	if (( $$? != 0 )) ; then \
+		echo "$(epref) fitsverify of twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits failed." | tee -a $(IIWI_LOG_DIR)/twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).log ; \
+		$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits', 'twilightflat_$(FILTER)_$(FORGED_DATE)_v$(VERSION).log','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+	else \
+		echo "$(pref) Adding processed twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits to calibration database table..." ; \
+		$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','$(FILTER)','PROCESS_FLAT',0,'twilightflat_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits',$(VERSION),1)" ; \
+		$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','$(FILTER)','WEIGHT_MAP',0,'weight_$(FORGED_DATE)_$(FILTER)_v$(VERSION).fits',$(VERSION),1)" ; \
+		echo "$(pref) Processed flat creation time for filter $(FILTER) $(deltat)."  ; \
+	fi
+
+
+# the .dat file is created in iiwi_trimflatslist.tcl
+twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat: 
+	@start=$$SECONDS; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		if [[ "$(REPROCESS)" == "" ]] ; then \
+			echo "$(pref) Selecting $(AMPM) twilight flats for filter $(FILTER) taken $(DATE)" ; \
+			flats=`$(bindir)/iiwi_trimflatlist.tcl $(AMPM) $(CRUNID) $(FILTER) $(DATE) 0 2>>$(IIWI_LOG_DIR)/twilightflat_$(DATE)_$(AMPM)_$(FILTER).log` ; \
+			if [[ "$$flats" == "" ]] ; then \
+				echo "$(pref) No $(AMPM) twilight flats for filter $(FILTER) taken $(DATE)" ; \
+			else \
+				echo "$(pref) `$(bindir)/wircount $$flats | awk '{printf("%d",$$1)}'` $(AMPM) twilight flats for filter $(FILTER) taken $(DATE)" ; \
+			fi ; \
+		else \
+			echo "$(pref) Reprocessing $(AMPM) twilight flats for filter $(FILTER) taken $(DATE)" ; \
+			flats=`$(bindir)/iiwi_trimflatlist.tcl $(AMPM) $(CRUNID) $(FILTER) $(DATE) 1 2>>$(IIWI_LOG_DIR)/twilightflat_$(DATE)_$(AMPM)_$(FILTER).log` ; \
+			if [[ "$$flats" == "" ]] ; then \
+				echo "$(pref) No $(DATE) $(AMPM) twilight flats for filter $(FILTER) taken $(DATE)" ; \
+			fi ; \
+		fi ; \
+		echo "$(pref) Total $(DATE) $(AMPM) twilight flat selection time for filter $(FILTER) $(deltat)." ; \
+	fi
+
+twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg: twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat 
+	@start=$$SECONDS; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		echo "$(pref) Creating $(CRUNID) $(DATE) $(AMPM) filter $(FILTER) flat sequence plot..." ; \
+		if [[ -s $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat ]] ; then \
+			$(bindir)/wirtrace $(TRACE) "$(bindir)/iiwi_plot_twilightflats datfile='$(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat' jpgfile='$(IIWI_WEB_DIR)twilightflats/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg' ampm='$(AMPM)' filter='$(FILTER)' date='$(DATE)'" ; \
+			$(bindir)/iiwi_plot_twilightflats datfile='$(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat' jpgfile='$(IIWI_WEB_DIR)twilightflats/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg' ampm='$(AMPM)' filter='$(FILTER)' date='$(DATE)' 1>>/dev/null 2>>/dev/null ; \
+			oks=`cat $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat | awk '{print $$2}' | grep 1 | wc -l`; \
+			((useit=(oks>=8))) ; \
+			echo "$(pref) Adding Twilight Flat Plot twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg to calibration database table..." ; \
+			$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','$(FILTER)','TWILIGHTPLOT',0,'twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg',$(VERSION),$${useit})" ; \
+		else \
+			echo "$(pref) Empty data list twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat" ;\
+		fi ; \
+		echo "$(pref) Filter $(FILTER) flat sequence $(DATE) $(AMPM) plot creation time $(deltat)." ; \
+	else \
+		echo "$(pref) Creating $(CRUNID) $(DATE) $(AMPM) summary flat sequence plot..." ; \
+		datlist="" ; \
+		filters=`$(bindir)/wirenvdb "select distinct filter from exposure where (etype='OBJECT' or etype='FLAT') and crunid='$(CRUNID)' and filter!='FakeBlank'" | tr '\n' ' '` ; \
+		for filter in $${filters} ; do \
+			if [[ -e $(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$${filter}.dat ]] ; then \
+				if [[ "$$datlist" == "" ]] ; then \
+					datlist="$(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$${filter}.dat" ; \
+				else \
+					datlist="$$datlist,$(IIWI_BYPRODUCTS_DIR)/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$${filter}.dat" ; \
+				fi ; \
+			fi ; \
+		done ; \
+		if [[ "$${datlist}" != "" ]] ; then \
+			echo -e "$${datlist}" | $(bindir)/iiwi_plot_twilightflats jpgfile='$(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg' ampm='$(AMPM)' date='$(DATE)' --readin $(FLAGS) 1>>/dev/null 2>>/dev/null ; \
+			if [[ -e $(IIWI_WEB_DIR)/twilightflats/twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg ]] ; then \
+				echo "$(pref) Adding Twilight Flat Plot twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).jpg to calibration database table..." ; \
+				$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','All','TWILIGHTPLOT',0,'twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_.jpg',$(VERSION),1)" ; \
+			fi ; \
+		else \
+			echo "$(pref) Empty data list twilightflat_$(CRUNID)_$(DATE)_$(AMPM)_$(FILTER).dat" ;\
+		fi ; \
+		echo "$(pref) Summary flat sequence $(DATE) $(AMPM) plot creation time $(deltat)." ; \
+	fi
+
+#########################################################################################
+# take twilight flats for the current filter
+#
+twilightflats: 
+	@start=$$SECONDS; \
+	if [[ "$(FILTER)" != "" ]] ; then \
+		$(ECHO) clicmd filter $(FILTER) || exit 1 ; \
+	fi ; \
+	cd ${NIGHTDIR} ; \
+	$(SetupForFlatsAndDarks) ; \
+	$(ECHO) qsoheader "TwilightFlats" ; \
+	if [[ "$(RA)" == "" || "$(DEC)" == "" ]] ; then \
+	   if (( zenith )) ; then \
+	      $(ECHO) clicmd tcoords zenith ; \
+	      $(ECHO) clicmd tcs.slew ; \
+	   fi ; \
+	else \
+	   $(ECHO) clicmd tcoords $$RA $$DEC 2000 0 0 "flats" ; \
+	   $(ECHO) clicmd tcs.slew ; \
+	fi ; \
+	filter=`ssGet i/wircam/filter/status/filter | tr '[A-Z]' '[a-z]'` ; \
+	((i=1)) ; \
+	((nexp=1)) ; \
+	while (( i <= $(NEXP) )) ; do \
+		$(ECHO) clicmd @tcs.wait ; \
+		echo "$(pref) Taking $$i of $(NEXP) exposures." ; \
+		$(ECHO) clicmd detcom.go etype=FLAT etime=$(ETIME) nexp=$$nexp || break ; \
+		sleep 5 ; \
+		filename=`clicap filename`; \
+		filename=`echo $$filename | sed -e 's/.fits//'`; \
+		slicename="$$filename-slice01.fits"; \
+		if [[ -e $$slicename ]] ; then \
+			sat=`wcreduce -b -e $$slicename /tmp` ; \
+			if [[ "`echo $$sat | grep -i saturated`" != "" ]] ; then \
+				echo "$(epref) Saturation detected, aborting after $$i of $(NEXP) exposures." ; \
+				break ; \
+			else \
+				scienceflux=`echo $$sat | awk '{printf("%d",($$1+$$3+$$5+$$7)/4)}'` ; \
+				minflux=`$(bindir)/wirenvdb "select minadu from flatparameters where lower(filter)='$$filter'"` ; \
+				if (( scienceflux < minflux )) ; then \
+					echo "$(epref) Low flux ($${scienceflux} < $${minflux}ADU) with an etime of $(ETIME) seconds, filter $$filter, aborting..."; \
+					break ; \
+				else \
+					echo "$(pref) Median $${scienceflux} ADU with an etime of $(ETIME) seconds, filter $$filter."; \
+				fi ; \
+			fi ; \
+		else \
+			echo "$(wpref) $${slicename} not found - saturation not tested." ; \
+		fi ; \
+		if (( $(NEXP) > 1 )) ; then \
+			$(ECHO) clicmd tcs.ocoords rel t 60 -60 ; \
+		fi ; \
+		((i++)) ; \
+	   	$(ECHO) clicmd tcs.wait ; \
+	done  ; \
+	echo "$(wpref) Twilight flat sequence finished." 
+
+#########################################################################################
+# create a master twilight flat for each filter for the run
+# pro iiwi_flatmaster, $
+# 	list_processedflat=list_processedflat, $
+# 	name_masterflat=name_masterflat, $
+# 	param_iiwiversion=param_iiwiversion, $
+# 	param_procdate=param_procdate, $
+# 
+# PROCESSED_FLAT_LIST	A list of the processed flats (the output of
+# iiwi_domeflat.pro or iiwi_twilightflat.pro) taken in the same filter during a
+# CRUNID.
+# 
+# MASTERFLAT_NAME	The name of the master flat that results when stacking
+# the individual processed flats together. 
+# 
+# 	Example: MASTERFLAT_NAME='/thefullcalibrationpath/mastertwilightflat_CH4On_08bw03_v200.fits'
+# 
+# How is the MASTERFLAT_NAME forged?
+# 
+# masterdomeflat or mastertwilightflat	Calibration title
+# 
+# Filter Name	The FILTER keyword in the of the first image in the list. String case untouched.
+# CRUNID	The CRUNID it was obtained for. lower case for the letters.
+# Version	The iiwi version number with 2 decimal points, decimal point
+# 		dropped, preceded with v.
+# dependency is on processed twilight flats 
+#
+#	Note that _use is set to 0. Why? _use is set to 1 when the masters are installed
+#	into the local calibration directories om the target machines, otherwise reduction
+#	will fail to find them.
+
+mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits:
+	@start=$$SECONDS; \
+	processedflats=`$(bindir)/wirenvdb "select distinct filename from calibration where type='PROCESS_FLAT' and crunid='$(CRUNID)' and filter='$(FILTER)' and _use>0" | tr '\n' ' '` ;\
+	flatlist="" ; \
+	((count=0)) ; \
+	for processedflat in $$processedflats ; do \
+		flat=$(IIWI_CALS_TWIFLATS_DIR)/$${processedflat} ; \
+		flatlist=`$(bindir)/wirappend sep=',' "'$$flat'" "$$flatlist"` ; \
+		((count++)) ; \
+	done ; \
+	if (( count > 0 )) ; then \
+		echo "$(pref) Creating master twilight flat from $$count flat(s), filter $(FILTER)..." ; \
+		$(bindir)wirtrace $(TRACE) "$(bindir)/iiwi_flatmaster list_processedflat=[$${flatlist}] name_masterflat='$(IIWI_CALS_TWIFLATS_DIR)mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits' param_iiwiversion='$(IIWI_VERSION)' param_procdate='$(PROCDATE)' $(FLAGS)" ; \
+		$(bindir)/iiwi_flatmaster list_processedflat="[$${flatlist}]" name_masterflat='$(IIWI_CALS_TWIFLATS_DIR)mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits' param_iiwiversion='$(IIWI_VERSION)' param_procdate='$(PROCDATE)' $(FLAGS) 1>>$(IIWI_LOG_DIR)/mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).log 2>>$(IIWI_LOG_DIR)/mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).log; \
+		fitsverify -q -e $(IIWI_CALS_TWIFLATS_DIR)mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits ; \
+		if (( $$? != 0 )) ; then \
+			echo "$(epref) fitsverify of mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits failed." | tee -a $(IIWI_LOG_DIR)/mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).log ; \
+			$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits', 'mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).log','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+		else \
+			echo "$(pref) Adding Master Twilight Flat mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits to calibration database table..." ; \
+			$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','$(FILTER)','MASTERFLAT',0,'mastertwilightflat_$(FILTER)_$(CRUNID)_v$(VERSION).fits',$(VERSION),1)" ; \
+			echo "$(pref) Master Twilight Flat time for $(CRUNID) filter $(FILTER) seconds $(deltat)." ; \
+		fi ; \
+	else \
+		echo "$(wpref) There were no processed flat(s), filter $(FILTER) to create a master twilight flat." ; \
+	fi
+
+#########################################################################################
+# take darks and then create a processed dark for each etime
+# which will later be combined for the entire run into the master dark
+# iiwi_dark, 
+#   	list=list, $
+#	finalname=finalname, $
+#	path_temporaryshort=path_temporaryshort, $
+#	path_config=path_config, $
+#	procdate=procdate, $
+#	verbose=verbose, $
+#	debug=debug, $
+#	readin=readin
+# 
+# RAW_DARK_NAME	The name of a single raw dark cube.  
+# 
+# 	Example: 
+# 	RAW_DARK_NAME='/thefullpath/1010345d.fits'
+# 
+# 
+# PROCESSED_DARK_NAME	The name of the "Processed" dark. A single FITS file
+# name where all raw slices have been stacked into a single slice. It's the
+# result of processing the raw darks.
+# 
+# 	Example:
+# 	PROCESSED_DARK_NAME='/thefullcalibrationpath/dark_005s_20090523HST090308_v200.fits'
+# 
+# How is the PROCESSED_DARK_NAME forged?
+# 
+# dark		Calibration title
+# 
+# Exposure time	A 3-digit string for the exposure time rounded to the second
+# 		preceeded with zeros if need be. Followed by 's'.
+# 
+# Observing date A YYYYMMDDHSTHHMMSS string in HST time obtained from the raw
+# 
+# Version	The iiwi version number with 2 decimal points, decimal point
+# 		dropped, preceded with v.
+# 
+# target e.g. <odometer>_$(ETIME)s_$(CRUNID)_v$(VERSION).fits
+#
+# Note: The time in the filename is arbitrarilt taken from the first file
+#	ETIME is ZEROEDETIME!!!!!
+
+dark_$(FORGED_DATE)_$(ETIME)_v$(VERSION).fits: 
+	@start=$$SECONDS; \
+	dark=$(SOURCES) ; \
+	echo "$(pref) Creating processed dark: dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits from $$dark" ; \
+	$(bindir)/wirtrace $(TRACE) "echo -e \"$${dark}\n$(IIWI_CALS_DARKS_DIR)dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits\n$(PROCDATE)\n$(IIWI_VERSION)\" | $(bindir)/iiwi_dark --readin $(FLAGS)" ; \
+	echo -e "$${dark}\n$(IIWI_CALS_DARKS_DIR)dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits\n$(PROCDATE)\n$(IIWI_VERSION)" | $(bindir)/iiwi_dark --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).log 2>>$(IIWI_LOG_DIR)/dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).log; \
+	fitsverify -q -e $(IIWI_CALS_DARKS_DIR)dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits ; \
+	if (( $$? != 0 )) ; then \
+		echo "$(epref) fitsverify of dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits failed." | tee -a $(IIWI_LOG_DIR)/dark_$(FORGED_DATE)_$(ETIME)_v$(VERSION).log ; \
+		$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits', 'dark_$(FORGED_DATE)_$(ETIME)_v$(VERSION)','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+	else \
+		echo "$(pref) Adding processed dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits to calibration database table..." ; \
+		$(bindir)wirenvdb "delete from calibration where filename='dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits'" ; \
+		$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','FakeBlank','PROCESS_DARK',$(ETIME),'dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits',$(VERSION),1)" ; \
+		echo "$(pref) Processed dark creation time for dark_$(ETIME)s_$(FORGED_DATE)_v$(VERSION).fits $(deltat)."  ; \
+	fi 
+
+darks: 
+	@start=$$SECONDS; \
+	echo "$(pref) Starting iiwi darks..." ; \
+	$(SetupForFlatsAndDarks) ; \
+	$(ECHO) clicmd @wircamfilter.filter fakeblank ; \
+	$(ECHO) clicmd @detcom.gof ; \
+	$(ECHO) clicmd @detcom.gon ; \
+	$(ECHO) clicmd @detcom.guide park  ; \
+	$(ECHO) clicmd @wircamfilter.wait ; \
+	$(ECHO) qsoheader "Darks" ; \
+	((total=0)) ; \
+	times="$(ETIMES)" ; \
+	for time in $(ETIMES) ; do \
+		count=15 ; \
+		if (( ( time >= 120 ) && ( time < 240 ) )) ; then \
+			count=7 ; \
+		fi ; \
+		if (( time >= 240 )) ; then \
+			count=5 ; \
+		fi ; \
+		((total=count*time+total+120)) ; \
+	done ; \
+	((mins=total/60)) ; \
+	echo "$(pref) etimes are: $$times" ; \
+	echo "$(pref) Total dark taking time: $$total seconds = $$mins minutes." ; \
+	darks="" ; \
+	for time in $$times ; do \
+		count=15 ; \
+		if (( ( time >= 120 ) && ( time < 240 ) )) ; then \
+			count=7 ; \
+		fi ; \
+		if (( time >= 240 )) ; then \
+			count=5 ; \
+		fi ; \
+		((mins=count*time/60)) ; \
+		echo "$(pref) Taking $$count darks of $$time seconds = $$mins minute(s) for this set, guide pixels clocked in park position..." ; \
+		((mins=total/60)) ; \
+		echo "Day Crew - you may turn on the lights - $$mins minutes to completion...." ; \
+		$(ECHO) clicmd go $$count etime=$$time etype=dark || break ; \
+		dark="`clicap filename | sed -e 's:.fits::'`" ; \
+		((total=total-(time*count))) ; \
+	done ; \
+	echo "$(pref) Dark time for $(NIGHT) $(deltat)." 
+	
+#########################################################################################
+# take processed darks and then create a master dark for each etime
+# for the entire run
+# pro iiwi_darkmaster, $
+#	 PROCESSED_DARK_LIST=PROCESSED_DARK_LIST, $
+#	 MASTERDARK_NAME=MASTERDARK_NAME, $
+#	 procdate=procdate
+# 
+# PROCESSED_DARK_LIST	A list of the processed darks (the output of
+# iiwi_dark.pro) of the same exposure time taken during a CRUNID.
+# 
+# MASTERDARK_NAME		The name of the master dark that results when stacking
+# the individual processed darks together.
+# 
+# 	Example: MASTERDARK_NAME='/thefullcalibrationpath/masterdark_014s_08bw03_v200.fits'
+# 
+# How is the MASTERDARK_NAME forged?
+# 
+# masterdark	Calibration title
+# 
+# Exposure time	The exposure time for these darks.
+# 
+# CRUNID		The CRUNID it was obtained for. lower case for the letters.
+# Version		The iiwi version number with 2 decimal points, decimal point
+# 		dropped, preceded with v.
+#
+#	Note that _use is set to 0. Why? _use is set to 1 when the masters are installed
+#	into the local calibration directories om the target machines, otherwise reduction
+#	will fail to find them.
+#
+#	Note that _use is set to 0. Why? _use is set to 1 when the masters are installed
+#	into the local calibration directories om the target machines, otherwise reduction
+#	will fail to find them.
+#
+
+masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits: 
+	@start=$$SECONDS; \
+	echo "$(pref) Creating Master Dark $(CRUNID) exposure time $(ETIME)." ; \
+	processeddarks="$(SOURCES)" ; \
+	if [[ "$${processeddarks}" ==  @[a-zA-Z0-9_\-/]* ]] ; then \
+		filelist=`echo $${processeddarks} | sed -e 's:\@::'`; \
+		processeddarks="`cat $$filelist | tr '\n' ' ' | sed -e 's: $$::' -e 's:^ ::'`" ; \
+	fi ; \
+	$(bindir)wirtrace $(TRACE) "echo -e \"$${processeddarks}\" | $(bindir)iiwi_darkmaster mastername='$(IIWI_CALS_DARKS_DIR)masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits' PARAM_IIWIVERSION='$(IIWI_VERSION)' PARAM_PROCDATE='$(PROCDATE)' --readin $(FLAGS)"; \
+	echo -e "$${processeddarks}" | $(bindir)iiwi_darkmaster mastername='$(IIWI_CALS_DARKS_DIR)masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits' PARAM_IIWIVERSION='$(IIWI_VERSION)' PARAM_PROCDATE='$(PROCDATE)' --readin $(FLAGS) 1>>$(IIWI_LOG_DIR)/masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).log 2>>$(IIWI_LOG_DIR)/masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).log; \
+	fitsverify -q -e $(IIWI_CALS_DARKS_DIR)masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits ; \
+	if (( $$? != 0 )) ; then \
+		echo "$(epref) fitsverify of masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits failed." | tee -a $(IIWI_LOG_DIR)/masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).log ; \
+		$(bindir)/wirenvdb "insert into error (filename,logname,severity,crunid,runid,message) values ('masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits', 'masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).log','WARNING','$(CRUNID)','$(RUNID)','fits verification failed.')" ; \
+	else \
+		echo "$(pref) Adding master dark masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits to calibration database table..." ; \
+		$(bindir)/wirenvdb "insert into calibration (crunid,filter,type,etime,filename,version,_use) values ('$(CRUNID)','FakeBlank','MASTERDARK',$(ETIME),'masterdark_$(ETIME)s_$(CRUNID)_v$(VERSION).fits',$(VERSION),1)" ; \
+		echo "$(pref) Master Dark time for $(CRUNID) exposure time $(ETIME) seconds $(deltat)." ; \
+	fi
+		
+#########################################################################################
+# compress final products
+
+%.fits.fz:
+	@echo "$(pref) Packing $(IIWI_REDUCTION_DIR)/$*.fits into $(IIWI_PROCESSED_DIR)$(RUNID)/$*.fits.fz..." ; \
+	if [[ -e $(IIWI_REDUCTION_DIR)/$*.fits ]] ; then \
+		rm -f $(IIWI_REDUCTION_DIR)/$*.fits.fz ; \
+		rm -f $(IIWI_PROCESSED_DIR)$(RUNID)/$*.fits.fz ; \
+		/usr/local/bin/fpack $(IIWI_REDUCTION_DIR)/$*.fits ; \
+		mv $(IIWI_REDUCTION_DIR)/$*.fits.fz $(IIWI_PROCESSED_DIR)$(RUNID)/$*.fits.fz ; \
+	else \
+		echo "$(wpref) Could not find $(IIWI_REDUCTION_DIR)/$*.fits" ; \
+	fi
+
+
+installcals:
+ifdef CRUNID
+	@start=$$SECONDS; \
+	echo "$(pref) Start of calibration installation for $(CRUNID)..." ; \
+	masterdarks=`wirenvdb "select filename from calibration where type='MASTERDARK' and crunid='$(CRUNID)' and _use>0" | tr '\n' ' '` ; \
+	masterdomeflats=`wirenvdb "select filename from calibration where type='MADOMEFLAT' and crunid='$(CRUNID)' and _use>0" | tr '\n' ' '` ; \
+	mastertwilightflats=`wirenvdb "select filename from calibration where type='MASTERFLAT' and crunid='$(CRUNID)' and _use>0" | tr '\n' ' '` ; \
+	for machine in $(CALMACHINES) ; do \
+		installdir="/data/$$machine/wircam/iiwi2/calibrations/" ; \
+		calibdir="/data/$$machine/wircam/calib" ; \
+		for masterdark in $$masterdarks ; do \
+			etime=`wirenvdb "select etime from calibration where filename='$$masterdark' and _use>0"` ; \
+			zeroedetime=`echo $$etime | awk '{printf("%03d", $$1)}'` ; \
+			echo "Installing masterdark $$masterdark on $$machine" ; \
+			runon $$machine install $(IIWI_CALS_DARKS_DIR)/$$masterdark $$installdir/ ; \
+			runon $$machine ln -sf $$installdir/$$masterdark $$installdir/masterdark_$${zeroedetime}.fits; \
+		done; \
+		for masterdomeflat in $$masterdomeflats ; do \
+			filter=`wirenvdb "select filter from calibration where filename='$$masterdomeflat' and _use>0"` ; \
+			echo "Installing masterdomeflat $$masterdomeflat on $$machine" ; \
+			runon $$machine install $(IIWI_CALS_DOMEFLATS_DIR)/$$masterdomeflat $$installdir/ ; \
+			runon $$machine ln -sf $$installdir/$$masterdomeflat $$installdir/masterdomeflat_$${filter}.fits ; \
+		done; \
+		for mastertwilightflat in $$mastertwilightflats ; do \
+			filter=`wirenvdb "select filter from calibration where filename='$$mastertwilightflat' and _use>0"` ; \
+			echo "Installing mastertwilightflat $$mastertwilightflat on $$machine" ; \
+			runon $$machine install $(IIWI_CALS_TWILIGHTFLATS_DIR)/$$mastertwilightflat $$installdir/ ; \
+			runon $$machine ln -sf $$installdir/$$mastertwilightflat $$installdir/mastertwilightflat_$${filter}.fits ; \
+		done; \
+		runon $$machine install $(IIWI_CALS_BADPIX_DIR)/$(BADPIX) $$installdir/ ; \
+		runon $$machine ln -sf $$installdir/$(BADPIX) $$installdir/masterbadpix.fits ; \
+	done ; \
+	bdate=`date "+%Y/%m/%d %X%p"` ; \
+	$(bindir)/wirenvdb "update run set status = 'Calibration installed, time = $(deltat).', enddatetime = convert(datetime, '$$bdate') where crunid = '$(CRUNID)'" ; \
+	echo "$(pref) ~~~ Total calibration installation time for $(CRUNID) $(deltat)" 
+else
+	@echo "Please specify a crunid in order to install calibrations."
+endif
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

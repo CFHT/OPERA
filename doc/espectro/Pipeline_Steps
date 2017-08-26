@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<!-- saved from url=(0059)./Pipeline_Steps -->
+<html lang="en" dir="ltr" class="client-js"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Pipeline Steps - espectro</title>
+
+<meta name="generator" content="MediaWiki 1.19.5">
+<link rel="shortcut icon" href="http://200.131.64.73/favicon.ico">
+<link rel="search" type="application/opensearchdescription+xml" href="http://200.131.64.73/wiki/espectro/opensearch_desc.php" title="espectro (en)">
+<link rel="EditURI" type="application/rsd+xml" href="http://200.131.64.73/wiki/espectro/api.php?action=rsd">
+<link rel="alternate" type="application/atom+xml" title="espectro Atom feed" href="http://200.131.64.73/wiki/espectro/index.php?title=Special:RecentChanges&amp;feed=atom">
+<link rel="stylesheet" href="./espectro_files/load.php">
+<style type="text/css" media="all">.js-messagebox{margin:1em 5%;padding:0.5em 2.5%;border:1px solid #ccc;background-color:#fcfcfc;font-size:0.8em}.js-messagebox .js-messagebox-group{margin:1px;padding:0.5em 2.5%;border-bottom:1px solid #ddd}.js-messagebox .js-messagebox-group:last-child{border-bottom:thin none transparent}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:8b08bdc91c52a9ffba396dccfb5b473c */
+
+
+.mw-collapsible-toggle{float:right} li .mw-collapsible-toggle{float:none} .mw-collapsible-toggle-li{list-style:none}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:4250852ed2349a0d4d0fc6509a3e7d4c */
+</style><meta name="ResourceLoaderDynamicStyles" content="">
+<style>a:lang(ar),a:lang(ckb),a:lang(fa),a:lang(kk-arab),a:lang(mzn),a:lang(ps),a:lang(ur){text-decoration:none}a.new,#quickbar a.new{color:#ba0000}
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-css:7:c88e2bcd56513749bec09a7e29cb3ffa */
+</style>
+
+<script src="./espectro_files/load(1).php"></script><script src="./espectro_files/load(2).php"></script>
+<script>if(window.mw){
+mw.config.set({"wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"Pipeline_Steps","wgTitle":"Pipeline Steps","wgCurRevisionId":1998,"wgArticleId":237,"wgIsArticle":true,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":[],"wgBreakFrames":false,"wgPageContentLanguage":"en","wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgRelevantPageName":"Pipeline_Steps","wgRestrictionEdit":[],"wgRestrictionMove":[],"wgWikiEditorEnabledModules":{"toolbar":true,"dialogs":true,"hidesig":true,"templateEditor":false,"templates":false,"preview":true,"previewDialog":false,"publish":true,"toc":false}});
+}</script><script>if(window.mw){
+mw.loader.implement("user.options",function($){mw.user.options.set({"ccmeonemails":0,"cols":80,"date":"default","diffonly":0,"disablemail":0,"disablesuggest":0,"editfont":"default","editondblclick":0,"editsection":1,"editsectiononrightclick":0,"enotifminoredits":0,"enotifrevealaddr":0,"enotifusertalkpages":1,"enotifwatchlistpages":0,"extendwatchlist":0,"externaldiff":0,"externaleditor":0,"fancysig":0,"forceeditsummary":0,"gender":"unknown","hideminor":0,"hidepatrolled":0,"highlightbroken":1,"imagesize":2,"justify":0,"math":1,"minordefault":0,"newpageshidepatrolled":0,"nocache":0,"noconvertlink":0,"norollbackdiff":0,"numberheadings":0,"previewonfirst":0,"previewontop":1,"quickbar":5,"rcdays":7,"rclimit":50,"rememberpassword":0,"rows":25,"searchlimit":20,"showhiddencats":0,"showjumplinks":1,"shownumberswatching":1,"showtoc":1,"showtoolbar":1,"skin":"vector","stubthreshold":0,"thumbsize":2,"underline":2,"uselivepreview":0,"usenewrc":0,"watchcreations":0,"watchdefault":0,"watchdeletion":0,
+"watchlistdays":3,"watchlisthideanons":0,"watchlisthidebots":0,"watchlisthideliu":0,"watchlisthideminor":0,"watchlisthideown":0,"watchlisthidepatrolled":0,"watchmoves":0,"wllimit":250,"usebetatoolbar":1,"usebetatoolbar-cgd":1,"wikieditor-preview":1,"wikieditor-publish":1,"variant":"en","language":"en","searchNs0":true,"searchNs1":false,"searchNs2":false,"searchNs3":false,"searchNs4":false,"searchNs5":false,"searchNs6":false,"searchNs7":false,"searchNs8":false,"searchNs9":false,"searchNs10":false,"searchNs11":false,"searchNs12":false,"searchNs13":false,"searchNs14":false,"searchNs15":false});;},{},{});mw.loader.implement("user.tokens",function($){mw.user.tokens.set({"editToken":"+\\","watchToken":false});;},{},{});
+
+/* cache key: lnawiki-espectro:resourceloader:filter:minify-js:7:505b325ececdfc1317a6cea46e739f26 */
+}</script>
+<script>if(window.mw){
+mw.loader.load(["mediawiki.page.startup","mediawiki.legacy.wikibits","mediawiki.legacy.ajax"]);
+}</script><script type="text/javascript" src="./espectro_files/load(3).php"></script>
+<!--[if lt IE 7]><style type="text/css">body{behavior:url("/wiki/espectro/skins/vector/csshover.min.htc")}</style><![endif]--><style type="text/css">
+:root #content > #right > .dose > .dosesingle,
+:root #content > #center > .dose > .dosesingle
+{ display: none !important; }</style></head>
+<body class="mediawiki ltr sitedir-ltr ns-0 ns-subject page-Pipeline_Steps skin-vector action-view">
+		<div id="mw-page-base" class="noprint"></div>
+		<div id="mw-head-base" class="noprint"></div>
+		<!-- content -->
+		<div id="content" class="mw-body">
+			<a id="top"></a>
+			<div id="mw-js-message" style="display:none;" class="js-messagebox"></div>
+						<!-- firstHeading -->
+			<h1 id="firstHeading" class="firstHeading">
+				<span dir="auto">Pipeline Steps</span>
+			</h1>
+			<!-- /firstHeading -->
+			<!-- bodyContent -->
+			<div id="bodyContent">
+								<!-- tagline -->
+				<div id="siteSub">From espectro</div>
+				<!-- /tagline -->
+								<!-- subtitle -->
+				<div id="contentSub"></div>
+				<!-- /subtitle -->
+																<!-- jumpto -->
+				<div id="jump-to-nav" class="mw-jump">
+					Jump to: <a href="./Pipeline_Steps#mw-head">navigation</a>,
+					<a href="./Pipeline_Steps#p-search">search</a>
+				</div>
+				<!-- /jumpto -->
+								<!-- bodycontent -->
+				<div id="mw-content-text" lang="en" dir="ltr" class="mw-content-ltr"><table id="toc" class="toc"><tbody><tr><td><div id="toctitle"><h2>Contents</h2><span class="toctoggle">&nbsp;[<a href="./Pipeline_Steps#" class="internal" id="togglelink">hide</a>]&nbsp;</span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="./Pipeline_Steps#Core_reduction_steps"><span class="tocnumber">1</span> <span class="toctext">Core reduction steps</span></a>
+<ul>
+<li class="toclevel-2 tocsection-2"><a href="./Pipeline_Steps#Calibration_stage"><span class="tocnumber">1.1</span> <span class="toctext">Calibration stage</span></a>
+<ul>
+<li class="toclevel-3 tocsection-3"><a href="./Pipeline_Steps#operaGain"><span class="tocnumber">1.1.1</span> <span class="toctext">operaGain</span></a></li>
+<li class="toclevel-3 tocsection-4"><a href="./Pipeline_Steps#operaMasterBias.2C_operaMasterFlat.2C_operaMasterFabPerot"><span class="tocnumber">1.1.2</span> <span class="toctext">operaMasterBias, operaMasterFlat, operaMasterFabPerot</span></a></li>
+<li class="toclevel-3 tocsection-5"><a href="./Pipeline_Steps#operaMasterComparison"><span class="tocnumber">1.1.3</span> <span class="toctext">operaMasterComparison</span></a></li>
+<li class="toclevel-3 tocsection-6"><a href="./Pipeline_Steps#operaOrderSpacingCalibration"><span class="tocnumber">1.1.4</span> <span class="toctext">operaOrderSpacingCalibration</span></a></li>
+<li class="toclevel-3 tocsection-7"><a href="./Pipeline_Steps#operaGeometryCalibration"><span class="tocnumber">1.1.5</span> <span class="toctext">operaGeometryCalibration</span></a></li>
+<li class="toclevel-3 tocsection-8"><a href="./Pipeline_Steps#operaInstrumentProfileCalibration"><span class="tocnumber">1.1.6</span> <span class="toctext">operaInstrumentProfileCalibration</span></a></li>
+<li class="toclevel-3 tocsection-9"><a href="./Pipeline_Steps#operaExtractionApertureCalibration"><span class="tocnumber">1.1.7</span> <span class="toctext">operaExtractionApertureCalibration</span></a></li>
+<li class="toclevel-3 tocsection-10"><a href="./Pipeline_Steps#operaExtraction_.28Th-Ar_and_flat-field.29"><span class="tocnumber">1.1.8</span> <span class="toctext">operaExtraction (Th-Ar and flat-field)</span></a></li>
+<li class="toclevel-3 tocsection-11"><a href="./Pipeline_Steps#operaWavelengthCalibration"><span class="tocnumber">1.1.9</span> <span class="toctext">operaWavelengthCalibration</span></a></li>
+<li class="toclevel-3 tocsection-12"><a href="./Pipeline_Steps#operaCreateFlatFieldFluxCalibration"><span class="tocnumber">1.1.10</span> <span class="toctext">operaCreateFlatFieldFluxCalibration</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-13"><a href="./Pipeline_Steps#Reduction_stage"><span class="tocnumber">1.2</span> <span class="toctext">Reduction stage</span></a>
+<ul>
+<li class="toclevel-3 tocsection-14"><a href="./Pipeline_Steps#operaExtraction_.28object.29"><span class="tocnumber">1.2.1</span> <span class="toctext">operaExtraction (object)</span></a></li>
+<li class="toclevel-3 tocsection-15"><a href="./Pipeline_Steps#operaPolar"><span class="tocnumber">1.2.2</span> <span class="toctext">operaPolar</span></a></li>
+<li class="toclevel-3 tocsection-16"><a href="./Pipeline_Steps#operaHeliocentricWavelengthCorrection"><span class="tocnumber">1.2.3</span> <span class="toctext">operaHeliocentricWavelengthCorrection</span></a></li>
+<li class="toclevel-3 tocsection-17"><a href="./Pipeline_Steps#operaTelluricWavelengthCorrection"><span class="tocnumber">1.2.4</span> <span class="toctext">operaTelluricWavelengthCorrection</span></a></li>
+<li class="toclevel-3 tocsection-18"><a href="./Pipeline_Steps#operaStarOnly.2C_operaStarPlusSky.2C_operaPolarIntensity"><span class="tocnumber">1.2.5</span> <span class="toctext">operaStarOnly, operaStarPlusSky, operaPolarIntensity</span></a></li>
+<li class="toclevel-3 tocsection-19"><a href="./Pipeline_Steps#operaPolarimetryCorrection"><span class="tocnumber">1.2.6</span> <span class="toctext">operaPolarimetryCorrection</span></a></li>
+<li class="toclevel-3 tocsection-20"><a href="./Pipeline_Steps#operaGenerateLEFormats"><span class="tocnumber">1.2.7</span> <span class="toctext">operaGenerateLEFormats</span></a></li>
+<li class="toclevel-3 tocsection-21"><a href="./Pipeline_Steps#operaSNR"><span class="tocnumber">1.2.8</span> <span class="toctext">operaSNR</span></a></li>
+<li class="toclevel-3 tocsection-22"><a href="./Pipeline_Steps#operaCreateProduct"><span class="tocnumber">1.2.9</span> <span class="toctext">operaCreateProduct</span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</td></tr></tbody></table>
+<h2> <span class="mw-headline" id="Core_reduction_steps"> Core reduction steps </span></h2>
+<p>Below is a list of each step that typically occurs in the core reduction process. The list includes the module name, a brief description of what the module does, a description of the files passed into the module and the files created by the module, and a mapping of the file inputs and outputs.
+</p><p>Output files are typically plaintext tables, except where mentioned otherwise. A list of the specific fields contained in each table file can be found in the file itself. These files are gzipped by default, which is not reflected in the filenames below, where [config] denotes a string specifying the instrument configuration (more accurately, the reduction list), and [obj] denotes an identifier for a science image (typically a number).
+</p>
+<h3> <span class="mw-headline" id="Calibration_stage"> Calibration stage </span></h3>
+<h4> <span class="mw-headline" id="operaGain"> operaGain </span></h4>
+<p>Calculates the gain, noise, and median bias level for each amplifier on the detector. This is needed to convert from detector counts to number of photons. This is particularly important for 2-amp mode. At least one bias image and two flat images are required for these calculations.
+</p>
+<ul><li> <b>Inputs:</b> bias images, flat images
+</li><li> <b>Outputs:</b> gain file
+</li><li> *b.fits, *f.fits -&gt; [config].gain
+</li></ul>
+<h4> <span class="mw-headline" id="operaMasterBias.2C_operaMasterFlat.2C_operaMasterFabPerot"> operaMasterBias, operaMasterFlat, operaMasterFabPerot </span></h4>
+<p>Combines a sequence of one type of calibration images into a single image by taking the median value at each pixel. This results in a master calibration image free of anomalies for each type of calibration. These three modules are actually functionally identical aside from their names. All images of a single calibration type from a reduction list should be passed together to the module of the corresponding calibration type.
+</p>
+<ul><li> <b>Inputs:</b> bias images, flat images, align images
+</li><li> <b>Outputs:</b> master bias, master flat, master align
+</li><li> *b.fits -&gt; masterbias_[config].fits
+</li><li> *f.fits -&gt; masterflat_[config].fits
+</li><li> *a.fits -&gt; masterfabperot_[config].fits
+</li></ul>
+<h4> <span class="mw-headline" id="operaMasterComparison"> operaMasterComparison </span></h4>
+<p>Combines a sequence of comparison images into a single master comparison image using a specified combine method. The default method is to stack and save the total exposure time per pixel.
+</p>
+<ul><li> <b>Inputs:</b> comparison images, master bias
+</li><li> <b>Outputs:</b> master comparison
+</li><li> *c.fits, masterbias_[config].fits -&gt; mastercomparison_[config].fits
+</li></ul>
+<h4> <span class="mw-headline" id="operaOrderSpacingCalibration"> operaOrderSpacingCalibration </span></h4>
+<p>Determines the center position along the dispersion direction of each order using the master flat, measures the distance between the centers, and performs a polynomial fit of the distances as a function of the centers.
+</p>
+<ul><li> <b>Inputs:</b> master bias, master flat, gain file
+</li><li> <b>Outputs:</b> order spacing polynomial
+</li><li> masterbias_[config].fits, masterflat_[config].fits, [config].gain -&gt; [config].ordp
+</li></ul>
+<h4> <span class="mw-headline" id="operaGeometryCalibration"> operaGeometryCalibration </span></h4>
+<p>Calculates a polynomial for each order which traces through the center of that order.
+</p>
+<ul><li> <b>Inputs:</b> master bias, master flat, gain file, order spacing polynomial
+</li><li> <b>Outputs:</b> geometry file
+</li><li> masterbias_[config].fits, masterflat_[config].fits, [config].gain, [config].ordp -&gt; [config].geom
+</li></ul>
+<h4> <span class="mw-headline" id="operaInstrumentProfileCalibration"> operaInstrumentProfileCalibration </span></h4>
+<p>Measures a two-dimensional instrument profile, which provides the expected distribution of flux across a region of pixels at any given position along the order. This is mainly reflective of the illumination pattern of the pseudo-slit, although other instrumental effects are captured by this profile. The profile is usually oversampled.
+</p>
+<ul><li> <b>Inputs:</b> master bias, master flat, master align, gain file, geometry file
+</li><li> <b>Outputs:</b> instrument profile
+</li><li> masterbias_[config].fits, masterflat_[config].fits, masterfabperot_[config].fits, [config].gain, [config].geom -&gt; [config].prof
+</li></ul>
+<h4> <span class="mw-headline" id="operaExtractionApertureCalibration"> operaExtractionApertureCalibration </span></h4>
+<p>Measures the orientation and sub-pixel offset of the instrument profile to produce a rectangular extraction aperture. The aperture represents the area of pixels that are examined to extract the flux at each wavelength along the order. The aperture may also be split into multiple beams, allowing fibers to be extracted separately, and may also contain pixel regions for background estimates.
+</p>
+<ul><li> <b>Inputs:</b> order spacing polynomial, geometry file, instrument profile
+</li><li> <b>Outputs:</b> extraction aperture
+</li><li> [config].ordp, [config].geom, [config].prof -&gt; [config].aper
+</li></ul>
+<h4> <span class="mw-headline" id="operaExtraction_.28Th-Ar_and_flat-field.29"> operaExtraction (Th-Ar and flat-field) </span></h4>
+<p>Slides an extraction aperture along each order of an input image, and calculates the flux contained within the aperture at each point along the order. Each point where the flux is calculated is a spectral element, the key attributes of which are the distance along the order (in pixels) and the flux (in e-). Each spectral element may have flux values for each beam (fiber) along with a combined flux element. The flux extraction can be done using a variety of methods, such as raw extraction (raw pixel sum), raw extraction with cosmic ray rejection, or optimal extraction.
+</p><p>The Thorium-Argon spectrum is extracted using the master comparison as the input image. By default the raw extraction method is used for this. A spectrum of the flat-field is extracted using the master flat as the input image. By default the optimal extraction method is used for this, although whatever method is used here should also be used when extracting science exposures.
+</p>
+<ul><li> <b>Inputs:</b> master comparison, master flat, master bias, gain file, geometry file, instrument profile, extraction aperture
+</li><li> <b>Outputs:</b> extracted Th-Ar spectrum, extracted flat-field spectrum
+</li><li> mastercomparison_[config].fits, masterbias_[config].fits, [config].gain, [config].geom, [config].prof, [config].aper -&gt; th_[config].e
+</li><li> masterflat_[config].fits, masterbias_[config].fits, [config].gain, [config].geom, [config].prof, [config].aper -&gt; ff_[config].e
+</li></ul>
+<h4> <span class="mw-headline" id="operaWavelengthCalibration"> operaWavelengthCalibration </span></h4>
+<p>Calculates a polynomial for each order which gives the wavelength (in nm) as a function of distance (in pixels). Using an initial guess for the wavelength polynomial, spectral lines from the extracted Th-Ar spectrum are matched up with an atlas of Th-Ar lines at known wavelengths. The distances of the lines in the extracted spectrum and the wavelengths of the lines in the atlas are used to iteratively refine the polynomial.
+</p>
+<ul><li> <b>Inputs:</b> extracted Th-Ar spectrum, geometry file
+</li><li> <b>Outputs:</b> wavelength solution
+</li><li> th_[config].e, [config].geom -&gt; [config].wcal
+</li></ul>
+<h4> <span class="mw-headline" id="operaCreateFlatFieldFluxCalibration"> operaCreateFlatFieldFluxCalibration </span></h4>
+<p>Normalizes the extracted flat-field to 1.0 at a specified reference wavelength.
+</p>
+<ul><li> <b>Inputs:</b> wavelength solution, extracted flat-field spectrum
+</li><li> <b>Outputs:</b> flat-field flux calibration
+</li><li> ff_[config].e, [config].wcal -&gt; masterflatfluxcalibration_[config].fcal
+</li></ul>
+<h3> <span class="mw-headline" id="Reduction_stage"> Reduction stage </span></h3>
+<h4> <span class="mw-headline" id="operaExtraction_.28object.29"> operaExtraction (object) </span></h4>
+<p>The extraction module is used again to extract the spectrum for each science image. The extraction method used should match the method used to extract the flat-field spectrum. There is one difference in star + sky mode: the flux of the sky fiber is subtracted from the flux of the star fiber. The flux of the sky fiber may be scaled by a ratio first, to reflect that the area of the two fibers may not be equal.
+</p>
+<ul><li> <b>Inputs:</b> science image, master bias, master flat, gain file, geometry file, instrument profile, extraction aperture
+</li><li> <b>Outputs:</b> extracted object spectrum
+</li><li> [obj]o.fits, masterbias_[config].fits, [config].gain, [config].geom, [config].prof, [config].aper -&gt; [obj].e
+</li></ul>
+<h4> <span class="mw-headline" id="operaPolar"> operaPolar </span></h4>
+<p>Uses a sequence of four extracted science exposures to calculate the flux and variance for a specified Stokes parameter (Q, U or V), the intensity spectrum (Stokes I), and the degree of polarization for the specified Stokes parameter. Also applies the wavelength calibration to provide the wavelength for each element. Note that the formulas used in this module are specific to Espadons and its sequence of four exposures.
+</p>
+<ul><li> <b>Inputs:</b> extracted spectra of four science exposures, wavelength calibration
+</li><li> <b>Outputs:</b> extracted polarimetry
+</li><li> [obj].e, [obj+1].e, [obj+2].e, [obj+3].e, [config].wcal -&gt; [obj].p
+</li></ul>
+<h4> <span class="mw-headline" id="operaHeliocentricWavelengthCorrection"> operaHeliocentricWavelengthCorrection </span></h4>
+<p>Calculates the heliocentric radial velocity for an observation, based on the date and time of the observation, exposure time, direction of the target, and position of the observatory. For polarimetry, the time from the start of the first exposure to the end of the last exposure is used as the overall exposure time.
+</p>
+<ul><li> <b>Inputs:</b> all values passed directly to the module (no files)
+</li><li> <b>Outputs:</b> heliocentric correction
+</li><li> -&gt; [obj]i.rvel
+</li><li> -&gt; [obj]p.rvel
+</li></ul>
+<h4> <span class="mw-headline" id="operaTelluricWavelengthCorrection"> operaTelluricWavelengthCorrection </span></h4>
+<p>Matches spectral lines on an extracted spectrum with an atlas of known atmospheric emission/absorption lines to improve the wavelength calibration.
+</p>
+<ul><li> <b>Inputs:</b> wavelength calibration, extracted object spectrum, extracted polarimetry
+</li><li> <b>Outputs:</b> telluric correction
+</li><li> [config].wcal, [obj].e -&gt; [obj]i.tell
+</li><li> [config].wcal, [obj].p -&gt; [obj]p.tell
+</li></ul>
+<h4> <span class="mw-headline" id="operaStarOnly.2C_operaStarPlusSky.2C_operaPolarIntensity"> operaStarOnly, operaStarPlusSky, operaPolarIntensity </span></h4>
+<p>Applies all calibrations and corrections to an extracted spectrum. The three modules are functionally identical aside from one difference: operaStarPlusSky recalculates the difference of the two beams (taking the fiber area ratio into account) after applying flat-field flux calibrations. That calculation aside, flux calibrations and normalizations are applied to each beam and the combined flux independently. By default, a flat response is applied to the un-normalized flux, and the normalized flux is obtained by dividing by the continuum measured across all orders. Most calibrations are applied separately so the output product contains values with and without each correction. Note that operaPolarIntensity is used with an extracted spectrum of a single exposure taken in polar mode, not with extracted polarimetry from a full polar sequence.
+</p>
+<ul><li> <b>Inputs:</b> extracted object spectrum, wavelength calibration, heliocentric correction, telluric correction, flat flux calibration
+</li><li> <b>Outputs:</b> extended spectrum
+</li><li> [obj].e, [config].wcal, [obj]i.rvel, [obj]i.tell, masterflatfluxcalibration_[config].fcal -&gt; [obj].spc
+</li></ul>
+<h4> <span class="mw-headline" id="operaPolarimetryCorrection"> operaPolarimetryCorrection </span></h4>
+<p>The counterpart of operaPolarIntensity, used to apply calibrations to polarimetry. Also detects and removes polarization continuum from the polarimetry (this is done into a separate field).
+</p>
+<ul><li> <b>Inputs:</b> extracted polarimetry, wavelength calibration, heliocentric correction, telluric correction, flat flux calibration
+</li><li> <b>Outputs:</b> extended polarimetry
+</li><li> [obj].p, [config].wcal, [obj]p.rvel, [obj]p.tell, masterflatfluxcalibration_[config].fcal -&gt; [obj].pol
+</li></ul>
+<h4> <span class="mw-headline" id="operaGenerateLEFormats"> operaGenerateLEFormats </span></h4>
+<p>Produces Libre-Esprit (LE) compatible output products from the data contained in the extended spectrum or extended polarimetry file. These come in a few different variations which are indicated by letters in the filename. The first letter gives the product type: intensity spectrum (i) or polarimetry (p). The second letter gives the flux type: normalized (n) or un-normalized (u). A third letter only appears when the wavelength is given without telluric correction (w).
+</p>
+<ul><li> <b>Inputs:</b> extended spectrum, extended polarimetry
+</li><li> <b>Outputs:</b> LE compatible spectra, LE compatible polarimetry
+</li><li> [obj].spc -&gt; [obj]iu.s, [obj]in.s, [obj]iuw.s, [obj]inw.s
+</li><li> [obj].pol -&gt; [obj]pu.s, [obj]pn.s, [obj]puw.s, [obj]pnw.s
+</li></ul>
+<h4> <span class="mw-headline" id="operaSNR"> operaSNR </span></h4>
+<p>Calculates the SNR of the spectrum.
+</p>
+<ul><li> <b>Inputs:</b> extracted object spectrum, wavelength calibration
+</li><li> <b>Outputs:</b> SNR file
+</li><li> [obj].e, [config].wcal -&gt; [obj]i.sn
+</li></ul>
+<h4> <span class="mw-headline" id="operaCreateProduct"> operaCreateProduct </span></h4>
+<p>Creates FITS output products containing the data from the extended spectrum, extended polarimetry, and LE compatible products. Using the initial object image as a starting point, other pertinent information is added to the FITS header. In the case of using the extended spectra or extended polarimetry as inputs, all columns are copied directly to the data section of the FITS product, whereas when using LE inputs, the columns from all four files are combined into a single table.
+</p>
+<ul><li> <b>Inputs:</b> LE compatible spectra, LE compatible polarimetry, extended spectrum, extended polarimetry, other files used only for header info
+</li><li> <b>Outputs:</b> LE compatible FITS spectrum, LE compatible FITS polarimetry, extended FITS spectrum, extended FITS polarimetry
+</li><li> [obj]o.fits, [obj]iu.s, [obj]in.s, [obj]iuw.s, [obj]inw.s, etc. -&gt; [obj]i.fits
+</li><li> [obj]o.fits, [obj]pu.s, [obj]pn.s, [obj]puw.s, [obj]pnw.s, etc. -&gt; [obj]p.fits
+</li><li> [obj]o.fits, [obj].spc, etc. -&gt; [obj]m.fits
+</li><li> [obj]o.fits, [obj].pol, etc. -&gt; [obj]q.fits
+</li></ul>
+
+<!-- 
+NewPP limit report
+Preprocessor node count: 86/1000000
+Post‐expand include size: 0/2097152 bytes
+Template argument size: 0/2097152 bytes
+Expensive parser function count: 0/100
+-->
+
+<!-- Saved in parser cache with key lnawiki-espectro:pcache:idhash:237-0!*!*!!en!*!* and timestamp 20170413210833 -->
+</div>				<!-- /bodycontent -->
+								<!-- printfooter -->
+				<div class="printfooter">
+				Retrieved from "<a href="http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;oldid=1998">http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;oldid=1998</a>"				</div>
+				<!-- /printfooter -->
+												<!-- catlinks -->
+				<div id="catlinks" class="catlinks catlinks-allhidden"></div>				<!-- /catlinks -->
+												<div class="visualClear"></div>
+				<!-- debughtml -->
+								<!-- /debughtml -->
+			</div>
+			<!-- /bodyContent -->
+		</div>
+		<!-- /content -->
+		<!-- header -->
+		<div id="mw-head" class="noprint">
+			
+<!-- 0 -->
+<div id="p-personal" class="">
+	<h5>Personal tools</h5>
+	<ul>
+		<li id="pt-login"><a href="http://200.131.64.73/wiki/espectro/index.php?title=Special:UserLogin&amp;returnto=Pipeline+Steps" title="You are encouraged to log in; however, it is not mandatory [alt-shift-o]" accesskey="o">Log in</a></li>
+	</ul>
+</div>
+
+<!-- /0 -->
+			<div id="left-navigation">
+				
+<!-- 0 -->
+<div id="p-namespaces" class="vectorTabs">
+	<h5>Namespaces</h5>
+	<ul>
+					<li id="ca-nstab-main" class="selected"><span><a href="./Pipeline_Steps" title="View the content page [alt-shift-c]" accesskey="c">Page</a></span></li>
+					<li id="ca-talk" class="new"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Talk:Pipeline_Steps&amp;action=edit&amp;redlink=1" title="Discussion about the content page [alt-shift-t]" accesskey="t">Discussion</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-variants" class="vectorMenu emptyPortlet">
+	<h4>
+		</h4>
+	<h5><span>Variants</span><a href="./Pipeline_Steps#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+			</div>
+			<div id="right-navigation">
+				
+<!-- 0 -->
+<div id="p-views" class="vectorTabs">
+	<h5>Views</h5>
+	<ul>
+					<li id="ca-view" class="selected"><span><a href="./Pipeline_Steps">Read</a></span></li>
+					<li id="ca-viewsource"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;action=edit" title="This page is protected.
+You can view its source [alt-shift-e]" accesskey="e">View source</a></span></li>
+					<li id="ca-history" class="collapsible"><span><a href="http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;action=history" title="Past revisions of this page [alt-shift-h]" accesskey="h">View history</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-cactions" class="vectorMenu emptyPortlet">
+	<h5><span>Actions</span><a href="./Pipeline_Steps#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+
+<!-- 2 -->
+<div id="p-search">
+	<h5><label for="searchInput">Search</label></h5>
+	<form action="http://200.131.64.73/wiki/espectro/index.php" id="searchform">
+				<div>
+			<input type="search" name="search" title="Search espectro [alt-shift-f]" accesskey="f" id="searchInput">			<input type="submit" name="go" value="Go" title="Go to a page with this exact name if exists" id="searchGoButton" class="searchButton">			<input type="submit" name="fulltext" value="Search" title="Search the pages for this text" id="mw-searchButton" class="searchButton">					<input type="hidden" name="title" value="Special:Search">
+		</div>
+	</form>
+</div>
+
+<!-- /2 -->
+			</div>
+		</div>
+		<!-- /header -->
+		<!-- panel -->
+			<div id="mw-panel" class="noprint">
+				<!-- logo -->
+					<div id="p-logo"><a style="background-image: url(http://200.131.64.73/wiki/images/logo8.gif);" href="./Main_page" title="Visit the main page"></a></div>
+				<!-- /logo -->
+				
+<!-- navigation -->
+<div class="portal" id="p-navigation">
+	<h5>Navigation</h5>
+	<div class="body">
+		<ul>
+			<li id="n-mainpage-description"><a href="./Main_page" title="Visit the main page [alt-shift-z]" accesskey="z">Main page</a></li>
+			<li id="n-portal"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Community_portal" title="About the project, what you can do, where to find things">Community portal</a></li>
+			<li id="n-currentevents"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Current_events" title="Find background information on current events">Current events</a></li>
+			<li id="n-recentchanges"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:RecentChanges" title="A list of recent changes in the wiki [alt-shift-r]" accesskey="r">Recent changes</a></li>
+			<li id="n-randompage"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:Random" title="Load a random page [alt-shift-x]" accesskey="x">Random page</a></li>
+			<li id="n-help"><a href="http://200.131.64.73/wiki/espectro/index.php/Help:Contents" title="The place to find out">Help</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /navigation -->
+
+<!-- SEARCH -->
+
+<!-- /SEARCH -->
+
+<!-- TOOLBOX -->
+<div class="portal" id="p-tb">
+	<h5>Toolbox</h5>
+	<div class="body">
+		<ul>
+			<li id="t-whatlinkshere"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:WhatLinksHere/Pipeline_Steps" title="A list of all wiki pages that link here [alt-shift-j]" accesskey="j">What links here</a></li>
+			<li id="t-recentchangeslinked"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:RecentChangesLinked/Pipeline_Steps" title="Recent changes in pages linked from this page [alt-shift-k]" accesskey="k">Related changes</a></li>
+			<li id="t-specialpages"><a href="http://200.131.64.73/wiki/espectro/index.php/Special:SpecialPages" title="A list of all special pages [alt-shift-q]" accesskey="q">Special pages</a></li>
+			<li><a href="http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;printable=yes" rel="alternate">Printable version</a></li>
+			<li id="t-permalink"><a href="http://200.131.64.73/wiki/espectro/index.php?title=Pipeline_Steps&amp;oldid=1998" title="Permanent link to this revision of the page">Permanent link</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /TOOLBOX -->
+
+<!-- LANGUAGES -->
+
+<!-- /LANGUAGES -->
+			</div>
+		<!-- /panel -->
+		<!-- footer -->
+		<div id="footer">
+							<ul id="footer-info">
+											<li id="footer-info-lastmod"> This page was last modified on 25 March 2017, at 23:11.</li>
+											<li id="footer-info-viewcount">This page has been accessed 15 times.</li>
+									</ul>
+							<ul id="footer-places">
+											<li id="footer-places-privacy"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:Privacy_policy" title="Espectro:Privacy policy">Privacy policy</a></li>
+											<li id="footer-places-about"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:About" title="Espectro:About">About espectro</a></li>
+											<li id="footer-places-disclaimer"><a href="http://200.131.64.73/wiki/espectro/index.php/Espectro:General_disclaimer" title="Espectro:General disclaimer">Disclaimers</a></li>
+									</ul>
+										<ul id="footer-icons" class="noprint">
+					<li id="footer-poweredbyico">
+						<a href="http://www.mediawiki.org/"><img src="./espectro_files/poweredby_mediawiki_88x31.png" alt="Powered by MediaWiki" width="88" height="31"></a>
+					</li>
+				</ul>
+						<div style="clear:both"></div>
+		</div>
+		<!-- /footer -->
+		<script src="./espectro_files/load(4).php"></script>
+<script>if(window.mw){
+mw.loader.load(["mediawiki.user","mediawiki.page.ready"], null, true);
+}</script><script src="./espectro_files/load(5).php" type="text/javascript"></script>
+<!-- Served in 0.159 secs. -->
+	
+
+</body></html>

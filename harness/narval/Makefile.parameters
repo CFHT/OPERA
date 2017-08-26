@@ -1,0 +1,705 @@
+#########################################################################################
+#
+# Makefile name: Makefile.parameters.espadons
+# Version: 1.0
+# Description: espadons parameter definitions
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_parameters_espadons
+#/// \brief OPERA Instrument Parameter Definitions
+#/// \brief - all instrument-specific parameter definitions go here
+#/// \brief Parameter definitions are specific to a particular instrument.
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# CFHT-specific Instrument Parameter Definitions
+#
+#########################################################################################
+EEV1_XSlow_defaultgain := 0.8
+EEV1_XSlow_defaultnoise := 2.5
+EEV1_Slow_defaultgain := 1.2
+EEV1_Slow_defaultnoise := 2.9
+EEV1_Normal_defaultgain := 1.4
+EEV1_Normal_defaultnoise := 4.5
+EEV1_Fast_defaultgain := 1.8
+EEV1_Fast_defaultnoise := 8.0
+
+OLAPAa_XSlow_defaultgain := 0.8
+OLAPAa_XSlow_defaultnoise := 2.5
+OLAPAa_Slow_defaultgain := 1.1
+OLAPAa_Slow_defaultnoise := 2.98
+OLAPAa_Normal_defaultgain := 1.3
+OLAPAa_Normal_defaultnoise := 3.8
+OLAPAa_Fast_defaultgain := 1.6
+OLAPAa_Fast_defaultnoise := 4.14
+
+OLAPAab_XSlow_defaultgain := 0.8
+OLAPAab_XSlow_defaultnoise := 2.5
+OLAPAab_Slow_defaultgain := 1.1
+OLAPAab_Slow_defaultnoise := 2.98
+OLAPAab_Normal_defaultgain := 1.3
+OLAPAab_Normal_defaultnoise := 3.8
+OLAPAab_Fast_defaultgain := 1.6
+OLAPAab_Fast_defaultnoise := 4.14
+
+rvel_limit	:= 5.0
+
+#########################################################################################
+# detail of where the data pixels are on the chips
+#########################################################################################
+EEV1_datasec_x1	:= 8
+EEV1_datasec_x2	:= 2040
+EEV1_datasec_y1	:= 4
+EEV1_datasec_y2	:= 4600
+
+OLAPAa_datasec_x1	:= 1
+OLAPAa_datasec_x2	:= 2048
+OLAPAa_datasec_y1	:= 1
+OLAPAa_datasec_y2	:= 4608
+
+OLAPAab_datasec_x1 := 21
+OLAPAab_datasec_x2 := 2068
+OLAPAab_datasec_y1 := 1
+OLAPAab_datasec_y2 := 4608
+
+OLAPAab_dseca_x1 := 21
+OLAPAab_dseca_x2 := 1044
+OLAPAab_dseca_y1 := 1
+OLAPAab_dseca_y2 := 4608
+
+OLAPAab_dsecb_x1 := 1045
+OLAPAab_dsecb_x2 := 2068
+OLAPAab_dsecb_y1 := 1
+OLAPAab_dsecb_y2 := 4608
+
+datasec := $($(DETECTOR)$(AMPLIFIER)_datasec_x1) $($(DETECTOR)$(AMPLIFIER)_datasec_x2) $($(DETECTOR)$(AMPLIFIER)_datasec_y1) $($(DETECTOR)$(AMPLIFIER)_datasec_y2)
+dseca   := $($(DETECTOR)$(AMPLIFIER)_dseca_x1) $($(DETECTOR)$(AMPLIFIER)_dseca_x2) $($(DETECTOR)$(AMPLIFIER)_dseca_y1) $($(DETECTOR)$(AMPLIFIER)_dseca_y2)
+dsecb   := $($(DETECTOR)$(AMPLIFIER)_dsecb_x1) $($(DETECTOR)$(AMPLIFIER)_dsecb_x2) $($(DETECTOR)$(AMPLIFIER)_dsecb_y1) $($(DETECTOR)$(AMPLIFIER)_dsecb_y2)
+
+#########################################################################################
+# Spectrograph
+#########################################################################################
+
+spectrograph_CCD_OLAPA					:= 1
+spectrograph_CCD_EEV1					:= 2
+EspadonsCCDReadoutSpeed_XSlow			:= 1
+EspadonsCCDReadoutSpeed_Slow			:= 2
+EspadonsCCDReadoutSpeed_Normal			:= 3
+EspadonsCCDReadoutSpeed_Fast			:= 4
+OpticalFiber_FBPPolymicro				:= 1
+OpticalFiber_STUPolymicro				:= 2
+spectrograph_pol						:= 1
+spectrograph_sp2						:= 2
+spectrograph_sp1						:= 3
+spectrograph_GRACES_sp2					:= 4
+spectrograph_GRACES_sp1					:= 5
+
+spectrograph_InjectionHoleDiameter		:= 1.6
+spectrograph_OpticalFiber				:= $(OpticalFiber_STUPolymicro)
+spectrograph_fiberLength				:= 33
+spectrograph_fiberCoreDiameter			:= 100
+spectrograph_numberOfInputFibers		:= 2
+spectrograph_numberOfSlices				:= 3
+spectrograph_spectralResolution			:= 65000
+spectrograph_pixelsize					:= 13 13
+spectrograph_EspadonsCCDReadoutSpeed	:= $(EspadonsCCDReadoutSpeed_$(SPEED))
+spectrograph_SpectrographCCD			:= $(spectrograph_CCD_$(DETECTOR))
+spectrograph_EspadonsInstrumentMode		:= $(spectrograph_$(MODE))
+
+#########################################################################################
+# Master Calibrations
+# pick a master, or 0 means median combine
+#########################################################################################
+ifdef pick
+	masterflatpick			:= $(pick)
+	masterfabperotpick		:= $(pick)
+	masterbiaspick			:= $(pick)
+	mastercomparisonpick	:= $(pick)
+else
+	masterflatpick			:= 0
+	masterfabperotpick		:= 1
+	masterbiaspick			:= 0
+	mastercomparisonpick	:= 0
+endif
+
+#########################################################################################
+# combineMethod 1: median combine.
+#
+# combineMethod 2: stack and save total exposure time per pixel. Note that
+# a given pixel may be saturated in some images and not saturated in others
+# so the only way to bring all pixel counts to the same units is
+# by knowing the total exposure time accounted for each pixel. The other trick
+# here is that the masterData should be initiallized as biasData to avoid negative
+# assignments to the unsigned variable.
+#
+# combineMethod 3: a simple pixel-by-pixel sum ignoring saturated pixels
+#########################################################################################
+mastercomparison_combinemethod						:= 2
+mastercomparison_linearityLimit						:= 65535
+mastercomparison_outputExposureTime					:= 60
+mastercomparison_biasConstant						:= 1
+mastercomparison_truncateOuputFluxToSaturation		:= 1
+
+# for testing...
+minorder				:= 22
+maxorder				:= 61
+
+#########################################################################################
+# gain / noise
+#########################################################################################
+
+EEV1_namps				:= 1
+OLAPAa_namps			:= 1
+OLAPAab_namps			:= 2
+
+minimumflatsforgain		:= 2
+maximumflatsforgain		:= 12
+
+gainsubwindow			:= 100 800 500 4000
+
+gainMinPixPerBin		:= 1000
+gainMaxNBins			:= 100
+gainLowestCount			:= 1000
+gainHighestCount		:= 30000
+
+#########################################################################################
+# geometry
+#########################################################################################
+
+geom_limit						:= 0.2
+geomsubformat					:= 8 2040 3 4600
+maxorders						:= 40
+colDispersion					:= 1
+invertOrders					:= 1
+geom_aperture_pol				:= 32		# width of aperture
+geom_aperture_sp1				:= 32		# width of aperture
+geom_aperture_sp2				:= 30		# width of aperture
+geom_aperture					:= $(geom_aperture_$(MODE))
+orderspacing_aperture_sp1		:= 32		# width of aperture for order spacing
+orderspacing_aperture_sp2		:= 32		# width of aperture for order spacing
+orderspacing_aperture_pol		:= 30		# width of aperture for order spacing
+orderspacing_aperture			:= $(orderspacing_aperture_$(MODE))
+detectionMethod					:= 2		# 1 Gaussian, 2 Instrument Profile, 3 Top-hat
+FFTfilter_EEV1_sp1				:= 1		# smooth using a low-pass FFT filters
+FFTfilter_EEV1_sp2				:= 1		# smooth using a low-pass FFT filters
+FFTfilter_EEV1_pol				:= 1		# smooth using a low-pass FFT filters
+FFTfilter_OLAPA_sp1				:= 0		# smooth using a low-pass FFT filters
+FFTfilter_OLAPA_sp2				:= 0		# smooth using a low-pass FFT filters
+FFTfilter_OLAPA_pol				:= 0		# smooth using a low-pass FFT filters
+FFTfilter						:= $(FFTfilter_$(DETECTOR)_$(MODE))		# smooth using a low-pass FFT filters
+geomnpar_Fast					:= 3		# max number of coefficents of polynomial (including zero)
+geomnpar_Slow					:= 3		# max number of coefficents of polynomial (including zero)
+geomnpar_Normal					:= 3		# max number of coefficents of polynomial (including zero)
+geombinsize						:= 25		# binning in y direction
+nsamples						:= 5		# number of samples for something or other
+minordertouse_EEV1				:= 20		# the first order that geometry outputs
+minordertouse_OLAPA				:= 22		# the first order that geometry outputs
+minordertouse					:= $(minordertouse_$(DETECTOR))		# the first order that geometry outputs
+recenterIPUsingSliceSymmetry_pol	:= 1		# refines the geometry
+recenterIPUsingSliceSymmetry_sp1	:= 1		# refines the geometry
+recenterIPUsingSliceSymmetry_sp2	:= 0		# refines the geometry
+recenterIPUsingSliceSymmetry	:= $(recenterIPUsingSliceSymmetry_$(MODE))
+totalNumberOfSlices_sp2			:= 6		# for recentering
+totalNumberOfSlices_sp1			:= 3		# for recentering
+totalNumberOfSlices_pol			:= 3		# for recentering
+totalNumberOfSlices				:= $(totalNumberOfSlices_$(MODE))
+referenceOrderNumber_pol		:= 48
+referenceOrderNumber_sp1		:= 48
+referenceOrderNumber_sp2		:= 48
+referenceOrderNumber			:= $(referenceOrderNumber_$(MODE))
+referenceOrderSeparation_pol	:= 57.2
+referenceOrderSeparation_sp1	:= 57.5
+referenceOrderSeparation_sp2	:= 57.5
+referenceOrderSeparation		:= $(referenceOrderSeparation_$(MODE))
+referenceOrderSamplePosition	:= 2300
+
+#########################################################################################
+# order spacing polynomial
+#########################################################################################
+
+ordpnumberOfsamples		:= 30		# number of samples for order spacing sampling
+sampleCenterPosition	:= 2300		# Detector position to center samples. Position along the dispersion direction (rows for Espadons)
+
+#########################################################################################
+# wavelength parameters
+# only set wavelengthgoodinitialguessnotavailable to 1 if you have no good
+# initial guess for the wavelength polynomials i.e. a new instrument
+# it is very slow in this case...
+#########################################################################################
+
+thorium_argon_atlas_lines		:= thar_MM201006.dat.gz
+thorium_argon_atlas_spectrum	:= LovisPepe_ThArAtlas.dat.gz
+wavelengthgoodinitialguessnotavailable := 0
+wcalParRangeSizeInPerCent		:= 1.0
+wcalNpointsPerPar				:= 3000
+wcalmaxorderofpolynomial		:= 4
+wcalinitialAcceptableMismatch	:= 1.5
+wcalnsigclip					:= 2.00
+wcal_generate3DPlot				:= 0
+wcal_subtractCentralWavelength	:= 1
+
+wcal_normalizeUncalibratedSpectrum_pol := 0
+wcal_normalizationBinSize_pol   := 150
+wcal_LocalMaxFilterWidth_pol    := 6.0
+wcal_uncalibrated_linewidth_pol := 1.8
+wcal_maxNIter_pol               := 40
+wcal_minNumberOfLines_pol		:= 40
+wcal_dampingFactor_pol			:= 0.9
+wcal_DetectionThreshold_pol		:= 0.05
+wcal_MinPeakDepth_pol			:= 1.00
+
+wcal_normalizeUncalibratedSpectrum_sp1 := 0
+wcal_normalizationBinSize_sp1   := 150
+wcal_LocalMaxFilterWidth_sp1    := 6.0
+wcal_uncalibrated_linewidth_sp1 := 1.8
+wcal_maxNIter_sp1				:= 40
+wcal_minNumberOfLines_sp1		:= 40
+wcal_dampingFactor_sp1			:= 0.9
+wcal_DetectionThreshold_sp1		:= 0.05
+wcal_MinPeakDepth_sp1			:= 1.00
+
+wcal_normalizeUncalibratedSpectrum_sp2 := 0
+wcal_normalizationBinSize_sp2   := 180
+wcal_LocalMaxFilterWidth_sp2    := 6.0
+wcal_uncalibrated_linewidth_sp2 := 1.6
+wcal_maxNIter_sp2				:= 40
+wcal_minNumberOfLines_sp2		:= 40
+wcal_dampingFactor_sp2			:= 0.85
+wcal_DetectionThreshold_sp2		:= 0.1
+wcal_MinPeakDepth_sp2			:= 1.5
+
+wcal_normalizeUncalibratedSpectrum := $(wcal_normalizeUncalibratedSpectrum_$(MODE))
+wcal_normalizationBinSize       := $(wcal_normalizationBinSize_$(MODE))
+wcal_LocalMaxFilterWidth        := $(wcal_LocalMaxFilterWidth_$(MODE))
+wcal_uncalibrated_linewidth     := $(wcal_uncalibrated_linewidth_$(MODE))
+wcalmaxNIter                    := $(wcal_maxNIter_$(MODE))
+wcalminNumberOfLines			:= $(wcal_minNumberOfLines_$(MODE))
+wcaldampingFactor				:= $(wcal_dampingFactor_$(MODE))
+wcal_DetectionThreshold			:= $(wcal_DetectionThreshold_$(MODE))
+wcal_MinPeakDepth				:= $(wcal_MinPeakDepth_$(MODE))
+
+#########################################################################################
+# telluric wavelength correction parameters
+#########################################################################################
+
+telluric_atlas_lines			:= opera_HITRAN08-extracted.par.gz
+telluric_reference_spectrum		:= KPNO_atmtrans.dat.gz
+telluric_absorptionMask			:= wavelengthMaskForTelluricAbsorption.txt
+telluric_spectralResolution_sp1	:= 65000
+telluric_spectralResolution_sp2	:= 80000
+telluric_spectralResolution_pol	:= 65000
+telluric_spectralResolution		:= $(telluric_spectralResolution_$(MODE))
+telluric_radialVelocityRange	:= 5.0
+telluric_radialVelocityStep		:= 0.15
+telluric_XCorrelationThreshold	:= 0.1
+telluric_normalizationbinsize	:= 110
+telluric_useFitToFindMaximum	:= 1
+
+#########################################################################################
+# radial velocity parameters
+#########################################################################################
+rv_syntheticSpectrum			:= syntethicSpectra/Teff5500.spec
+rv_xcorrWavelengthMask			:= wavelengthMaskForRVxcorr.txt
+rv_searchRange					:= 200
+rv_searchStep					:= 0.5
+
+#########################################################################################
+# Stitch Orders
+#########################################################################################
+stitch_orderOfReference         := 36
+stitch_DWavelengthRange         := 0.2
+stitch_DWavelengthStep          := 0.00005
+stitch_XCorrelationThreshold    := 0.1
+stitch_sigmaThreshold           := 2.5
+
+#########################################################################################
+# dispersion Laurent Polynomial
+# max order must be zero and min order must be negative
+#########################################################################################
+dispminorderOfLaurentPolynomial	:= -3
+dispmaxorderOfLaurentPolynomial	:= 0
+minoutputorder					:= 22
+maxoutputorder					:= 61
+binsizeToRemoveOutliers         := 7
+thresholdToRemoveOutliers       := 2
+disp_wcalmaxorderofpolynomial   := 1
+
+#########################################################################################
+# instrument profile
+#########################################################################################
+
+#sp1_IPDimensions		:= 28 4 6 8
+#sp2_IPDimensions		:= 28 4 6 8
+#pol_IPDimensions		:= 28 4 6 8
+# for more speed
+#sp1_IPDimensions		:= 28 1 6 4
+#sp2_IPDimensions		:= 28 1 6 4
+#pol_IPDimensions		:= 28 1 6 4
+# fixes polar issues
+#sp1_IPDimensions		:= 30 5 6 5
+#sp2_IPDimensions		:= 30 5 6 5
+#pol_IPDimensions		:= 30 5 6 5
+# New EDER
+#sp1_IPDimensions		:= 30 3 4 5
+#sp2_IPDimensions		:= 28 3 4 5
+#pol_IPDimensions		:= 30 3 4 5
+#IPDimensions			:= $($(MODE)_IPDimensions)
+sp1_IPXSize				:= 32
+sp2_IPXSize				:= 30
+pol_IPXSize				:= 32
+IPXSize					:= $($(MODE)_IPXSize)
+IPYSize					:= 4
+IPXSampling				:= 3
+IPYSampling				:= 5
+spectralElementHeight	:= 1.0
+DetectionThreshold		:= 0.2
+referenceLineWidth_sp2		:= 2.0
+referenceLineWidth_sp1		:= 1.8
+referenceLineWidth_pol		:= 2.5
+referenceLineWidth		:= $(referenceLineWidth_$(MODE))
+#LocalMaxFilterWidth = 2.5*referenceLineWidth
+LocalMaxFilterWidth		:= 3.0
+#MinPeakDepth			:= 1.5*noise
+MinPeakDepth_Slow		:= 2.0
+MinPeakDepth_Normal		:= 1.5
+MinPeakDepth_Fast		:= 1.5
+MinPeakDepth			:=$(MinPeakDepth_$(SPEED))
+IPtilt_pol				:= -2.0
+IPtilt_sp2				:= -2.0
+IPtilt_sp1				:= -1.0
+IPtilt					:= $(IPtilt_$(MODE))
+IPminimumlines			:= 5
+IPBinsize				:= 100
+#methods of measuring instrument profile
+IPWeightedMeanMethod	:= 1
+IPMedianMethod			:= 2
+IPUsingFabPerotMethod	:= 3
+IPWithBinningMethod		:= 4
+IPDefaultMethod			:= $(IPMedianMethod)
+
+#########################################################################################
+# normalized flats
+# Note: Although normalized flat is listed as a dependency, in fact it is optional
+# and creation of the flat is signaled by a flag "CREATE_NORMALIZED_FLAT" in the
+# Makefile.parameters
+#########################################################################################
+
+CREATE_NORMALIZED_FLAT		:= 0
+normalizedflataperture		:= 28
+normalizedflatbinsize		:= 40
+
+#########################################################################################
+# flat response creation
+#########################################################################################
+
+flatresponse_normalizationWavelength := 700
+
+#########################################################################################
+# normalize
+#########################################################################################
+
+FourierFilterWidthNormal := 0.1
+
+#########################################################################################
+# aperture
+#########################################################################################
+
+sp1_numberOfBeams		:= 2
+sp2_numberOfBeams		:= 1
+pol_numberOfBeams		:= 2
+# Note that the apertureWidth is usually given as $(word 1,$(IPDimensions))-2*$(aperbackgroundAperture)
+sp1_apertureWidth		:= 32
+sp2_apertureWidth		:= 30
+pol_apertureWidth		:= 32
+sp1_apertureHeight		:= 0.6923
+sp2_apertureHeight		:= 0.6923
+pol_apertureHeight		:= 0.6923
+sp1_backgroundAperture	:= 1.0
+sp2_backgroundAperture	:= 1.0
+pol_backgroundAperture	:= 1.0
+sp1_gapBetweenBeams		:= 0
+sp2_gapBetweenBeams		:= 0
+pol_gapBetweenBeams		:= 0
+sp1_constanttiltflag	:= 0 #1
+sp2_constanttiltflag	:= 0
+pol_constanttiltflag	:= 0
+apernumberOfBeams		:= $($(MODE)_numberOfBeams)
+apernapertureWidth		:= $($(MODE)_apertureWidth)
+aperapertureHeight		:= $($(MODE)_apertureHeight)
+aperbackgroundAperture	:= $($(MODE)_backgroundAperture)
+apergapBetweenBeams		:= $($(MODE)_gapBetweenBeams)
+constanttiltflag		:= $($(MODE)_constanttiltflag)
+aperpickImageRow		:= 0
+apernRowSamples			:= 10
+aperxbin				:= 10
+
+#########################################################################################
+# Plotting
+#########################################################################################
+
+SNRupperlowerbounds		:= 100
+linestyle				:= lines
+xrange					:= 
+yrange					:= 
+withtelluriclines		 = \"$(tmpdir)$(basename $(thorium_argon_atlas_lines))\" using 1:2 title 'telluric' with impulses linestyle 5,
+withtelluricspectrum	 = \"$(tmpdir)$(basename $(telluric_reference_spectrum))\" using 1:2 title 'telluric' with impulses linestyle 4,
+centralsnr				:= 1
+
+#########################################################################################
+# normalization
+#########################################################################################
+
+normalize_usePolynomial	:= 0
+normalize_binsize		:= 110
+
+#########################################################################################
+# extraction
+#########################################################################################
+
+extraction_backgroundBinsize	:= 300
+extraction_sigmaclip_sp1		:= 6
+extraction_sigmaclip_sp2		:= 6
+extraction_sigmaclip_pol		:= 7
+extraction_sigmaclip			:= $(extraction_sigmaclip_$(MODE))
+extraction_usePolynomialFit		:= 0
+extraction_removeBackground		:= 0
+extraction_iterations			:= 3
+
+#########################################################################################
+# Create Flux Calibration
+#########################################################################################
+
+createfluxcalibrationbinsize	:= 500
+createfluxcalibrationminorder	:= 22
+createfluxcalibrationmaxorder	:= 61
+createfluxcalibrationPixelsize					:= 1 1
+createfluxcalibrationWavelengthForNormalization	:= 548
+createfluxcalibrationnumberOfPointsInUniformSample      := 150
+createfluxcalibrationnumberOfPointsInUniformRefSample   := 70
+
+createfluxcalibration_WavelengthMaskForUncalContinuum   := wavelengthMaskForUncalContinuumDetection.txt
+createfluxcalibration_WavelengthMaskForRefContinuum   := wavelengthMaskForRefContinuumDetection.txt
+
+#########################################################################################
+# Create Flat Response
+#########################################################################################
+
+createflatresponsebinsize	:= 750
+createflatresponsenumberOfPointsInUniformSample      := 300
+createflatresponsenumberOfPointsInUniformRefSample   := 70
+
+#########################################################################################
+# Master Flux Calibration
+#########################################################################################
+
+mastercomparison_combinemethod  :=  1
+
+#########################################################################################
+# Flux Calibration
+#########################################################################################
+fluxCalibrationAbsoluteCalibration	:= 0
+fluxcalibrationbinsize				:= 150
+fluxcalibrationorderBin				:= 4
+
+#########################################################################################
+# type of extraction requested
+#########################################################################################
+
+RawSpectrum						:= 1		# uncalibrated / standard vectors of x,y coordinates and flux
+StandardSpectrum				:= 2 		# uncalibrated / standard vectors of x,y coordinates and flux
+OptimalSpectrum					:= 3		# uncalibrated / optimal vectors of x,y coordinates and flux
+OperaOptimalSpectrum			:= 4 		# uncalibrated / opera optimal vectors of x,y coordinates and flux
+RawBeamSpectrum					:= 5 		# uncalibrated / raw beam output of operaExtraction
+StandardBeamSpectrum			:= 6 		# uncalibrated / standard beam output of operaExtraction
+OptimalBeamSpectrum				:= 7 		# uncalibrated / optimal beam output of operaExtraction
+OperaOptimalBeamSpectrum		:= 8		# uncalibrated / opera optimal beam output of operaExtraction
+
+CalibratedRawSpectrum			:= 9		# wavelength calibrated / standard vectors of wl and flux
+CalibratedStandardSpectrum		:= 10 		# wavelength calibrated / standard vectors of wl and flux
+CalibratedOptimalSpectrum		:= 11		# wavelength calibrated / optimal vectors of wl and flux
+CalibratedOperaOptimalSpectrum	:= 12		# wavelength calibrated / opera optimal vectors of wl and flux
+CalibratedRawBeamSpectrum		:= 13 		# wavelength calibrated / rawsum vectors of wl and flux
+CalibratedStandardBeamSpectrum	:= 14 		# wavelength calibrated / standard vectors of wl and flux
+CalibratedOptimalBeamSpectrum	:= 15 		# wavelength calibrated / optimal vectors of wl and flux
+CalibratedOperaOptimalBeamSpectrum:= 16		# wavelength calibrated / opera optimal vectors of wl and flux
+CalibratedExtendedBeamSpectrum	:= 17		# wavelength calibrated / opera optimal vectors of wls and fluxes
+ExtendedPolarimetry				:= 18		# wavelength calibrated / opera polar vectors of wls and fluxes
+LibreEspritSpectrum				:= 19		# wavelength calibrated / LE vectors of wl and flux
+LibreEspritSpectrum_sp1			:= 20		# wavelength calibrated / LE vectors of wl and flux
+LibreEspritSpectrum_sp2			:= 21		# wavelength calibrated / LE vectors of wl and flux
+LibreEspritSpectrum_pol			:= 22		# wavelength calibrated / LE vectors of wl and flux
+LibreEspritpolarimetry			:= 23		# wavelength calibrated / LE vectors of wl and flux
+LibreEspritSNR					:= 24		# wavelength calibrated / LE vectors of wl and SNR
+OperaSNR						:= 31		# wavelength calibrated / opera vectors of wl and SNR
+OperaCSV						:= 43		# wavelength calibrated / opera vectors of wl and Flux in CSV format
+
+DefaultSpectrumTypeName				:= OptimalBeamSpectrum
+DefaultCalibratedSpectrumTypeName	:= CalibratedExtendedBeamSpectrum
+DefaultSpectrumType					:= $($(DefaultSpectrumTypeName))
+DefaultCalibratedSpectrumType		:= $($(DefaultCalibratedSpectrumTypeName))
+
+extraction_minorder		:= 22
+extraction_maxorder		:= 60
+
+
+#########################################################################################
+# this is used throughout calibration, extraction and polarimetry so that
+# we get a consistent single order. Specify an order or set this to -999 for all orders.
+ordernumber				:= -999
+
+#########################################################################################
+# Extraction
+#########################################################################################
+deconstructor_sp1			:= operaStarPlusSky
+deconstructor_sp2			:= operaStarOnly
+deconstructor_pol			:= operaPolarIntensity
+deconstructor				:= $(deconstructor_$(MODE))
+starplusskymode_sp1			:= 1
+starplusskymode_sp2			:= 0
+starplusskymode_pol			:= 0
+starplusskymode				:= $(starplusskymode_$(MODE))
+
+ssfiberarearatio			:= 1.890625 #(2.2*2.2)/(1.6*1.6)
+
+extractor_normalizationBinsize			:= 750
+extractor_numberOfPointsInUniformSample	:= 150
+extractor_AbsoluteCalibration_pol		:= 0
+extractor_AbsoluteCalibration_sp1		:= 0
+extractor_AbsoluteCalibration_sp2		:= 0
+extractor_AbsoluteCalibration			:= $(extractor_AbsoluteCalibration_$(MODE))
+extractor_WavelengthMaskForUncalContinuum := wavelengthMaskForUncalContinuumDetection.txt
+
+extractor_FlatResponse_EEV1				:= flat_resp_eev1.s
+extractor_FlatResponse_OLAPA			:= flat_resp_olapa.fits.gz
+#extractor_FlatResponse_OLAPA			:= flat_resp_olapa.s
+extractor_FlatResponse					:= $(extractor_FlatResponse_$(DETECTOR))
+
+
+#########################################################################################
+# To Generate LE Formats
+#########################################################################################
+
+RawFluxInElectronsPerElement            := 1
+NormalizedFluxToContinuum               := 2
+CalibratedFluxNormalizedToRefWavelength := 3
+
+ThArCalibratedInNM                      := 1
+TelluricCorrectedWavelengthInNM         := 2
+RVCorrectedWavelengthInNM               := 3
+RVAndTelluricCorrectedWavelengthInNM    := 4
+
+LEOrderWavelength                       := LE_order_wavelength.dat
+
+#########################################################################################
+# Polarimetry
+#########################################################################################
+
+StokesI					:= 0
+StokesQ					:= 1
+StokesU					:= 2
+StokesV					:= 3
+stokesparameter			:= $(StokesQ)
+difference				:= 1
+ratio					:= 2
+polarmethod				:= $(ratio)
+
+#########################################################################################
+# Compression
+#########################################################################################
+#
+# 1. FITS product OUTPUT
+# taken from the cfitsio header...
+cNone					:= 0
+cRICE					:= 11
+cGZIP					:= 21
+cHCOMPRESS				:= 41
+cPLIO					:= 31
+compressiontype			:= $(cGZIP)
+
+# FITS can be fits or FIT or whatever
+FITS					:= fits
+# compression extension can be .gz or .fz or nothing
+extension				:= .gz
+#
+# 2. FITS Image INPUT compression extension
+#
+inextension				:= .gz
+#
+# 3. Intermediate text products
+#
+# used for calibration products and .s .e files...
+# Coordinate this with the GZSTREAM define in globaldefines.h
+gzip					:= .gz
+
+#########################################################################################
+#
+# Analysis Parameters
+#
+#########################################################################################
+
+HAlpha	:= 656.28
+Li		:= 670.8
+Na		:= 589.0
+Na2		:= 589.6
+He		:= 587.5618
+
+#########################################################################################
+# operaBinPolarData
+#########################################################################################
+polarbinningsize	:= 750
+
+#########################################################################################
+#
+# Upena Parameters
+#
+#########################################################################################
+# approval email recipients
+recipients					:= teeple,manset,forshay,tburd,moutou,malo
+
+# is fluxcalibration requested
+upenawantfcal				:= 0
+operawantfcal				:= 0
+
+# what kind(s) of wavelength correction are desired
+wanttelluriccorrection		:= 1
+wantheliocentriccorrection	:= 1
+
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+
+

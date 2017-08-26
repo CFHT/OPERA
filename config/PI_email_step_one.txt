@@ -1,0 +1,50 @@
+To: |EMAIL|
+From: opera@cfht.hawaii.edu
+Subject: OPERA Instalation Instructions Part 1
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+Dear Dr. |PI|,
+
+Welcome to opera-1.0. We would like to proceed with the installation
+in careful steps.
+
+The first step is ensuring that g++ and gcc are installed on your computer.
+
+We have successfull installations on Linux Kernel 2.6.x.x, and MacOSX - Snow Leopard, 
+Lion and Mountain Lion:
+
+Snow Leopard	- 10.6
+Lion			- 10.7
+Mountain Lion	- 10.8
+
+Older versions of MacOSX can be tricky because gcc of the appropriate version may be difficult
+to locate. The command line tools were bundled at one point with XCode, and later were
+unbundled and required a separate installation. If you have trouble locating the correct version
+command line tools please send an email to opera@cfht.hawaii.edu for help.
+
+- gcc/g++	-- compiles with version 3.x.x and up to 4.2.x of gcc, note that version 2.x.x 
+			   has problems (no template suppport) and is not supported.
+			-- first determine which version of gcc and g++ you have, do this in a terminal window:
+				g++ -v
+				gcc -v
+				
+Installation of C/C++ on Linux is complex enough that you should ask your sysadmin to do it for you.
+
+If your version os less than 3.4.6 please upgrade. On linux, have your sysadmin upgrade for you.
+
+- XCode	-- FOR MAC USERS ONLY 
+			- used to browse the opera-1.0 project on a mac and also
+			   to get a gcc compiler to build the above libraries...
+			- BUT you do need the command line tools!
+			- http://developer.apple.com
+				- you must register as a mac developer
+				- go to the xcode download page
+				- download Code and install it
+				- download the command line tools extras and install it (includes gcc or llvm-gcc)
+
+Please send an email to opera@cfht.hawaii.edu when these steps have completed successfully to
+receive the next set of instructions.
+
+Regards,
+The OPERA Team

@@ -1,0 +1,1068 @@
+#########################################################################################
+#
+# Makefile name: Makefile.analysis
+# Version: 1.0
+# Description: Analysis routines for espadons
+# Author(s): CFHT OPERA team
+# Affiliation: Canada France Hawaii Telescope 
+# Location: Hawaii USA
+# Date: Aug/2011
+# Contact: opera@cfht.hawaii.edu
+# 
+# Copyright (C) 2011  Opera Pipeline team, Canada France Hawaii Telescope
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see:
+# http://software.cfht.hawaii.edu/licenses
+# -or-
+# http://www.gnu.org/licenses/gpl-3.0.html
+#
+#/// \package Makefile_analysis_espadons
+#/// \brief Collaborators may include their analysis targets here.
+#/// \note This version implements OLAPA as well as EEV1 modes
+#/// \ingroup harness
+#
+#########################################################################################
+
+#########################################################################################
+#///
+#/// \cond makefile
+#///
+#########################################################################################
+
+#########################################################################################
+#
+# Create new analysis targets here. In general output should go to the
+# $(analysesdir) directory. Create a main target to be called from the
+# opera command line (like polarbinning or radialvelocitysequence).
+# And then create the odometers target using % in place of the odometer,
+# giving the product a unique extension (like .b or .rv). Usually the
+# products are gzip'd to save space and improve read/write speed.
+# opera will automatically pick up the new command. See the examples below.
+#
+#########################################################################################
+
+define doAllDirs
+	datadirs="$(DATADIRS)" ; \
+	if [[ "$${datadirs}" =~ "@[.]*" ]] ; then \
+		datadirlist=`echo $${datadirs} | sed -e 's:.\([.]*\):\1:` ; \
+		datadirs=`cat <datadirlist` ; \
+	fi ; \
+	for datadir in $${datadirs} ; do \
+		if [ -d $${datadir} ] ; then \
+			$(ECHO) $(MAKE) -f $(makedir)Makefile INPUT=$1 TARGET=$2 OUT=$(OUT) TEMPLATE=$(TEMPLATE) OBJECT="$(OBJECT)" RECHO=$(RECHO) DATADIR=$${datadir} TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory partarget --jobs --no-print-directory; \
+		else \
+			echo "$(epref)$${datadir} does not exist, skipping..."; \
+		fi ; \
+	done
+endef
+
+#########################################################################################
+# binning the polar spectra
+# call: opera DATADIR=... polarbinning
+#########################################################################################
+
+polarbinning:
+	@start=$$SECONDS; \
+	if [[ "$(DATADIR)" == "" ]] ; then \
+		echo "$(epref)Please specify the DATADIR or NIGHT to process:" ; \
+		echo "$(epref)opera DATADIR=... polarbinning" ; \
+	else \
+		echo "$(pref) Starting polar binning for $(NIGHT)." ; \
+		$(ECHO) $(MAKE) -f $(makedir)Makefile INPUT=o.$(FITS)$(inextension) TARGET=b.s$(gzip) MODE=pol partarget DATADIR=$(DATADIR) TIME=$(TIME) TRACE=$(TRACE) DEBUG=$(DEBUG) VERBOSE=$(VERBOSE) PLOT=$(PLOT) optargs="$(optargs)" --no-print-directory ; \
+		echo "$(pref) polar binning for $(NIGHT) complete in $(deltat)" ; \
+	fi
+
+cleanpolarbin cleanpolarpolarbinning:
+	@rm -f $(analysesdir)*b.s$(gzip)
+
+%b.s$(gzip):
+	@start=$$SECONDS; \
+	if [ ! -e $(analysesdir)$@ ] ; then \
+		if [ -e $(spectradir)$*.p$(gzip) ] ; then \
+			echo "$(pref) Starting Binned polar product creation in $@ $(QUALIFIERS)" ; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				pargs="--plotfilename=$(visualsdir)$*bs.eps --spectrumDataFilename=$(byproductsdir)$*bs.pdat --scriptfilename=$(byproductsdir)$*bs.gnu" ; \
+			fi ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaBinPolarData \
+--inputPolarSpectrum=$(spectradir)$*.p$(gzip) \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--minorder=$(extraction_minorder) \
+--maxorder=$(extraction_maxorder) \
+--ordernumber=$(ordernumber) \
+--binsize=$(polarbinningsize) \
+--StokesParameter=`$(bindir)operagetstokes --numeric $(DATADIR)/$*o.$(FITS)$(inextension)` \
+$${pargs} \
+--outputBinnedSpectrum=$(analysesdir)$@ $(optargs)" 2>&1 | tee -a $(logdir)$*.log ; \
+		rm -f $(byproductsdir)$*bs.pdat $(byproductsdir)$*bs.gnu ; \
+		echo "$(pref) Intensity product $@ $(QUALIFIERS) complete in $(deltat)" ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# Radial Velocity time sequence over a sequence of nights.
+# call: opera DATADIRS=... OUT=... TEMPLATE=... OBJECT=... radialvelocitysequence
+#########################################################################################
+
+radialvelocitysequence:
+	@start=$$SECONDS; \
+	if [[ "$(DATADIRS)" == "" || "$(OBJECT)" == "" ]] ; then \
+		echo "$(epref)Please specify the DATADIRS and an OBJECT to process:" ; \
+		echo "$(epref)opera DATADIRS=\". . .\" [OUT=... TEMPLATE=...] OBJECT=... radialvelocitysequence" ; \
+	else \
+		echo "$(pref) Starting radial velocity sequence for $(DATADIRS)." ; \
+		$(call doAllDirs,o.$(FITS)$(inextension),.rv) ; \
+		echo "$(pref) radial velocity sequence for $(DATADIRS) complete in $(deltat)" ; \
+	fi
+
+cleanrv cleanradialvelocitysequence:
+	@rm -f $(analysesdir)*.rv
+
+#########################################################################################
+# Single odometer Radial Velocity Calculation
+#########################################################################################
+
+%.rv:
+	@start=$$SECONDS; \
+	if [ ! -e $(analysesdir)$@ ] ; then \
+		if [ -e $(spectradir)$*i.e$(gzip) ] ; then \
+			echo "$(pref) Starting Radial Velocity generation for $*o.$(FITS) $(OBJECT)" ; \
+			expnum=`$(bindir)operagetheader --keyword=EXPNUM $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			mjdate=`$(bindir)operagetheader --keyword=MJDATE $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			exptime=`$(bindir)operagetheader --keyword=EXPTIME $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			airmass=`$(bindir)operagetheader --keyword=AIRMASS $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			outsideTemp=`$(bindir)operagetheader --keyword=TEMPERAT $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			windspeed=`$(bindir)operagetheader --keyword=WINDSPED $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			relHumidity=`$(bindir)operagetheader --keyword=RELHUMID $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			atmoPressure=`$(bindir)operagetheader --keyword=PRESSURE $(DATADIR)/$*o.$(FITS)$(inextension)` ; \
+			if [[ "$(PLOT)" != "0" ]] ; then \
+				pargs="--plotfilename=$(visualsdir)$*rv.eps --datafilename=$(byproductsdir)$*rv.pdat --scriptfilename=$(byproductsdir)$*rv.gnu" ; \
+			fi ; \
+			out="$(OUT)" ; \
+			if [[ "$${out}" == "" ]] ; then \
+				obj=`echo $(OBJECT) | tr [:blank:] '_'` ; \
+				out=$(analysesdir)rv_$${obj}.log ; \
+			fi ; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaRadialVelocity \
+--inputObjectSpectrum=$(spectradir)$*i.e$(gzip) \
+--inputWaveFile=$(calibrationdir)$(QUALIFIERS).wcal$(gzip) \
+--telluric_lines=$(configdir)$(telluric_atlas_lines) \
+--inputWavelengthMask=$(configdir)$(rv_xcorrWavelengthMask) \
+--inputStellarSpectrum=$(configdir)$(rv_syntheticSpectrum) \
+--spectralResolution=$(telluric_spectralResolution) \
+--radialVelocitySearchRange=$(rv_searchRange) \
+--radialVelocitySearchStep=$(rv_searchStep) \
+--XCorrelationThreshold=$(telluric_XCorrelationThreshold) \
+--normalizationBinsize=$(telluric_normalizationbinsize) \
+--headerData="$(expnum) $(mjdate) $(exptime) $(airmass) $(outsideTemp) $(windspeed) $(relHumidity) $(atmoPressure)"
+--inputBarycentricCorrection=$(calibrationdir)$*i.rvel$(gzip) \
+--inputFlatFluxCalibration=$(calibrationdir)masterflatfluxcalibration_$(QUALIFIERS).fcal$(gzip) \
+--StarPlusSky=$(starplusskymode) \
+--useFitToFindMaximum=$(telluric_useFitToFindMaximum) \
+$${pargs} \
+--outputRVFile=$(analysesdir)$@ $(optargs)" 2>&1 | tee -a $${out} | tee -a $(logdir)$*.log ; \
+			rm -f $(byproductsdir)$*rv.pdat $(byproductsdir)$*rv.gnu ; \
+			echo "$(pref) Radial Velocity for $*o.$(FITS) created in $(deltat)" ; \
+		fi ; \
+	fi
+
+#########################################################################################
+#
+# Visualization
+#
+#########################################################################################
+
+#########################################################################################
+# gnu plotting support
+#########################################################################################
+
+#########################################################################################
+# make a thumbnail image of a source image
+#########################################################################################
+
+%o.png:
+	@if [ -e $(bindir)operaFITStoPNG ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaFITStoPNG --kind=png --ztrans=h --output=$(visualsdir)$@ $(DATADIR)/$*o.$(FITS)$(inextension) $(optargs)"  ; \
+	else \
+		echo "$(pref)Plot of $* skipped as libpng is not installed. " ; \
+	fi
+
+%o.jpg:
+	@if [ -e $(bindir)operaFITStoPNG ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaFITStoPNG --kind=jpg --ztrans=h --output=$(visualsdir)$@ $(DATADIR)/$*o.$(FITS)$(inextension) $(optargs)" ; \
+	else \
+		echo "$(pref)Plot of $* skipped as libpng is not installed. " ; \
+	fi
+
+#########################################################################################
+# make a thumbnail image of a master calibration image
+#########################################################################################
+
+%m.png:
+	@if [ -e $(bindir)operaFITStoPNG ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaFITStoPNG --kind=png --ztrans=h --output=$(visualsdir)$@ $(calibrationdir)$*.$(FITS)$(extension) $(optargs)"  ; \
+	else \
+		echo "$(pref)Plot of $* skipped as libpng is not installed. " ; \
+	fi
+
+%m.jpg:
+	@if [ -e $(bindir)operaFITStoPNG ] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operaFITStoPNG --kind=jpg --ztrans=h --output=$(visualsdir)$@ $(calibrationdir)$*.$(FITS)$(extension) $(optargs)"  ; \
+	else \
+		echo "$(pref)Plot of $* skipped as libpng is not installed. " ; \
+	fi
+
+#########################################################################################
+# prelude to all plot files
+#########################################################################################
+define prelude
+			echo "################################################################" >$(byproductsdir)$1.gnu ; \
+			echo "# " >>$(byproductsdir)$1.gnu ; \
+			echo "# Plot script generated by opera for $@" >>$(byproductsdir)$1.gnu ; \
+			echo "# by $(versionstr)" >>$(byproductsdir)$1.gnu ; \
+			echo "# " >>$(byproductsdir)$1.gnu ; \
+			echo "################################################################" >>$(byproductsdir)$1.gnu ; \
+			echo "set terminal postscript noenhanced color \"Helvetica\" 14" >>$(byproductsdir)$1.gnu ; \
+			echo "set style line 1 linetype -1 linecolor rgb \"red\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set style line 2 linetype -1 linecolor rgb \"green\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set style line 3 linetype -1 linecolor rgb \"blue\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set style line 4 linetype -1 linecolor rgb \"orange\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set style line 5 linetype -1 linecolor rgb \"magenta\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set palette rgb 33,33,10" >>$(byproductsdir)$1.gnu; \
+			echo "set datafile missing \"nan\"" >>$(byproductsdir)$1.gnu; \
+			echo "set output \"$(visualsdir)$@\"" >>$(byproductsdir)$1.gnu; \
+			echo "set title \"$(NIGHT) $1 $${object} $(comment)\" font \"FreeSans, 18\""  >>$(byproductsdir)$1.gnu; \
+			echo "set xlabel \"$2\"" >>$(byproductsdir)$1.gnu; \
+			echo "set ylabel \"$3\"" >>$(byproductsdir)$1.gnu; \
+			echo "set format x \"%.4f\"" >>$(byproductsdir)$1.gnu; \
+			echo "set format y \"%.4g\"" >>$(byproductsdir)$1.gnu; \
+			if [[ "$(xrange)" != "" ]] ;  then \
+				echo "set xrange [$(xrange)]" >>$(byproductsdir)$1.gnu; \
+			fi ; \
+			if [[ "$(yrange)" != "" ]] ;  then \
+				echo "set yrange [$(yrange)]" >>$(byproductsdir)$1.gnu; \
+			fi ; \
+			echo "set grid" >>$(byproductsdir)$1.gnu; \
+			echo "set key top right" >>$(byproductsdir)$1.gnu; \
+			echo "set key box"  >>$(byproductsdir)$1.gnu
+endef
+
+define imageprelude
+			echo "################################################################" >$(byproductsdir)$1.gnu ; \
+			echo "# " >>$(byproductsdir)$1.gnu ; \
+			echo "# Plot script generated by opera for $1" >>$(byproductsdir)$1.gnu ; \
+			echo "# by $(versionstr)" >>$(byproductsdir)$1.gnu ; \
+			echo "# " >>$(byproductsdir)$1.gnu ; \
+			echo "################################################################" >>$(byproductsdir)$1.gnu ; \
+			echo "set terminal postscript enhanced color  \"Helvetica\" 14" >>$(byproductsdir)$1.gnu ; \
+			echo "set style line 1 linetype -1 linecolor rgb \"red\" linewidth 0.0000001" >>$(byproductsdir)$1.gnu; \
+			echo "set output \"$(visualsdir)$1.eps\"" >>$(byproductsdir)$1.gnu; \
+			echo "set title \"Plot of $1.fits '$${object}' $(comment)\" font \"FreeSans, 18\""  >>$(byproductsdir)$1.gnu; \
+			echo "set palette gray"  >>$(byproductsdir)$1.gnu; \
+			echo "unset xtics"  >>$(byproductsdir)$1.gnu; \
+			echo "unset ytics"  >>$(byproductsdir)$1.gnu; \
+			echo "unset colorbox"  >>$(byproductsdir)$1.gnu; \
+			echo "set size ratio -1"  >>$(byproductsdir)$1.gnu; \
+			echo "set mouse"  >>$(byproductsdir)$1.gnu; \
+			echo "unset key"  >>$(byproductsdir)$1.gnu
+endef
+
+#########################################################################################
+# Absorption Lines
+#########################################################################################
+# Designation	Element	Wavelength (nm)
+# y				O2		898.765
+# Z				O2		822.696
+# A				O2		759.370
+# B				O2		686.719
+# C				Hα		656.281
+# a				O2		627.661
+# D1			Na		589.592
+# D2			Na		588.995
+# D3 or d		He		587.5618
+# e				Hg		546.073
+# E2			Fe		527.039
+# b1			Mg		518.362
+# b2			Mg		517.270
+# b3			Fe		516.891
+# b4			Fe		516.891
+# b4			Mg		516.733
+# c				Fe		495.761
+# F				Hβ		486.134
+# d				Fe		466.814
+# e				Fe		438.355
+# G'			Hγ		434.047
+# G				Fe		430.790
+# G				Ca		430.774
+# h				Hδ		410.175
+# H				Ca+		396.847
+# K				Ca+		393.368
+# L				Fe		382.044
+# N				Fe		358.121
+# P				Ti+		336.112
+# T				Fe		302.108
+# t				Ni		299.444
+#########################################################################################
+
+#########################################################################################
+# SNR plot
+# does a comparison of upena vs opera if the corresp. upena product exists.
+# if centralsnr==1 then we have col1 = order and col2 = SNR
+# adjusted for LE aperture height vs opera aperture height
+# handles both the opera and LE-compatible formats
+#########################################################################################
+%i.sn.eps %ie.sn.eps: directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:' -e 's:spectra:reductions:'` ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			if [[ "$(order)" != "" ]] ; then \
+				$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +12 | awk '/^$(order)/' | awk '{printf("%g %g\n", $$2, $$3);}' >$(spectradir)$${spectrum} ; \
+			else \
+				if [[ $${spectrum} =~ [0-9]*ie.sn ]] ; then \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +12 | awk '{printf("%g %g\n", $$2, $$3);}' >$(spectradir)$${spectrum} ; \
+					upenaspectrum="`basename $${spectrum} e.sn`.sn" ; \
+				else \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +3 | awk '{printf("%g %g\n", $$1, $$2);}' >$(spectradir)$${spectrum} ; \
+					upenaspectrum="`basename $${spectrum}`" ; \
+				fi ; \
+			fi ; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cat <$${upenadir}/$${upenaspectrum} | tail -n +3 >$(tmpdir)$${spectrum} ; \
+			fi ; \
+		fi ; \
+		if [[ "$(centralsnr)" == "1" ]] ; then \
+			$(call prelude,$${spectrum},'Wl(nm)',SNR) ; \
+		else \
+			$(call prelude,$${spectrum},Order,SNR) ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+            echo "set xrange[368:1050]" >>$(byproductsdir)$${spectrum}.gnu ; \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:2 title 'opera SNR' with lines linestyle 3, \"$(tmpdir)/$${spectrum}\" using 1:2 title 'upena SNR' with lines linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+            echo "set xrange[368:1050]" >>$(byproductsdir)$${spectrum}.gnu ; \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:2 title 'opera SNR' with lines linestyle 3" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${spectrum} ; \
+		fi ; \
+		rm -f $(spectradir)$${spectrum} ; \
+	fi
+
+#########################################################################################
+# intensity plot of opera intensity products, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+#
+# Arguments:
+#
+#	-I=1	immediate plot
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf' or 'd0:dn'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+# Note that xrange is in Distance units, not wl in the case of .e.gz
+#
+#########################################################################################
+%.e.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			if [[ "$(order)" != "" ]] ; then \
+				$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '/^$(order)/' | awk '{printf("%g %g %g %g %d\n", $$7, $$8, sqrt($$9), $$10, $$1);}'  >$(spectradir)$${spectrum} ; \
+			else \
+				$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '{printf("%g %g %g %g\n", $$7, $$8, sqrt($$9), $$10);}'  >$(spectradir)$${spectrum} ; \
+			fi ; \
+			upenaspectrum="`basename $${spectrum} .e`.s" ; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cols=`cat <$${upenadir}/$${upenaspectrum} | head -2 | tail -1 | awk '{print $$2}'` ; \
+				object=`cat <$${upenadir}/$${upenaspectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+				if (( cols == 2 )) ; then \
+					cat <$${upenadir}/$${upenaspectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$3);}' >$(tmpdir)$${spectrum} ; \
+				else \
+					cat <$${upenadir}/$${upenaspectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$5);}' >$(tmpdir)$${spectrum} ; \
+				fi ; \
+			fi ; \
+		fi ; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		$(call prelude,$${spectrum},Distance,Flux) ; \
+		echo "set format x \"%.0f\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${spectrum}\" using 1:2:3 title 'upena' with $${linestyle} linestyle 2, \"$(spectradir)$${spectrum}\" using 1:4 title 'xcorr' with dots" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1, \"$(spectradir)$${spectrum}\" using 1:4 title 'xcorr' with dots" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# intensity plot of opera intensity products, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+#
+# Arguments:
+#
+#	-I=1	immediate plot
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf' or 'd0:dn'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	type=normalized | unnormalized | fcal
+#	wl=1(wcal) | 2(tell) | 3(barycentric)
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+# Note that xrange is in Distance units, not wl in the case of .e.gz
+# Calibrated Extended Beam Spectrum (as output from operaExtraction) format is:
+# <number of orders> <newline>
+# <order number> <nElements> <nBeams> <elementindex> <wavelength> <wavelength telluric corrected> <barycentric wavelength correction> <SpectralElements flux> <SpectralElements flux variance>
+# <SpectralElements normalizedFlux> <SpectralElements fcalFlux>
+# <beam> <BeamElements[beam] flux> <BeamElements[beam] flux variance> <newline>
+#
+#########################################################################################
+%.spc.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			if [[ "$${type}" == "normalized" ]] ; then \
+				if [[ "$(order)" != "" ]] ; then \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '/^$(order)/' | awk '{printf("%g %g %g %d\n", $$5, $$10, sqrt($$9), $$1);}'  >$(spectradir)$${spectrum} ; \
+				else \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '{printf("%g %g %g\n", $$5, $$10, sqrt($$9));}'  >$(spectradir)$${spectrum} ; \
+				fi ; \
+			else \
+				if [[ "$${type}" == "fcal" ]] ; then \
+					if [[ "$(order)" != "" ]] ; then \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '/^$(order)/' | awk '{printf("%g %g %g %d\n", $$5, $$11, sqrt($$9), $$1);}'  >$(spectradir)$${spectrum} ; \
+					else \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '{printf("%g %g %g\n", $$5, $$11, sqrt($$9));}'  >$(spectradir)$${spectrum} ; \
+					fi ; \
+				else \
+					if [[ "$(order)" != "" ]] ; then \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '/^$(order)/' | awk '{printf("%g %g %g %d\n", $$5, $$8, sqrt($$9), $$1);}'  >$(spectradir)$${spectrum} ; \
+					else \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +14 | awk '{printf("%g %g %g\n", $$5, $$8, sqrt($$9));}'  >$(spectradir)$${spectrum} ; \
+					fi ; \
+				fi ; \
+			fi ; \
+			upenaspectrum="`basename $${spectrum} .spc`.s" ; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cols=`cat <$${upenadir}/$${upenaspectrum} | head -2 | tail -1 | awk '{print $$2}'` ; \
+				object=`cat <$${upenadir}/$${upenaspectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+				if (( cols == 2 )) ; then \
+					cat <$${upenadir}/$${upenaspectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$3);}' >$(tmpdir)$${spectrum} ; \
+				else \
+					cat <$${upenadir}/$${upenaspectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$5);}' >$(tmpdir)$${spectrum} ; \
+				fi ; \
+			fi ; \
+		fi ; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		$(call prelude,$${spectrum},Distance,Flux) ; \
+		echo "set format x \"%.0f\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${spectrum}\" using 1:2:3 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${spectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# intensity plot of LE-compatible products, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+#
+# Arguments:
+#
+#	-I=1	immediate plot
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf' or 'd0:dn'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	color=1 -- plot fits image with a default color palette
+#	color=22,13,5 -- plot fits image with a color palette as given
+#	geom=... -- overplot geometry
+#	wave=... -- overplot wavelength
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+# Note that xrange is in Distance units, not wl in the case of .e.gz
+#
+#########################################################################################
+%iu.s.eps %iuw.s.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '{printf("%.4f %g %g %g %g %g\n", $$1, $$2, $$3, $$4, $$5, $$6);}' >$(spectradir)$${spectrum} ; \
+			if [ -e $${upenadir}/$${spectrum} ] ; then \
+				cols=`cat <$${upenadir}/$${spectrum} | head -2 | tail -1 | awk '{print $$2}'` ; \
+				object=`cat <$${upenadir}/$${spectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+				if (( cols == 2 )) ; then \
+					cat <$${upenadir}/$${spectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$3);}' >$(tmpdir)$${spectrum} ; \
+				else \
+					cat <$${upenadir}/$${spectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$5);}' >$(tmpdir)$${spectrum} ; \
+				fi ; \
+			fi ; \
+		fi ; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		$(call prelude,$${spectrum},'Wl(nm)',Flux) ; \
+		echo "set xrange[368:1050]" >>$(byproductsdir)$${spectrum}.gnu ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${spectrum}\" using 1:2:3 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${spectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			rm -f $(spectradir)$${spectrum} ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# intensity plot of LE-compatible products, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+#
+# Note that xrange is in Distance units, not wl in the case of .e.gz
+#
+#########################################################################################
+%in.s.eps %inw.s.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '{printf("%.4f %g %g %g %g %g\n", $$1, $$2, $$3, $$4, $$5, $$6);}' >$(spectradir)$${spectrum} ; \
+			if [ -e $${upenadir}/$${spectrum} ] ; then \
+				cols=`cat <$${upenadir}/$${spectrum} | head -2 | tail -1 | awk '{print $$2}'` ; \
+				object=`cat <$${upenadir}/$${spectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+				if (( cols == 2 )) ; then \
+					cat <$${upenadir}/$${spectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$3);}' >$(tmpdir)$${spectrum} ; \
+				else \
+					cat <$${upenadir}/$${spectrum} | tail -n +3  | awk '{printf("%.4f %g %g\n", $$1, $$2, $$5);}' >$(tmpdir)$${spectrum} ; \
+				fi ; \
+			fi ; \
+		fi ; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		$(call prelude,$${spectrum},'Wl(nm)',Flux) ; \
+		echo "set xrange[368:1050]" >>$(byproductsdir)$${spectrum}.gnu ; \
+		echo "set yrange[-2:2]" >>$(byproductsdir)$${spectrum}.gnu ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${spectrum}\" using 1:2:3 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2:3 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${spectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			rm -f $(spectradir)$${spectrum} ; \
+		fi ; \
+	fi
+
+
+#########################################################################################
+# polarimetry plot, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+# multiplots intensity, degree of polarization, N1, N2
+#
+# Arguments:
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+#########################################################################################
+%pu.s.eps %pn.s.eps %puw.s.eps %pnw.s.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		upenaspectrum="$${spectrum}" ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '{printf("%.4f %g %g %g %g %g\n", $$1, $$2, - $$3, $$4, $$5, $$6);}' >$(spectradir)$${spectrum} ; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cat <$${upenadir}/$${upenaspectrum} | tail -n +3 >$(tmpdir)$${upenaspectrum} ; \
+				object=`cat <$${upenadir}/$${upenaspectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+			fi ; \
+		fi ; \
+		$(call prelude,$${spectrum},"","") ; \
+		echo "set tmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set bmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set lmargin 6"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set rmargin 3"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set multiplot layout 4, 1 title \"$(NIGHT) $${spectrum} $${object} $(comment)\""  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset title" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xlabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xtics" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Flux\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:2 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset key" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Polarization\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:3:6 title 'upena' with $${linestyle}  linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N1\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:4 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N2\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xtics nomirror" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xlabel \"Wl(nm)\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:5 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset multiplot"  >>$(byproductsdir)$${spectrum}.gnu; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		if [ -e $(spectradir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${upenaspectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			rm -f $(spectradir)$${spectrum} ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# polarimetry plot, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+# multiplots intensity, degree of polarization, N1, N2
+#
+# Arguments:
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+#########################################################################################
+%.p.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		upenaspectrum="$${spectrum}" ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			if [[ "$(order)" != "" ]] ; then \
+				$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '/^$(order)/' | awk '{printf("%.4f %g %g %g %g %g %d\n", $$5, $$9, - $$11, $$13, $$15, ($$12>1.0?0.0:sqrt($$12)), $$1);}'  >$(spectradir)$${spectrum} ; \
+			else \
+				$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +11 | awk '{printf("%.4f %g %g %g %g %g %d\n", $$5, $$9, - $$11, $$13, $$15, ($$12>1.0?0.0:sqrt($$12)), $$1);}'  >$(spectradir)$${spectrum} ; \
+			fi ; \
+			upenaspectrum="`basename $${upenaspectrum} .p`pu.s" ; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cat <$${upenadir}/$${upenaspectrum} | tail -n +3 >$(tmpdir)$${upenaspectrum} ; \
+				object=`cat <$${upenadir}/$${upenaspectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+			fi ; \
+		fi ; \
+		$(call prelude,$${spectrum},"","") ; \
+		echo "set tmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set bmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set lmargin 6"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set rmargin 3"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set multiplot layout 4, 1 title \"$(NIGHT) $${spectrum} $${object} $(comment)\""  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset title" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xlabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xtics" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Flux\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:2 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset key" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Polarization\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:3:6 title 'upena' with $${linestyle}  linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N1\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:4 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N2\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xtics nomirror" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xlabel \"Wl(nm)\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:5 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset multiplot"  >>$(byproductsdir)$${spectrum}.gnu; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		if [ -e $(spectradir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${upenaspectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# polarimetry plot, usually the script is given as $*.gnu
+# does a comparison of upena vs opera if the corresp. upena product exists.
+# multiplots intensity, degree of polarization, N1, N2
+#
+# Arguments:
+#	linestyle=impulses | dots etc
+#	xrange='wl0:wlf'
+#	yrange='y0:yf'
+#	order=n (only for e.eps, p.eps, pn.eps)
+#	comment="..."
+#	type=normalized | unnormalized | fcal
+#	wl=1(wcal) | 2(tell) | 3(barycentric)
+#	withtelluriclines is defined in Makefile.parameters
+#	withtelluricspectrum is defined in Makefile.parameters
+#
+# Extended Polarimetry format is:
+# <number of orders> <cols> <method> <newline>
+# <order number> <StokesParameter_t> <length> <distance> <wavelength> <tell>> <rvel> <crosscorrelation>
+# Stokes(Q,U,V) flux> <Stokes(Q,U,V) variance>
+# <StokesI flux> <StokesI variance>
+# <SpectralElements normalizedFlux> <SpectralElements fcalFlux>
+# <degree of polarization flux> <degree of polarization variance> <first null polarization> <first null polarization variance> <second null polarization> <second null polarization variance> <newline>
+#########################################################################################
+%.pol.eps : directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		spectrum=$(basename $@ .eps) ; \
+		upenadir=`echo $(spectradir) | sed -e 's:opera:upena:'` ; \
+		linestyle=$(linestyle) ; \
+		upenaspectrum="$${spectrum}" ; \
+		if [ -e $(spectradir)$${spectrum}$(gzip) ] ; then \
+			if [[ "$${type}" == "normalized" ]] ; then \
+				if [[ "$(order)" != "" ]] ; then \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '/^$(order)/' | awk '{printf("%.4f %g %g %g %g %g %d\n",  $$5, $$13, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+				else \
+					$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '{printf("%.4f %g %g %g %g %g %d\n", $$5, $$13, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+				fi ; \
+			else \
+				if [[ "$${type}" == "fcal" ]] ; then \
+					if [[ "$(order)" != "" ]] ; then \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '/^$(order)/' | awk '{printf("%.4f %g %g %g %g %g %d\n",  $$5, $$14, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+					else \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '{printf("%.4f %g %g %g %g %g %d\n", $$5, $$14, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+					fi ; \
+				else \
+					if [[ "$(order)" != "" ]] ; then \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '/^$(order)/' | awk '{printf("%.4f %g %g %g %g %g %d\n",  $$5, $$11, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+					else \
+						$(bindir)catz <$(spectradir)$${spectrum}$(gzip) | tail -n +13 | awk '{printf("%.4f %g %g %g %g %g %d\n", $$5, $$11, - $$15, $$17, $$19, ($$16>1.0?0.0:sqrt($$16)), $$1);}'  >$(spectradir)$${spectrum} ; \
+					fi ; \
+				fi ; \
+			fi ; \
+			if [[ "$${type}" == "normalized" ]] ; then \
+				upenaspectrum="`basename $${upenaspectrum} .pn`pn.s" ; \
+			else \
+				upenaspectrum="`basename $${upenaspectrum} .p`pu.s" ; \
+			fi; \
+			if [ -e $${upenadir}/$${upenaspectrum} ] ; then \
+				cat <$${upenadir}/$${upenaspectrum} | tail -n +3 >$(tmpdir)$${upenaspectrum} ; \
+				object=`cat <$${upenadir}/$${upenaspectrum} | head -1 | awk '{print $$4 $$5 $$6}'` ; \
+			fi ; \
+		fi ; \
+		$(call prelude,$${spectrum},"","") ; \
+		echo "set tmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set bmargin 0"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set lmargin 6"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set rmargin 3"  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set multiplot layout 4, 1 title \"$(NIGHT) $${spectrum} $${object} $(comment)\""  >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset title" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xlabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset xtics" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Flux\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [[ "$(withtelluriclines)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(thorium_argon_atlas_lines) | awk '{printf("%.4f %g\n", $$2/10.0, log($$3))}' >$(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+		fi ; \
+		if [[ "$(withtelluricspectrum)" != "" ]] ; then \
+			$(bindir)catz <$(configdir)$(telluric_reference_spectrum) | awk '{printf("%.4f %g\n", $$2, $$3)}' >$(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:2 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot $(withtelluriclines) $(withtelluricspectrum) \"$(spectradir)$${spectrum}\" using 1:2 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset key" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"Polarization\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:3:6 title 'upena' with $${linestyle}  linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:3:6 title 'opera' with $${linestyle}  linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N1\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:4 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:4 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "set yrange [-0.01:0.01]" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "unset ylabel" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set ylabel \"N2\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xtics nomirror" >>$(byproductsdir)$${spectrum}.gnu; \
+		echo "set xlabel \"Wl(nm)\"" >>$(byproductsdir)$${spectrum}.gnu; \
+		if [ -e $(tmpdir)/$${upenaspectrum} ] ; then \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1, \"$(tmpdir)/$${upenaspectrum}\" using 1:5 title 'upena' with $${linestyle} linestyle 2" >>$(byproductsdir)$${spectrum}.gnu; \
+		else \
+			echo "plot \"$(spectradir)$${spectrum}\" using 1:5 title 'opera' with $${linestyle} linestyle 1" >>$(byproductsdir)$${spectrum}.gnu; \
+		fi ; \
+		echo "unset multiplot"  >>$(byproductsdir)$${spectrum}.gnu; \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		if [ -e $(spectradir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${upenaspectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+			rm -f $(tmpdir)$(basename $(thorium_argon_atlas_lines)) ; \
+			rm -f $(tmpdir)$(basename $(telluric_reference_spectrum)) ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# plot a FITS image in gnuplot - will be used to overplot calibrations
+# press any key to get the flux at the current x,y coordinates
+# Adds arguments:
+#	geom-<geometry filename>
+#	wave=<wavelength flilename>
+#	color=1 or color=<palette>
+#########################################################################################
+%.fits.eps: directoriescreated
+		@fits=$(basename $@ .eps) ; \
+		if [ -e $${fits} ] ; then \
+			NAXIS1=`$(bindir)operagetheader --keyword=NAXIS1 $${fits}` ; \
+			NAXIS2=`$(bindir)operagetheader --keyword=NAXIS2 $${fits}` ; \
+			object=`$(bindir)operagetheader --keyword=OBJECT $${fits}` ; \
+			$(bindir)operaExtractImage $${fits} $(optargs) ; \
+			base=`basename $*` ; \
+			$(call imageprelude,$${base},"","") ; \
+			if [[ "$(color)" != "" ]] ; then \
+				if [[ "$(color)" == "1" ]] ; then \
+					echo "set palette rgbformulae 13,13,10" >>$(byproductsdir)$${base}.gnu; \
+				else \
+					echo "set palette rgbformulae $(color)" >>$(byproductsdir)$${base}.gnu; \
+				fi ; \
+			fi ; \
+			if [[ "$(geom)" != "" ]] ; then \
+				if [[ "$(order)" != "" ]] ; then \
+					$(bindir)operaPlotOut --geom=$(geom) --wave=$(wave) --ordernumber=$(order) --output=$(tmpdir)$${base}.dat $(optargs) ; \
+				else \
+					$(bindir)operaPlotOut --geom=$(geom) --wave=$(wave) --output=$(tmpdir)$${base}.dat $(optargs) ; \
+				fi ; \
+				geout=", \"$(tmpdir)$${base}.dat\" using 2:3:3 title '' with dots" ; \
+			fi ; \
+			echo "message = \"Press <ESC> to quit, middle mouse button click shows flux.\""  >>$(byproductsdir)$${base}.gnu; \
+			echo "set label 9998 message at screen 0.01,0.01 font \"FreeSans, 10\""  >>$(byproductsdir)$${base}.gnu; \
+			echo "set pm3d map; splot '$*.bin' binary array=($${NAXIS1},$${NAXIS2}) format='%uint16' using 1:1:1 with image palette $${geout} "  >>$(byproductsdir)$${base}.gnu; \
+			if [[ "$(I)" != "" ]] ; then \
+				echo "set terminal X11" >>$(byproductsdir)$${base}.gnu; \
+				echo "set output" >>$(byproductsdir)$${base}.gnu; \
+				echo "replot" >$(tmpdir)$${base}.gnu; \
+				echo "pause mouse key, button2" >>$(tmpdir)$${base}.gnu; \
+				echo "unset label 9998" >>$(tmpdir)$${base}.gnu ; \
+				printf "if (MOUSE_X > 0.0 && MOUSE_X < $$NAXIS1 && MOUSE_Y > 0.0 && MOUSE_Y < $$NAXIS2) ; " >>$(tmpdir)$${base}.gnu; \
+				printf "f=system(sprintf(\"$(bindir)operaimagestats --fluxpoint --naxis1=$$NAXIS1 --x=%%d --y=%%d $*.bin $(optargs)\",MOUSE_X,MOUSE_Y)); " >>$(tmpdir)$${base}.gnu; \
+				printf "fl=sprintf(\"Flux at %%d %%d = %%s\",MOUSE_X,MOUSE_Y,f); " >>$(tmpdir)$${base}.gnu; \
+				printf "print fl; " >>$(tmpdir)$${base}.gnu ; \
+				echo "set label 9999 fl at screen 0.01,0.01 font \"FreeSans, 10\" " >>$(tmpdir)$${base}.gnu; \
+				echo "if (MOUSE_KEY != 27) reread"  >>$(tmpdir)$${base}.gnu; \
+				echo "load \"$(tmpdir)$${base}.gnu\""  >>$(byproductsdir)$${base}.gnu; \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${base}.gnu" ; \
+			else \
+				$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${base}.gnu" ; \
+			fi ; \
+			rm -f $(tmpdir)$${base}.gnu ; \
+			rm -f $(tmpdir)$${base}.dat ; \
+			rm -f $*.bin ; \
+		else \
+			echo "$${fits} does not exist."
+		fi
+
+#########################################################################################
+# general plot, usually the script is given as $*.gnu
+#########################################################################################
+%.eps: directoriescreated
+	@if [[ "$(GNU)" != "" ]] ; then \
+		$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(GNU)"  ; \
+	else \
+		if [ -e $(spectradir)$*$(gzip) ] ; then \
+			$(bindir)catz <$(spectradir)$*$(gzip) >$(spectradir)$* ; \
+		fi ; \
+		$(call prelude,$*,'Wl(nm)',Flux) ; \
+		if [[ "$(I)" != "" ]] ; then \
+			echo "set terminal X11" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "set output" >>$(byproductsdir)$${spectrum}.gnu; \
+			echo "replot" >>$(byproductsdir)$${spectrum}.gnu; \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot -persist $(byproductsdir)$${spectrum}.gnu"  ; \
+		else \
+			$(bindir)operatrace $(TRACE) $(errfile) $(MACHINE) "$(bindir)operagnuplot $(byproductsdir)$${spectrum}.gnu"  ; \
+		fi ; \
+		if [ -e $(tmpdir)/$${spectrum} ] ; then \
+			rm -f $(tmpdir)/$${spectrum} ; \
+			rm -f $(spectradir)$${spectrum} ; \
+		fi ; \
+	fi
+
+#########################################################################################
+# CFHT-only - get requested SNR from database
+# call: opera FILE=<odometer>o.fits requestedsnr
+#########################################################################################
+
+requestedsnr:
+	@runid=`$(bindir)/operagetheader --keyword=RUNID $(FILE) | sed -e 's: ::'` ; \
+	$(bindir)/wirph2db "select isnull(t.peak_sn,0.0) from ph2.dbo.prg p, ph2.dbo.ogroup g, ph2.dbo.ob b, ph2.dbo.obseq s, ph2.dbo.target t where p.id=g.prg_id and s.ogr_id=g.id and s.ob_id=b.id and b.tar_id=t.id and g.is_deleted=0 and p.runid='$${runid}' and g.label=1"
+
+#########################################################################################
+#///
+#/// \endcond
+#///
+#########################################################################################
+

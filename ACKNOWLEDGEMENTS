@@ -1,0 +1,75 @@
+
+The OPERA Team would gratefully like to acknowledge contributions to the OPERA pipeline.
+
+- The thorium argon atlas thar_MM201006.dat was adopted from and can be found at 
+http://astronomy.swin.edu.au/~mmurphy/thar/index.html as published in Astrophysics:
+
+"Selection of ThAr lines for wavelength calibration of echelle spectra and implications 
+for variations in the fine-structure constant"
+M. T. Murphy (1), P. Tzanavaris (2,3), J. K. Webb (2), C. Lovis (4) 
+(1) Institute of Astronomy, Cambridge, UK; (
+(2) University of New South Wales, Sydney, Australia; 
+(3) Institute of Astronomy and Astrophysics, National Observatory of Athens, Greece; 
+(4) Observatoire de Geneve, Switzerland)
+(http://arxiv.org/abs/astro-ph/0703623)
+
+Please also see DEPENDENCIES for a list of software libraries used.
+
+- the gzstream library (LGPL)
+	gzstream, C++ iostream classes wrapping the zlib compression library.
+	Copyright (C) 2001  Deepak Bandyopadhyay, Lutz Kettner
+
+- OPERA contains a source distribution of the IAU SOFA library, for time calculations
+	Copyright (C) 2012
+	Standards Of Fundamental Astronomy Board of the International Astronomical Union.
+		By email:  sofa@ukho.gov.uk
+		By post:   IAU SOFA Center
+					HM Nautical Almanac Office
+					UK Hydrographic Office
+					Admiralty Way, Taunton
+					Somerset, TA1 2DN
+					United Kingdom
+
+- Extracts from The HITRAN 2008 molecular spectroscopic database
+	L.S. Rothman a, I.E. Gordon a, A. Barbe b, D.Chris Benner c, P.F. Bernath d, M. Birk e, 
+	V. Boudon f, L.R. Brown g, A. Campargue h, J.-P. Champion f, K. Chance a, L.H. Coudert i, 
+	V. Dana j, V.M. Devi c, S. Fally k,1, J.-M. Flaud i, R.R. Gamache l, A. Goldman m, D. Jacquemart n, 
+	I. Kleiner i, N. Lacome n, W.J. Lafferty o, J.-Y. Mandin j, S.T. Massie p, S.N. Mikhailenko q, C.E. Miller g,
+	N. Moazzen-Ahmadi r, O.V. Naumenko q, A.V. Nikitin q, J. Orphal i, V.I. Perevalov q, A. Perrin i, 
+	A. Predoi-Cross s, C.P. Rinsland t, M. Rotger b,f, M. Sˇimecˇkova ́ a,2, M.A.H. Smith t, K. Sung g, 
+	S.A. Tashkun q, J. Tennyson u, R.A. Toth g, A.C. Vandaele v, J. Vander Auwera k
+	
+	a Harvard-Smithsonian Center for Astrophysics, Atomic and Molecular Physics Division, Cambridge, MA 02138, USA 
+	b Universite ́ de Reims-Champagne-Ardenne, Groupe de Spectrom ́etrie Mole ́culaire et Atmosph ́erique, 51062 Reims, France 
+	c The College of William and Mary, Department of Physics, Williamsburg, VA 23187, USA 
+	d University of York, Department of Chemistry, York, UK 
+	e DLR – Remote Sensing Technology Institute, Wessling, Germany 
+	f CNRS-Universite ́ de Bourgogne, Institut Carnot de Bourgogne, 21078 Dijon, France 
+	g California Institute of Technology, Jet Propulsion Laboratory, Pasadena, CA 91109, USA 
+	h Universite ́ Joseph Fourier/CNRS, Laboratoire de Spectrometrie Physique, 38402 Saint-Martin-d’He`res, France 
+	i CNRS et Universite ́s Paris Est et Paris 7, Laboratoire Inter-Universitaire des Syste`mes Atmospheriques, 94010 Cr ́eteil, France 
+	j UPMC Universite ́ Paris 06, UMR 7092, Laboratoire de Physique Mol ́eculaire et Applications, 75252 Paris, France 
+	k Universite ́ Libre de Bruxelles, Service de Chimie Quantique et Photophysique, C.P. 160/09, B-1050 Brussels, Belgium 
+	l University of Mass Lowell, Department of Environmental Earth & Atmospheric Sciences, Lowell, MA 01854, USA 
+	m University of Denver, Department of Physics, Denver, CO 80208, USA 
+	n UPMC Universite ́ Paris 06, UMR 7075, Laboratoire de Dynamique, Interactions et R ́eactivite ́, 75252 Paris, France 
+	o National Institute of Standards and Technology, Gaithersburg, MD 20899, USA 
+	p National Center for Atmospheric Research, Boulder, CO 80307, USA 
+	q Institute of Atmospheric Optics, Tomsk 634055, Russia 
+	r University of Calgary, Department of Physics and Astronomy, Calgary, AB, Canada T2N 1N4 
+	s University of Lethbridge, Department of Physics and Astronomy, Lethbridge, AB, Canada T1K 3M4 
+	t NASA Langley Research Center, Science Directorate, Hampton, VA 23681, USA 
+	u University College London, Department of Physics and Astronomy, London WC1E 6BT, UK 
+	v Institut d’Ae ́ronomie Spatiale de Belgique, B-1180 Brussels, Belgium
+
+- Heliocentric library
+SKY CALCULATOR PROGRAM 
+John Thorstensen, Dartmouth College.  
+Credits:  
+The julian date and sidereal time routines were 
+originally coded in PL/I by  Steve Maker of Dartmouth College.  
+They were based on routines in the old American Ephemeris.
+Many of the routines were coded from Jean Meeus' "Astronomical
+Formulae for Calculators", published by Willman-Bell.  This is
+an extraordinarily helpful little book!
+

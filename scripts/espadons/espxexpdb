@@ -1,0 +1,195 @@
+#!/bin/bash
+# \
+source /apps/sybase/local/etc/sybase_env.sh ; exec /apps/sybase/local/bin/sybtcl "$0" "$@"
+#!/apps/sybase/local/bin/sybtcl
+# Kanoa Withington CFHT 2003
+#########################################################################################
+# Name                           Owner                          Object_type
+# ------------------------------ ------------------------------ --------------------------------
+# select_xexp_v7                 dbo                            stored procedure
+#
+# Parameter_name  Type            Length      Prec Scale Param_order Mode
+# --------------- --------------- ----------- ---- ----- ----------- --------------------
+# @date_obs_beg   datetime                  8 NULL  NULL           1 in
+# @date_obs_end   datetime                  8 NULL  NULL           2 in
+# @qobserver      varchar                  40 NULL  NULL           3 in
+# @qcoordinator   varchar                  40 NULL  NULL           4 in
+# @xexp_status    varchar                  20 NULL  NULL           5 in
+# @xicseq_status  varchar                  20 NULL  NULL           6 in
+# @xobseq_status  varchar                  20 NULL  NULL           7 in
+# @xogroup_status varchar                  20 NULL  NULL           8 in
+# @xprg_status    varchar                  20 NULL  NULL           9 in
+# @xexp_obstype   varchar                  20 NULL  NULL          10 in
+# @prg_agency     varchar                  20 NULL  NULL          11 in
+# @prg_runid      varchar                  20 NULL  NULL          12 in
+# @xexp_obsid_min int                       4 NULL  NULL          13 in
+# @xexp_obsid_max int                       4 NULL  NULL          14 in
+# @qrunid         varchar                  20 NULL  NULL          15 in
+# @debug          tinyint                   1 NULL  NULL          16 in
+# @fail_test      bit                       1 NULL  NULL          17 in
+#########################################################################################
+# select_xexp_v7:
+#
+# xprg_id 
+# prg_runid
+# instr_name
+# agency_name
+# agency_letter
+# prg_tac_rank
+# prg_usr_id
+# usr_fname
+# usr_lname
+# prg_pty_id
+# ptype_name
+# prg_pgr_id
+# pgrade_name
+# xprg_status
+# xprg_itime_obs
+# xogroup_id
+# ogroup_label
+# xogroup_status
+# xogroup_is_status_locked
+# xogroup_itime_obs
+# ob_id ob_label
+# obtype_name
+# ob_needs_phot_calib
+# ob_needs_acc_point
+# xobseq_obiter
+# xobseq_status
+# obseq_itime_obs
+# xobseq_id
+# target_name
+# target_type
+# xtarget_app_ra
+# xtarget_app_dec
+# xtarget_app_ra_deg
+# xtarget_app_dec_deg
+# ic_id
+# ic_label
+# ic_exptime
+# ic_raster
+# xicseq_status
+# xicseq_itime_obs
+# xicseq_id filter_name
+# binning_value
+# iq_upper_value
+# iq_lower_value
+# iq_name
+# skybg_name
+# airmass_upper_value
+# xexp_archive_path
+# xexp_archive_tape
+# xexp_archive_tarset
+# xexp_instrume
+# xexp_instmode
+# xexp_regmode
+# xexp_obsid
+# xexp_filename
+# xexp_path
+# xexp_status
+# xexp_exptime
+# xexp_date_obs
+# xexp_object
+# xexp_cmmtobs
+# xexp_cmmtseq
+# xexp_date_obs_date
+# xexp_date_obs_time
+# xexp_filter
+# xexp_airmass
+# xexp_binning
+# xexp_obstype
+# xexp_ra
+# xexp_ra_deg
+# xexp_dec
+# xexp_dec_deg
+# xexp_id
+# xexp_raster
+# xexp_eval
+# xexp_obs_comment
+# xexp_coo_comment
+# xexp_is_phot
+# xq_name
+# xexp_nb_val
+# xexp_nb_req
+# xicseq_nb_val
+# xicseq_nb_req
+# xobseq_nb_val
+# xobseq_nb_req
+# xogroup_nb_val
+# xogroup_nb_req
+# xexpe_iq
+# xexpe_iq_center
+# xexpe_iq_r_ratio
+# xexpe_iq_x_ratio
+# xexpe_iq_y_ratio
+# xexpe_skybg
+# xexpe_skybg_name
+# xexpe_eval
+# xexpe_seval
+#
+#########################################################################################
+
+
+	if {[llength $argv] < 1} {
+	   puts "espxexpdb: <odometer> [ <odometer> ] [obs|qc] query an odometer from dbw12 database."
+		puts "If obs | qc is given then just return the observor the queue coordinator comments."
+	   exit
+	}
+	source /cfht/lib/syblib
+	set arg1 "[lindex $argv 0]"
+   if {[regexp {([0-9]+)[oabfxc].fits} $arg1 trash odo ] > 0} {
+		set arg1 $odo
+		set arg2 $arg1
+	}
+	set who ""
+	if { $argc >= 2 } {
+		set arg2 "[lindex $argv 1]"
+    	if {[regexp {([0-9]+)[oabfxc].fits} $arg2 trash odo ] > 0} {
+			set arg2 $odo
+		}
+    	if {"qc" == $arg2 } {
+			set who $arg2
+			set arg2 $arg1
+		}
+    	if {"obs" == $arg2 } {
+			set who $arg2
+			set arg2 $arg1
+		}
+		if { $argc == 3 } {
+			set arg3 "[lindex $argv 2]"
+			set who $arg3
+		}
+	} else {
+		set arg2 $arg1
+	}
+
+	set dbh [sybconnect "dad_adh" "d@d,3ah" pono op]
+	sybuse $dbh op
+	set query  "select _filename as xexp_filename, obs_comment as xexp_obs_comment ,coo_comment as xexp_coo_comment from op.dbo.xexp where _obsid=$arg1"
+	set sybmsg(nullvalue) NULL
+	if {[catch {sybsql $dbh $query} msg]} {puts "$msg";}
+	set columns [sybcols $dbh]
+	set row [sybnext $dbh]
+	while {$sybmsg(nextrow) == "REG_ROW"} {
+		if { $who != "" } {
+			if { $who == "qc" } {
+				set name  [lindex $row [lsearch $columns "xexp_filename"]]
+				set cmmtcoo [lindex $row [lsearch $columns "xexp_coo_comment"]]
+				if { $cmmtcoo != "NULL" && "$cmmtcoo" != "" } {
+					puts "$name: $cmmtcoo"
+				}
+			}
+			if { $who == "obs" } {
+				set name  [lindex $row [lsearch $columns "xexp_filename"]]
+				set cmmtobs [string trim [lindex $row [lsearch $columns "xexp_obs_comment"]]]
+				if { $cmmtobs != "NULL" && "$cmmtobs" != "" } {
+					puts "$name: $cmmtobs"
+				}
+			}
+		} else {
+			puts "$row"
+		}
+		set row [sybnext $dbh]
+	}
+	catch syb_disconnect $dbh
+exit

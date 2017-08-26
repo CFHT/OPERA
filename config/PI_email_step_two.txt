@@ -1,0 +1,48 @@
+To: |EMAIL|
+From: opera@cfht.hawaii.edu
+Subject: OPERA Installation Instructions Part 2
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+Dear Dr. |PI|,
+
+The second step is to install the dependencies on your computer.
+
+We strove to minimize the dependencies. There are only four. You MUST install these in 
+the order shown and the installation MUST complete correctly. If a step fails, stop, 
+and send an email to opera@cfht.hawaii.edu for help.
+
+The dependencies are:
+
+- cfitsio -- (mandatory) read and write FITS images				
+			-- http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
+				Download the Linux version into your home directory and do the simplified steps
+				(ignore all the warnings):
+				cd cfitsio
+				./configure --prefix=/usr/local/
+				make
+				sudo make install
+
+- FFTW3   -- (mandatory)FFT Library
+			-- download from http://www.fftw.org/
+				Download the Linux version into your home directory and do the simplified steps:
+				cd fftw-3.3
+				./configure --prefix=/usr/local/
+				make
+				sudo make install
+
+- lz		-- (mandatory) used to compress intermediate results
+			-- download from http://www.zlib.net/
+				cd zlib-<version>
+				./configure
+				make
+				sudo make install
+			   
+Stop immediately and contact opera@cfht.hawaii.edu if a step fails.
+
+Please send an email to opera@cfht.hawaii.edu when these steps have completed successfully to
+receive the next set of instructions.
+
+
+Regards,
+The OPERA Team
