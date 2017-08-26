@@ -1,0 +1,5 @@
+doc/* linguist-documentation
+DefaultCalibration/* linguist-vendored
+config/* linguist-vendored
+autom4te.cache/* linguist-generated
+m4/* linguist-generated
