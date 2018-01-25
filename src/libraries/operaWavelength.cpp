@@ -298,10 +298,10 @@ void operaWavelength::matchAtlaswithComparisonLines(double acceptableMismatch) {
                     nextfirstline = bestAtlasMatchIndex+1;
                 }
             }
-			if (nDataPoints >= getnAtlasLines()) {
+			if (nDataPoints > getnAtlasLines()) {
 				throw operaException("operaWavelength: ", operaErrorLengthMismatch, __FILE__, __FUNCTION__, __LINE__);	
 			}
-			if (nDataPoints >= getnComparisonLines()) {
+			if (nDataPoints > getnComparisonLines()) {
 				throw operaException("operaWavelength: ", operaErrorLengthMismatch, __FILE__, __FUNCTION__, __LINE__);
 			}
         }
