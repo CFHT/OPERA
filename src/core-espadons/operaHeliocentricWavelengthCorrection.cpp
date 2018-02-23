@@ -274,7 +274,7 @@ double DiurnalVelocity(double latitude_degrees, double longitude_degrees, double
 	double dzero = JDTime-2451545.0; //Time elapsed since Noon UT on Jan 1, 2000
 	
 	double gmst = 18.697374558 + 24.06570982441908*dzero; //Greenwich mean sidereal time
-	double lmst = fmod(gmst - DegToHrs(longitude_degrees), 24.0); //Local mean sidereal time
+	double lmst = fmod(gmst + DegToHrs(longitude_degrees), 24.0); //Local mean sidereal time
 	
 	return vc * cos(latitude_radians) * cos(dec_radians) * sin(ra_radians - HrsToRad(lmst));
 }
